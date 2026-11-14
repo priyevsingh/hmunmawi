@@ -1,0 +1,19 @@
+Hmunmawi
+Copyright 2026 The Hmunmawi authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The name "Hmunmawi" and its icon are not covered by that license (Apache-2.0, section 6): if you publish a changed
+version, please give it a different name and icon.
+
+Third-party material:
+- Resources/LiveWorker/root.mjs embeds Apple Root CA - G3, a public certificate published by Apple
+  (https://www.apple.com/certificateauthority/), used to check that purchase notifications are signed by Apple.
+- Sources/HmunmawiCore/SubscriptionTruth.swift uses the civil-date algorithms published by Howard Hinnant
+  (public domain).
+- Sparkle 2.10.1 (https://sparkle-project.org), embedded for in-app updates, is under the MIT licence; its full
+  licence text ships inside the app at Contents/Frameworks/Sparkle.framework and is in licenses/Sparkle.txt.
+- Resources/Shaders.metal uses the widely shared one-line pseudo-random hash from the shader-programming community.
+
+Trademarks: Apple, App Store, App Store Connect, TestFlight, Mac, macOS and Xcode are trademarks of Apple Inc.,
+registered in the U.S. and other countries and regions. Hmunmawi is not affiliated with or endorsed by Apple Inc.

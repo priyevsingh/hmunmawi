@@ -1,0 +1,14 @@
+{
+  "id": "scriptfeed",
+  "name": "Script feed",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "scriptfeed-addon",
+  "emits": ["*"],
+  "summary": "Runs a read-only script of yours every 10 minutes and turns what it prints into events.",
+  "poll": { "everySeconds": 600 },
+  "permissions": { "mac": ["script.run"] },
+  "settings": [
+    { "key": "script", "label": "Script path (must be executable)", "type": "text", "required": true }
+  ]
+}

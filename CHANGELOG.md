@@ -1,0 +1,68 @@
+# Changelog
+
+All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
+
+## 1.0.0 (build 100)
+
+The first public version. Hmunmawi is a calm Mac app for indie app developers: it reads your numbers, tells you
+what matters each day, and asks before it acts. Free and open source.
+
+**Every day**
+- **Today:** one page with what went well, what to watch and what to do next, written in plain words from your own
+  numbers. Money, reach and health at a glance, your projects (apps and websites) side by side.
+- **Money:** earnings by month up to today (Apple's monthly reports, and the current month from Apple's daily
+  sales so far), where each payment stands (paid, due, overdue), and where every rupee or dollar went.
+- **Costs and profit:** your tools and plans (free ones from a startup program listed, never counted), API credits
+  with their spend read from Anthropic's cost report, OpenAI, xAI, OpenRouter and DeepSeek accounts, plan limits
+  with reset times, and an AI job pause for your own scripts.
+- **Menu bar:** an "H" with a health dot, an optional number (sales, downloads, reviews, things waiting or things to
+  fix) and a panel with today, your connections, the latest moments and anything waiting for your OK. A sale that
+  arrives while the window is closed plays its moment when you come back.
+- **Mac notifications** that stay quiet: grouped per app, bursts combined, quiet hours respected, never for sample
+  numbers, and a problem only if it's still there 7 minutes later (the same one at most every 12 hours).
+
+- **Publish from an agent:** `hm publish` writes your portal and runs your approved upload command (waits for your OK
+  unless you allowed it). A public copy now also drops any list line that names an amount.
+
+**Your sources**
+- Connections for App Store Connect, RevenueCat, PostHog, Sentry, Google Search Console, Bing Webmaster Tools,
+  YouTube, X, Cloudflare and your own scripts. Live purchase updates through a small worker in your own
+  Cloudflare account. A day reported by two sources is counted once.
+- Works for apps on every Apple platform: iPhone, iPad, Apple Watch, Mac, Apple TV and Vision Pro. Releases, TestFlight builds
+  and Submit for Review follow each version's own platform.
+- Keys stay in your Mac's Keychain. Connections run as separate, sandboxed add-ons you approve, never see your keys,
+  and can be disconnected (keys deleted) from Settings → Connections.
+- **Your own numbers:** a small script can add cards to any page (see docs/SCRIPT-FEED.md).
+
+**Doing things for you**
+- **Routines:** reminders, website checks, offer-code expiry warnings, post drafts from your bank, AI briefs about
+  your numbers, outreach follow-ups, your own scripts (with an optional settings file) and your Mac's own scheduled
+  jobs, one or several times a day or every 1–60 minutes, each with a try-out mode first. Everything that changes
+  something waits for your OK.
+- **X, the way the maintainer runs it:** your X numbers through your Safari login (no API, no key), your X at a
+  glance (pinned post, latest article, a post that's taking off, your top replies), drafts at your best
+  hours, reply ideas and a daily unfollow list from Grok Bot or, without it, found by Hmunmawi through your
+  Safari login (replies drafted free by Apple's on-device AI, or your AI key), all checked; you always post, reply and unfollow by hand
+  (docs/X-SETUP.md).
+- **Post drafts that follow X:** weak drafts are skipped, the best goes first, and the ranking follows X's published
+  algorithm (checked weekly, no AI; changes logged and undoable).
+- **Publish:** your numbers as a portal web page in the app's colours, light or dark (earnings by month, apps, the App
+  Store, subscribers, retention, trends, X, Google Search and Bing, YouTube, outreach, attention, startup programs, your account and more), with sections you choose, a "safe to show anyone" switch and an
+  optional upload command for Cloudflare Pages or Netlify.
+- **Share cards** for a week of your numbers, ready to post.
+- **Agents** (Claude Code, Cursor and others) can read what the app shows and stored numbers (`hm data-read`), and
+  ask for actions through `hm` or MCP, under the same approval rules.
+
+**Wall of Apps**
+- Add your app from Settings → About; every entry is checked against the App Store automatically, and the README
+  shows a mosaic of app icons with a full list, both rebuilt by themselves. Once your app is on the wall you can
+  share it on X, and you can browse the community's apps in the app.
+
+**Safety**
+- Self-healing: a Mac job that fails is started once more; a connection that stops answering is restarted; missed
+  runs catch up; fix scripts you pick in Settings (for example, free disk space when it runs low) run by themselves
+  and wait for a new OK if the file changes.
+- Daily backups (a full copy, the settings when they changed, and small daily snapshots), with an encrypted copy in
+  iCloud Drive if you want one; a damaged database is restored automatically.
+- Signed activity log, signed approvals, and nothing personal in the app or its code.
+- Signed with Developer ID and notarized by Apple; in-app updates through Sparkle 2.10.1 (signed feed).

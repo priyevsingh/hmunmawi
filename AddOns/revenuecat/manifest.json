@@ -1,0 +1,19 @@
+{
+  "id": "revenuecat",
+  "name": "RevenueCat",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "revenuecat-addon",
+  "emits": ["section.snapshot"],
+  "summary": "Reads active subscriptions, trials, monthly recurring revenue and 28-day revenue from your RevenueCat project every 3 hours.",
+  "poll": { "everySeconds": 10800 },
+  "permissions": {
+    "hosts": ["api.revenuecat.com"],
+    "secrets": ["apiKey"]
+  },
+  "settings": [
+    { "key": "projectID", "label": "Project ID (RevenueCat → Project settings)", "type": "text", "required": true },
+    { "key": "appName", "label": "App name to show", "type": "text" },
+    { "key": "apiKey", "label": "Secret API key v2 (RevenueCat → API keys → Secret key (v2), read-only metrics)", "type": "secret", "required": true }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "id": "appstoreconnect",
+  "name": "App Store Connect",
+  "version": "0.3.0",
+  "protocol": 1,
+  "executable": "asc-addon",
+  "summary": "Reads your apps' new customer reviews, App Store icons, where each version is on its way to release, and daily downloads and proceeds from Apple's sales reports, every hour.",
+  "poll": {
+    "everySeconds": 3600
+  },
+  "permissions": {
+    "hosts": [
+      "api.appstoreconnect.apple.com",
+      "api.frankfurter.dev"
+    ],
+    "secrets": [
+      "keyID",
+      "issuerID",
+      "privateKey"
+    ],
+    "secretHosts": {
+      "keyID": [
+        "api.appstoreconnect.apple.com"
+      ],
+      "issuerID": [
+        "api.appstoreconnect.apple.com"
+      ],
+      "privateKey": [
+        "api.appstoreconnect.apple.com"
+      ]
+    }
+  },
+  "settings": [
+    {
+      "key": "issuerID",
+      "label": "Issuer ID",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "key": "keyID",
+      "label": "Key ID",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "key": "privateKey",
+      "label": "Private key (.p8 file)",
+      "type": "secret-file",
+      "required": true
+    },
+    {
+      "key": "vendorNumber",
+      "label": "Vendor number (App Store Connect → Payments and Financial Reports, top left)",
+      "type": "text"
+    }
+  ],
+  "emits": ["asc.access", "asc.watch", "ci.build", "expiry.snapshot", "finance.month", "icon.snapshot", "money.portal", "nominations.snapshot", "offercodes.snapshot", "pagetests.snapshot", "perf.snapshot", "release.check", "release.snapshot", "versions.snapshot", "revenue.daily", "review.new", "reviews.snapshot", "suboffers.snapshot", "subscription.events", "subscription.mrr", "testflight.feedback"],
+  "actions": [
+    "asc.fix",
+    "ack"
+  ]
+}

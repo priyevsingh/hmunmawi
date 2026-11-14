@@ -1,0 +1,20 @@
+{
+  "id": "posthog",
+  "name": "PostHog",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "posthog-addon",
+  "emits": ["analytics.daily_users"],
+  "summary": "Reads daily active users from your PostHog project every 3 hours.",
+  "poll": { "everySeconds": 10800 },
+  "permissions": {
+    "hosts": ["us.posthog.com", "eu.posthog.com"],
+    "secrets": ["apiKey"]
+  },
+  "settings": [
+    { "key": "region", "label": "Region: us or eu", "type": "text", "required": true },
+    { "key": "projectID", "label": "Project ID", "type": "text", "required": true },
+    { "key": "appName", "label": "App name to show", "type": "text" },
+    { "key": "apiKey", "label": "Personal API key (query:read)", "type": "secret", "required": true }
+  ]
+}

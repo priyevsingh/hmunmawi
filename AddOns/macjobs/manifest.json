@@ -1,0 +1,15 @@
+{
+  "id": "macjobs",
+  "name": "Mac jobs",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "macjobs-addon",
+  "emits": ["job.failed", "job.finished"],
+  "summary": "Watches your scheduled Mac jobs (launchd), flags any that fail, and can tell you when chosen ones finish.",
+  "poll": { "everySeconds": 300 },
+  "permissions": { "mac": ["launchd.list"] },
+  "settings": [
+    { "key": "prefixes", "label": "Job names start with (comma separated)", "type": "text", "required": true },
+    { "key": "finished", "label": "Tell me when these jobs finish (optional; job names, comma separated, up to 10). Add the rule \"A Mac job finishes\" to be told", "type": "text" }
+  ]
+}

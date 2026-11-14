@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Hmunmawi</string>
+	<key>CFBundleExecutable</key>
+	<string>Hmunmawi</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.priyevsingh.Hmunmawi</string>
+	<key>CFBundleName</key>
+	<string>Hmunmawi</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>100</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Hmunmawi uses Messages to send alerts to your own phone number when your rules say so, Mail to read the list of replies to your outreach if you choose Apple Mail, and Safari only for a tracker page you ask it to read or the Zoho Mail source you switch on.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Hmunmawi adds an event to its own "Hmunmawi" calendar when a routine you switched on "Also put it in my Calendar" has something to tell you. It does not read or change your other calendars.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Hmunmawi adds an event to its own "Hmunmawi" calendar when a routine you switched on "Also put it in my Calendar" has something to tell you.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Hmunmawi looks on the Desktop only when you ask it to find a key file you saved there.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Hmunmawi looks in Documents only when you ask it to find a key file or a script you chose.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Hmunmawi looks in Downloads only when you ask it to find a key file you saved there (for example an App Store Connect .p8 key).</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Licensed under Apache-2.0</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/priyevsingh/hmunmawi/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>ma465JH3qVBsqXhK85mrGVgMSYavYjiQ8OummYnT30Q=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+</dict>
+</plist>

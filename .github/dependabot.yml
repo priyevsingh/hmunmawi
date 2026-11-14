@@ -1,0 +1,15 @@
+# Weekly, grouped dependency updates (one pull request per ecosystem), checked by CI like any other change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+  # Swift packages (Sparkle) are updated by hand: Dependabot's Linux runner can't resolve a macOS-only package, so a
+  # weekly version-update job would only fail. Dependabot alerts and security fixes still cover Sparkle.
+  - package-ecosystem: npm
+    directory: /Tests/Worker
+    schedule: { interval: weekly }
+    groups:
+      worker-tests: { patterns: ["*"] }

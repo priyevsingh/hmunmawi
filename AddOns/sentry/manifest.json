@@ -1,0 +1,20 @@
+{
+  "id": "sentry",
+  "name": "Sentry",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "sentry-addon",
+  "emits": ["crash.daily"],
+  "summary": "Reads how many app sessions ran each day and how many of them crashed, from your Sentry account every 3 hours.",
+  "poll": { "everySeconds": 10800 },
+  "permissions": {
+    "hosts": ["sentry.io", "us.sentry.io", "de.sentry.io"],
+    "secrets": ["authToken"]
+  },
+  "settings": [
+    { "key": "org", "label": "Organization slug (the part after /organizations/ in your Sentry web address, e.g. my-team)", "type": "text", "required": true },
+    { "key": "region", "label": "Data region: leave empty for sentry.io, or type de.sentry.io if your Sentry account is hosted in the EU", "type": "text" },
+    { "key": "apps", "label": "App names (optional): project-slug=App Name, separated by commas, e.g. my-app=My App. Empty uses the Sentry project names", "type": "text" },
+    { "key": "authToken", "label": "Auth token (Sentry → Settings → Auth Tokens → Create New Token, scopes: org:read, project:read)", "type": "secret", "required": true }
+  ]
+}
