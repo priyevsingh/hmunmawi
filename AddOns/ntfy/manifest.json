@@ -1,0 +1,33 @@
+{
+  "id": "ntfy",
+  "name": "ntfy push",
+  "version": "0.2.0",
+  "protocol": 1,
+  "executable": "ntfy-addon",
+  "emits": [],
+  "summary": "Sends alerts to your phone through the free ntfy app. Its check only asks ntfy.sh whether it answers; nothing is sent to your phone.",
+  "actions": [
+    "notify"
+  ],
+  "poll": {
+    "everySeconds": 21600
+  },
+  "permissions": {
+    "hosts": [
+      "ntfy.sh"
+    ]
+  },
+  "settings": [
+    {
+      "key": "topic",
+      "label": "Topic: a long random name only you know, 16+ characters (topics are public: anyone who guesses it reads your alerts)",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "details",
+      "label": "Include details in alerts (figures, names, AI text). Off: titles only, since ntfy.sh keeps messages 12 hours unencrypted",
+      "type": "toggle"
+    }
+  ]
+}

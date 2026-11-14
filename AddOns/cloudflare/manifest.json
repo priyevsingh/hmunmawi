@@ -1,0 +1,20 @@
+{
+  "id": "cloudflare",
+  "name": "Cloudflare",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "cloudflare-addon",
+  "emits": ["login.cloudflare.snapshot", "section.snapshot"],
+  "summary": "Reads how many people visited your website each day over the last 28 days from Cloudflare, every 3 hours.",
+  "poll": { "everySeconds": 10800 },
+  "permissions": {
+    "hosts": ["api.cloudflare.com"],
+    "secrets": ["apiToken"]
+  },
+  "settings": [
+    { "key": "accountID", "label": "Account ID (Cloudflare dashboard → your website → Overview, right column under API → Account ID)", "type": "text", "required": true },
+    { "key": "zoneID", "label": "Zone ID (same place, just above Account ID). Leave empty to use the first website in the account", "type": "text" },
+    { "key": "siteName", "label": "Website name to show (e.g. mysite.com)", "type": "text" },
+    { "key": "apiToken", "label": "API token (My Profile → API Tokens → Create Token, permissions: Zone → Analytics → Read and Zone → Zone → Read)", "type": "secret", "required": true }
+  ]
+}

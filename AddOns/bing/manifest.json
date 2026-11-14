@@ -1,0 +1,18 @@
+{
+  "id": "bing",
+  "name": "Bing Webmaster Tools",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "bing-addon",
+  "emits": ["growth.bing"],
+  "summary": "Reads your site's Bing search clicks and impressions for the last 28 days every 6 hours.",
+  "poll": { "everySeconds": 21600 },
+  "permissions": {
+    "hosts": ["ssl.bing.com"],
+    "secrets": ["apiKey"]
+  },
+  "settings": [
+    { "key": "siteURL", "label": "Site address exactly as Bing Webmaster Tools lists it (for example https://example.com/)", "type": "text", "required": true },
+    { "key": "apiKey", "label": "API key from Bing Webmaster Tools → Settings (gear icon) → API access → API key", "type": "secret", "required": true }
+  ]
+}

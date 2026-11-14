@@ -1,0 +1,18 @@
+{
+  "id": "searchconsole",
+  "name": "Google Search Console",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "searchconsole-addon",
+  "emits": ["growth.search"],
+  "summary": "Reads your Google search clicks, impressions, top searches and top pages for each site every 6 hours.",
+  "poll": { "everySeconds": 21600 },
+  "permissions": {
+    "hosts": ["www.googleapis.com"],
+    "secrets": ["serviceAccount"]
+  },
+  "settings": [
+    { "key": "sites", "label": "Sites, separated by commas, exactly as Search Console lists them (for example sc-domain:example.com, https://www.example.com/)", "type": "text", "required": true },
+    { "key": "serviceAccount", "label": "Service account key (JSON) from Google Cloud → IAM → Service accounts → Keys; add the account's email as a user of each site in Search Console → Settings → Users and permissions", "type": "secret-file", "required": true }
+  ]
+}

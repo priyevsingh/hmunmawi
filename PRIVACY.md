@@ -1,0 +1,76 @@
+# Privacy
+
+Hmunmawi runs on your Mac and works for you alone. It has **no telemetry, no analytics and no account**, and its author never receives any of your data.
+
+## What stays on your Mac
+
+- **Your data:** a SQLite database in `~/Library/Application Support/Hmunmawi/`, with the numbers your connections fetch, your rules, and the activity log.
+- **Your keys:** in the macOS Keychain only.
+- **Settings:** the app's preferences and settings file in the same folder.
+- **Backups:** once a day in `~/Library/Application Support/Hmunmawi/Backups/`: a full copy of the database (the last 7 kept, 2 if it grows past 300 MB), the settings file whenever it changed, and small snapshots (the last 30 days plus the first of each month for a year). If iCloud Drive is on, an **encrypted** copy also goes to *iCloud Drive › Hmunmawi Backups*. The key stays in your Keychain, and a recovery code is shown in Settings → Backups.
+- **Your published portal (only if you press Publish):** one `index.html` with your numbers, written to `~/Library/Application Support/Hmunmawi/Portal/` or the folder you choose in Settings → Publish. Hmunmawi doesn't upload it; if you set and approve your own upload command, that command (your tool, your login) sends it where you chose. With "Safe to show anyone" on, no money amounts, sales list or problem list are in it. Dated copies of the last 8 days stay in the `earlier` folder next to it. Sample numbers are never published.
+
+- **Apple payouts (only if you press "Fill paid months from App Store Connect" or switch on "Keep them filled"):** the amounts Apple sent to your bank are read from App Store Connect's Payments page in your own signed-in Safari (Apple's API doesn't offer them) and kept in `payouts.json`. Read only; nothing is changed in App Store Connect, and the automatic check only runs when an App Store Connect tab is already open.
+
+## What leaves your Mac, and why
+
+Only these, and each one only for the reason given:
+
+| To | When | What is sent |
+|---|---|---|
+| Each service you connect (App Store Connect, PostHog, Sentry, Google Search Console, Bing, YouTube, X, Cloudflare, RevenueCat, ntfy) | On its regular check, once you've connected and approved it | The requests that service needs, with your key for it |
+| The AI provider you choose (optional) | When you ask for AI help, or a feature you turned on writes a summary | The numbers and text that summary is about. Nothing is sent when no provider is set |
+| Messages (iMessage) | When a rule you made says to text you | A short alert (no passwords or key values) |
+| Apple's public App Store lookup (`itunes.apple.com`) | About once a day | Your apps' public App Store IDs, to read release dates and ratings |
+| Currency rates (`frankfurter.app` / `frankfurter.dev`, European Central Bank rates) | Once a day, when money is shown in another currency | Nothing about you; only the currencies asked for |
+| Hacker News, Bluesky and GitHub public search | When you switch on "mentions" for your apps | Your app names or the repository you entered, to find public posts about them |
+| `rdap.org` | When you watch a domain's expiry | The domain name |
+| Each service's own website | When its icon is first shown | A normal request for its icon, like a browser tab; cached afterwards |
+| Your own Cloudflare account | Only if you switch on live sales or instant App Store Connect updates | The small worker(s) that receive Apple's notifications, uploaded to *your* account |
+| Apple's system status page and the Apple Developer news feed | While the app runs (at most every 30 minutes, news every few hours) | Normal page requests; nothing about you |
+| Your own websites, and connectivity checks (`apple.com`, `cloudflare.com/cdn-cgi/trace`) | When you add a website to watch, on its schedule | A normal request to the address you entered, to see it is up |
+| Apple's public App Store search (`itunes.apple.com/search`) | When you use competitor tracking or the outreach coverage watch | The competitor or outlet names you entered |
+| The contact domains you entered for outreach | When the coverage watch runs | A request for `/feed` or `/rss` on that domain, to look for a post about your app |
+| Apple's notification history (`api.storekit.itunes.apple.com`) | Only in "Within minutes" live sales mode | A request signed with the In-App Purchase key you gave it |
+| xAI, DeepSeek, OpenAI and OpenRouter balance or cost pages | Only if you added those keys | The key, to read your balance or spend |
+| GitHub (`github.com`, the update feed) | When Hmunmawi checks for updates (Sparkle) | A normal request for `appcast.xml`, which carries the app's version |
+| Apple's public App Store lookup and GitHub, through your own `gh` login | Only when you press "Add my app to the Wall of Apps" and confirm | Your app's public name, App Store link, icon and developer name, as a pull request to `docs/wall-of-apps.json` |
+| x.com, through your own Safari login | Only if you switch on *Read via your Safari login* (X numbers): every 6 hours | Opens your own X profile in a background Safari tab, reads the counts X's page already loaded (followers, your posts' views, likes, replies, which post is pinned, your articles' titles and who your replies answered), closes the tab. Nothing is clicked, posted or sent; the result stays in `x-file.json` on your Mac |
+| x.com search and your Following page, through your own Safari login | Only for an *X reply ideas* or *X unfollow list* routine set to read via Safari: once a day each | Opens X's search for your topics, or your Following page, in a background Safari tab, reads what the page loaded (posts, or who follows you back), closes the tab. Nothing is clicked or sent. Drafts by Apple's on-device AI stay on your Mac; with your AI key instead, each chosen post's text goes to your AI provider to draft a reply |
+| GitHub (`api.github.com` and `raw.githubusercontent.com`, X's public algorithm code) | Only while a *Post drafts* routine is on: at most once a week, and the file only when X's code changed | A normal request for the latest commit of `xai-org/x-algorithm` and one public file; nothing about you |
+| GitHub (`raw.githubusercontent.com`, the public Wall of Apps list) | Only if you switch on "Show the community's apps" or added your own app (to offer Share on X): about twice a day | A normal request for the public list; nothing about you |
+| Your mail (only if you choose a source under Settings → Connections → Outreach replies) | Every 10 minutes at most | *Apple Mail:* a local read of senders, subjects and dates. *Other mail (IMAP):* a TLS connection to the server you entered with your app password, reading the same. *Zoho Mail (owner extra only, see below):* Zoho's own list page opened in a background Safari tab with the login Safari already has. Message text is never read |
+
+Nothing else is sent anywhere. Add-ons can only reach the hosts listed in their manifest, which you see before approving them.
+
+## Files Hmunmawi reads outside its own folder
+
+Only with your permission, which you give once during setup (or later in Settings → Permissions). The app re-checks status without presenting a system box, and a job that still needs a grant waits instead of asking mid-run.
+
+
+- **Find my key** (only when you press it): your Keychain entries whose name mentions the service, `.env` and `config.toml` files in folders you add with "Also look in a folder…", `~/.config` and your home folder, and `AuthKey_*.p8` files in Downloads, Documents, Desktop and iCloud Drive. It does not look in any project folders unless you add them. Values are never shown, only where they were found. When you pick a file, Hmunmawi stores only that file path and field name in `secret-sources.json` (never the secret) so it can re-import after a rebuild.
+- **Mac jobs:** the list of your own LaunchAgents (`~/Library/LaunchAgents`) and their log files, to show what ran.
+- **Files you point it to:** offer-code CSVs, a JSON file your bot writes, a folder of App Store Connect reports, a usage folder.
+- **Another tool's usage figure:** if you named your bot "Grok" (Automations → Your routines → Set up your bot), Grok Bot's local cache folder under `~/Library/Application Support/Grok Bot/` is read for its weekly usage figure, only to show it.
+- **Safari**, only for the two things you switch on: reading a tracker page you're signed in to (the one address you gave, once), and, as an owner extra, the Zoho Mail source (it opens Zoho's list page in a background tab, at most every 10 minutes, and reads sender, subject and folder; it never opens a message).
+
+- **Owner extras** (off unless you create `owner.json` in the app's data folder): a hub folder, key folder and projects folder to search, an AI pause card, the Zoho Mail reader, a Keychain-prompt alert and a fixed time zone. A new install has none of these.
+- **Mac notifications** stay on your Mac (macOS Notification Center). Review text and buyer details are hidden unless you switch on "Show details" in Settings → Menu bar, and sample data never notifies.
+
+## Removing everything
+
+Quit Hmunmawi and delete the app, these folders, and the preferences file:
+
+- `~/Library/Application Support/Hmunmawi/` (your data, including outreach notes and mail text; routines you remove stay in `routines-deleted.json` for 30 days so you can restore them; `AddOnRun/` holds read-only copies of approved add-ons)
+- `~/Library/Logs/Hmunmawi/` (app logs)
+- `~/Library/Preferences/io.github.priyevsingh.Hmunmawi.plist` (settings, including your sending address and cached AI text)
+- *iCloud Drive › Hmunmawi Backups* (if you used iCloud backups)
+- `~/.local/bin/hm` (the command-line link, if you installed it)
+
+Keys can be removed one by one in Settings → Connections → Disconnect, or in Keychain Access. Items are named `io.github.priyevsingh.Hmunmawi`, including the backup key, the key that signs your approvals and the activity log, and a few small "done once" marks and checkpoints for those checks. Removing the backup key means encrypted iCloud backups can't be opened again.
+
+Hmunmawi doesn't delete data on other services (your App Store Connect, Sentry, PostHog or AI provider accounts); manage those there.
+
+## Removing your data
+
+Everything Hmunmawi keeps is listed above. To remove it all, follow [Remove Hmunmawi](README.md#remove-hmunmawi) in the README.

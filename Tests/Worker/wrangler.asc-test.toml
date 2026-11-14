@@ -1,0 +1,20 @@
+name = "hmunmawi-asc-relay-test"
+main = "../../Resources/LiveWorker/worker.mjs"
+compatibility_date = "2026-10-01"
+
+[[kv_namespaces]]
+binding = "OUTBOX"
+id = "00000000000000000000000000000000"
+
+[durable_objects]
+bindings = [{ name = "ASC_RELAY", class_name = "AscRelayDO" }]
+
+[[migrations]]
+tag = "v1-asc-relay-test"
+new_sqlite_classes = ["AscRelayDO"]
+
+[vars]
+RELAY_KEY = "test-relay-key"
+ASC_WEBHOOK_SECRET = "test-asc-secret"
+ASC_QUEUE_V2 = "1"
+ASC_KV_IMPORT = "1"

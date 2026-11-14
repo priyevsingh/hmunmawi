@@ -1,0 +1,16 @@
+{
+  "id": "x",
+  "name": "X",
+  "version": "0.2.0",
+  "protocol": 1,
+  "executable": "x-addon",
+  "emits": ["growth.x", "growth.x_pulse", "growth.x_glance"],
+  "summary": "Reads your X numbers for free from your Mac's daily X file; no key needed. Followers, and the views and engagement on your posts from the last 24 hours.",
+  "poll": { "everySeconds": 1800 },
+  "permissions": {
+    "mac": ["xfile.read"]
+  },
+  "settings": [
+    { "key": "file", "label": "Your Mac's X file (optional; empty uses the one set in Settings → General → X)", "type": "text" }
+  ]
+}

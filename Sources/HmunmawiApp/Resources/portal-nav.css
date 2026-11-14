@@ -1,0 +1,43 @@
+
+/* Portal top bar + hamburger menu. */
+.pnav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg-alt, var(--bg)) 78%, transparent); -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); border-bottom: 1px solid var(--line); margin: 0; }
+.pnav-in { max-width: 980px; margin: 0 auto; padding: 6px 16px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; }
+.pnav-brand { flex: none; font: 600 17px -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: -0.02em; color: var(--text, var(--fg)); text-decoration: none; }
+.pnav-here { flex: 1; min-width: 0; font: 500 14px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnav-here:not(:empty)::before { content: "·"; margin-right: 8px; opacity: 0.6; }
+.pnav-toggle, .pnav-close { flex: none; margin-left: auto; padding: 10px 8px; background: none; border: 0; cursor: pointer; color: var(--text, var(--fg)); -webkit-tap-highlight-color: transparent; border-radius: 10px; }
+.pnav-toggle:focus-visible, .pnav-close:focus-visible, .pnav-menu a:focus-visible { outline: 2px solid var(--accent, #0071e3); outline-offset: 2px; }
+.pnav-icon { display: flex; flex-direction: column; gap: 5px; width: 22px; }
+.pnav-icon span { display: block; width: 100%; height: 2px; background: currentColor; border-radius: 1px; transition: transform 0.35s cubic-bezier(0.645, 0.045, 0.355, 1), opacity 0.35s ease; }
+.pnav-toggle[aria-expanded="true"] .pnav-icon span:nth-child(1), .pnav-close .pnav-icon span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.pnav-toggle[aria-expanded="true"] .pnav-icon span:nth-child(2), .pnav-close .pnav-icon span:nth-child(2) { opacity: 0; }
+.pnav-toggle[aria-expanded="true"] .pnav-icon span:nth-child(3), .pnav-close .pnav-icon span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.pnav-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: var(--bg-alt, var(--bg)); visibility: hidden; opacity: 0; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
+.pnav-overlay.is-open { visibility: visible; opacity: 1; transition: opacity 0.25s ease; }
+.pnav-overlay-head { flex: none; display: flex; align-items: center; justify-content: space-between; max-width: 980px; width: 100%; margin: 0 auto; box-sizing: border-box; min-height: 44px; padding: 6px 16px; }
+.pnav-menu { flex: 1; overflow-y: auto; max-width: 980px; width: 100%; margin: 0 auto; box-sizing: border-box; padding: 12px 22px 48px; display: grid; grid-template-columns: 1fr; align-content: start; }
+.pnav-menu a { display: flex; align-items: center; gap: 10px; font: 600 21px -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: -0.02em; color: var(--text, var(--fg)); text-decoration: none; padding: 14px 0; border-bottom: 1px solid var(--line); transition: color 0.2s ease; }
+.pnav-menu a:hover { color: var(--accent, #0071e3); }
+.pnav-menu a[aria-current] { color: var(--accent, #0071e3); }
+.pnav-menu a[aria-current]::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pnav-menu a.pnav-page { font-size: 17px; font-weight: 500; color: var(--muted); }
+.pnav-menu a.pnav-page::before { content: "↗"; font-size: 14px; opacity: 0.7; }
+.pnav-menu a.pnav-page[aria-current] { color: var(--accent, #0071e3); }
+html.pnav-lock body { position: fixed; left: 0; right: 0; overflow: hidden; }
+@media (min-width: 760px) { .pnav-in, .pnav-overlay-head { padding: 8px 28px; } .pnav-menu { padding: 16px 28px 56px; grid-template-columns: 1fr 1fr; column-gap: 40px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .pnav-overlay.is-open .pnav-menu a { animation: pnav-in 420ms cubic-bezier(0.22, 0.8, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 22ms); }
+}
+@keyframes pnav-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pnav-icon span, .pnav-overlay { transition: none; } }
+section[id] { scroll-margin-top: 58px; }
+.pnav-here { cursor: pointer; }
+/* Jump to top / bottom (30 Oct 2026): each shows only when it would move you, bottom-right, clear of the notch. */
+.pnav-jump { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 40; display: flex; flex-direction: column; gap: 8px; }
+.pnav-jump button { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); cursor: pointer; color: var(--text, var(--fg)); font: 600 18px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background: color-mix(in srgb, var(--bg-alt, var(--bg)) 82%, transparent); -webkit-backdrop-filter: saturate(180%) blur(14px); backdrop-filter: saturate(180%) blur(14px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); opacity: 0; transform: translateY(6px) scale(0.92); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; -webkit-tap-highlight-color: transparent; }
+.pnav-jump button.is-on { opacity: 1; transform: none; pointer-events: auto; }
+.pnav-jump button:hover { color: var(--accent, #0071e3); }
+.pnav-jump button:focus-visible { outline: 2px solid var(--accent, #0071e3); outline-offset: 2px; }
+html.pnav-lock .pnav-jump { display: none; }
+@media (prefers-reduced-motion: reduce) { .pnav-jump button { transition: none; transform: none; } }
+@media print { .pnav-jump { display: none; } }

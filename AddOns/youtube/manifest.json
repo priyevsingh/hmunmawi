@@ -1,0 +1,18 @@
+{
+  "id": "youtube",
+  "name": "YouTube",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "youtube-addon",
+  "emits": ["growth.youtube"],
+  "summary": "Reads your YouTube channel's subscribers, views and newest videos every 6 hours.",
+  "poll": { "everySeconds": 21600 },
+  "permissions": {
+    "hosts": ["www.googleapis.com"],
+    "secrets": ["apiKey"]
+  },
+  "settings": [
+    { "key": "channelID", "label": "Channel ID (starts with UC) from youtube.com/account_advanced", "type": "text", "required": true },
+    { "key": "apiKey", "label": "API key from Google Cloud Console → APIs & Services → Credentials → Create credentials → API key (turn on \"YouTube Data API v3\" in the Library first)", "type": "secret", "required": true }
+  ]
+}

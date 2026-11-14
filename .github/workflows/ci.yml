@@ -1,0 +1,52 @@
+name: CI
+
+# Every pull request and every push to main: build and test the app on a GitHub-hosted macOS 26 Mac, and test the
+# live-sales Cloudflare worker on Linux. Read-only, no secrets: signing and releases happen on the maintainer's Mac.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (swift build and test)
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - name: Tools
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+
+  worker:
+    name: Live-sales worker (Node tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Tests/Worker
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Webhook test
+        run: node asc_webhook_test.mjs
+      - name: Worker tests
+        run: npm test

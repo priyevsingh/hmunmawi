@@ -1,0 +1,14 @@
+{
+  "id": "imessage",
+  "name": "iMessage",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "imessage-addon",
+  "emits": [],
+  "summary": "Sends alerts to your own number with Messages on this Mac.",
+  "actions": ["notify"],
+  "permissions": { "mac": ["messages.send"] },
+  "settings": [
+    { "key": "to", "label": "Your phone number or Apple Account email", "type": "text", "required": true }
+  ]
+}
