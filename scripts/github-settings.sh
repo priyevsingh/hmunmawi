@@ -39,17 +39,14 @@ upsert_ruleset() {  # name, json
   local id; id=$(gh api "repos/$R/rulesets" -q ".[] | select(.name==\"$1\") | .id" 2>/dev/null | grep -E '^[0-9]+$' | head -1)
   if [ -n "$id" ]; then echo "$2" | api -X PUT "repos/$R/rulesets/$id" --input -; else echo "$2" | api -X POST "repos/$R/rulesets" --input -; fi
 }
-# The Wall of Apps workflow commits its rebuilt mosaic straight to main with GitHub's own token, so GitHub Actions (app
-# 15368) may bypass the pull-request rule; only that workflow has write access, and workflow changes still need a PR.
+# main can never be force-pushed or deleted, by anyone (no bypass). Outside contributors cannot push at all: they fork and open
+# a pull request, which only the maintainer can merge. A "require pull request" rule is NOT used: the Wall of Apps workflow commits
+# its rebuilt mosaic straight to main with GitHub's own token, and GitHub only lets the Actions app bypass rules on organization
+# repositories (a personal repo answers 422 "Actor GitHub Actions integration must be part of the ruleset source or owner organization").
 upsert_ruleset "Protect main" '{"name":"Protect main","target":"branch","enforcement":"active",
- "bypass_actors":[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"},
-                  {"actor_id":15368,"actor_type":"Integration","bypass_mode":"always"}],
+ "bypass_actors":[],
  "conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},
- "rules":[{"type":"deletion"},{"type":"non_fast_forward"},
-  {"type":"pull_request","parameters":{"required_approving_review_count":1,"require_code_owner_review":true,
-    "dismiss_stale_reviews_on_push":true,"require_last_push_approval":true,"required_review_thread_resolution":true}},
-  {"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[
-    {"context":"App (swift build and test)"},{"context":"Live-sales worker (Node tests)"},{"context":"Every commit is signed off"}]}}]}' \
+ "rules":[{"type":"deletion"},{"type":"non_fast_forward"}]}' \
   && ok "ruleset: protect main" || skip "ruleset main" "$(cat /tmp/ghs.err)"
 upsert_ruleset "Protect release tags" '{"name":"Protect release tags","target":"tag","enforcement":"active",
  "bypass_actors":[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"}],
