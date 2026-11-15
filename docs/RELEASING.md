@@ -86,6 +86,6 @@ python3 scripts/wall-of-apps.py --since 2026-11-14   # the previous release's da
 branches deleted, sign-off required on web edits, only GitHub's own Actions with a read-only token, Dependabot alerts
 and security updates, and, for a public repository, approval before outside contributors' workflows run, secret
 scanning with push protection, private vulnerability reporting, CodeQL code scanning, and rulesets that protect
-`main` (pull request, green checks and the code owner's review; no force pushes or deletion) and the `v*` release
-tags. The maintainer can bypass the rulesets to publish releases, and GitHub Actions can bypass the `main` rule so the Wall of Apps workflow can commit its rebuilt mosaic. Run it after creating the repository and again after
+`main` (no force pushes, no deletion, no bypass for anyone) and the `v*` release
+tags (no moving or deleting; only the maintainer can bypass, to publish releases). `main` has no "require a pull request" rule on purpose: the Wall of Apps workflow commits its rebuilt mosaic straight to `main`, and GitHub lets the Actions app bypass rules only on organization repositories. Outside contributors cannot push at all; they fork and open a pull request. Run it after creating the repository and again after
 making it public; it says which settings it applied and which aren't available yet.
