@@ -87,7 +87,7 @@ struct FrontPage: View {
 
     /// The day's headline: what changed since you last looked, then the one thing worth knowing.
     private func headline(facts: OverviewFacts, earned: Double, sales: [StoredEvent], since: Date) -> some View {
-        let when = since.formatted(.relative(presentation: .named))
+        let when = Ago.text(since)
         let span = LastSeen.spanText
         let first: String = {
             if ProjectStore.shared.selected?.kind == .website {

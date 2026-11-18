@@ -163,7 +163,7 @@ struct WorldCard: View {
         KitCard {
             HStack {
                 CardHeader(symbol: "globe.europe.africa.fill", title: "Out in the world", tint: Brand.Category.web,
-                           caption: world.statusChecked.map { "checked \($0.formatted(.relative(presentation: .named)))" } ?? "Apple status, news and mentions")
+                           caption: world.statusChecked.map { "checked \(Ago.text($0))" } ?? "Apple status, news and mentions")
                 Button { Task { await world.refresh(appNames: names, force: true) } } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless).help("Check now")
             }
@@ -197,7 +197,7 @@ struct WorldCard: View {
                     ForEach(world.mentions.prefix(4)) { m in
                         VStack(alignment: .leading, spacing: 1) {
                             if let link = m.link { Link(m.text, destination: link).font(.callout).multilineTextAlignment(.leading) } else { Text(m.text).font(.callout) }
-                            Text([m.source, m.date?.formatted(.relative(presentation: .named))].compactMap { $0 }.joined(separator: " · "))
+                            Text([m.source, m.date.map { Ago.text($0) }].compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }

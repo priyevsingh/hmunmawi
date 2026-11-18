@@ -50,13 +50,8 @@ enum TickerItems {
     /// minute. Formatting against the clock inside a plain `Text` froze the label at whatever it said when the row was first
     /// drawn, so yesterday's sale kept reading "1 minute ago".
     static func age(_ event: StoredEvent, now: Date, locale: Locale = .current) -> String {
-        let f = RelativeDateTimeFormatter()
-        f.locale = locale
-        f.dateTimeStyle = .named
-        f.unitsStyle = .full
-        let at = Date(timeIntervalSince1970: Double(event.occurredAt) / 1000)
         // A clock a few seconds behind the sender must not turn a fresh moment into "in 3 seconds".
-        return f.localizedString(for: min(at, now), relativeTo: now)
+        Ago.text(Date(timeIntervalSince1970: Double(event.occurredAt) / 1000), now: now, clampFuture: true, locale: locale)
     }
 
     @MainActor static func text(_ event: StoredEvent) -> String {

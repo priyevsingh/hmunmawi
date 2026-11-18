@@ -128,7 +128,7 @@ struct CompetitorsCard: View {
         KitCard {
             HStack {
                 CardHeader(symbol: "binoculars.fill", title: "Rivals & prices", tint: Brand.Category.web,
-                           caption: watch.lastRun.map { "checked \($0.formatted(.relative(presentation: .named)))" } ?? "Apple's public App Store data")
+                           caption: watch.lastRun.map { "checked \(Ago.text($0))" } ?? "Apple's public App Store data")
                 Button { Task { await watch.refresh(force: true) } } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help("Check now")
                 Button { adding = true } label: { Label("Add a rival", systemImage: "plus") }.buttonStyle(.pill)
             }

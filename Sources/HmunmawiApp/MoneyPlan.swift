@@ -336,7 +336,7 @@ struct MoneyPlanCard: View {
                 + creditsLeft() + ". Click for details."
         }
         return "\(tools) + Claude API in \(Date.now.formatted(.dateTime.month(.wide))), measured by Anthropic: \(usd(b.total)) used, \(usd(cov)) covered by credits, \(usd(b.paid)) paid"
-            + (Credits.shared.paidRead.map { Date.now.timeIntervalSince($0) > 3600 ? " (read \($0.formatted(.relative(presentation: .named))))" : "" } ?? "") + ". Click for details."
+            + (Credits.shared.paidRead.map { Date.now.timeIntervalSince($0) > 3600 ? " (read \(Ago.text($0)))" : "" } ?? "") + ". Click for details."
     }
 
     /// " · OpenAI $4.10 paid · DeepSeek $3.20 left": each connected account, or why it couldn't be read.
@@ -445,7 +445,7 @@ struct MoneyPlanCard: View {
                 "The big number is what you've paid so far this month, as Anthropic measured it. The month-end range runs from this month's own daily pace to the last 28 days' pace, because API spend comes in bursts (big jobs on a few days, little on most). Each projection keeps each workspace's pace, and the projected days go through the same credit rules (a monthly credit's next period included), so it matches the full-month payday forecast. It's never less than what you've already paid; early in the month it moves more.",
                 "Apple's months are its fiscal months and Anthropic bills by calendar month; they overlap by 25 days or more, close enough for this comparison.",
             ] }
-            m.source = "Anthropic cost report" + (Credits.shared.paidRead.map { " · read " + $0.formatted(.relative(presentation: .named)) } ?? "")
+            m.source = "Anthropic cost report" + (Credits.shared.paidRead.map { " · read " + Ago.text($0) } ?? "")
         } else {
             let usage = AISettings.shared.usage
             let ai = usage.month == AISettings.monthKey() ? usage.usd : 0
@@ -602,7 +602,7 @@ private struct CostsEditor: View {
             }
             if let keyNote { Text(keyNote).font(.caption).foregroundStyle(.secondary) }
             else if Credits.shared.hasAdminKey == true {
-                Label(Credits.shared.paidRead.map { "Key saved · read \($0.formatted(.relative(presentation: .named)))" } ?? "Key saved · first read pending",
+                Label(Credits.shared.paidRead.map { "Key saved · read \(Ago.text($0))" } ?? "Key saved · first read pending",
                       systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
             }
             Toggle("I buy Anthropic API credits myself (card or auto-reload)", isOn: $paysForAPI)

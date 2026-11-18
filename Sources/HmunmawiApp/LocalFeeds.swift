@@ -172,7 +172,7 @@ final class XPlan {
     func origin(fileDate: Date?) -> String {
         switch source {
         case "bot" where !missingInFile:
-            return "Updated by your bot" + (fileDate.map { " · \($0.formatted(.relative(presentation: .named)))" } ?? "")
+            return "Updated by your bot" + (fileDate.map { " · \(Ago.text($0))" } ?? "")
         case "receipt": return "From your receipt · update it when your plan changes"
         default: return "Typed by you · not updated automatically"
         }

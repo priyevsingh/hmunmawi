@@ -54,7 +54,7 @@ struct EventRow: View {
             }
             Spacer(minLength: 8)
             if let at {
-                Text(Date(timeIntervalSince1970: Double(at) / 1000), format: .relative(presentation: .named))
+                Text(Ago.text(millis: at))
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
@@ -376,15 +376,14 @@ struct InboxPage: View {
                     if mail.isEmpty { LogRow(title: "No replies in the last 8 days") }
                     // When the inbox was last read, so an old reply never looks like the latest news.
                     if let seen = model.events.filter({ $0.kind == "mail.seen" || $0.kind == "mail.reply" }).map(\.occurredAt).max() {
-                        Text("Mail checked \(Date(timeIntervalSince1970: Double(seen) / 1000).formatted(.relative(presentation: .named)))")
+                        Text("Mail checked \(Ago.text(millis: seen))")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                     ForEach(Array(mail.prefix(12).enumerated()), id: \.element.id) { i, event in
                         if i > 0 { Divider() }
                         LogRow(title: event.payload[path: "subject"]?.string ?? "No subject",
                                detail: event.app == "Mail" ? "" : event.app ?? "",
-                               trailing: Date(timeIntervalSince1970: Double(event.occurredAt) / 1000)
-                                   .formatted(.relative(presentation: .named)))
+                               trailing: Ago.text(millis: event.occurredAt))
                     }
                 }
                 // Only when your scripts send plan steps that are still open; Next steps above is the app's own advice.

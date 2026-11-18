@@ -233,7 +233,7 @@ struct MenuBarPanel: View {
                                 Text(Self.line(e)).font(.caption).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer()
-                            Text(Date(timeIntervalSince1970: Double(e.occurredAt) / 1000), format: .relative(presentation: .named))
+                            Text(Ago.text(millis: e.occurredAt))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         .contentShape(Rectangle())

@@ -186,7 +186,7 @@ private struct DateTile: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Text(date.formatted(.dateTime.year())).font(.headline)
-                Text(date, format: .relative(presentation: .named)).font(.callout).foregroundStyle(.secondary)
+                Text(Ago.text(date)).font(.callout).foregroundStyle(.secondary)
             }
         }
         .padding(12)

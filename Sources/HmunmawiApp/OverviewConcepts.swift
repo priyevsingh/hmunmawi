@@ -92,7 +92,7 @@ struct PaymentRow: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(Date(timeIntervalSince1970: Double(event.occurredAt) / 1000), format: .relative(presentation: .named))
+            Text(Ago.text(millis: event.occurredAt))
                 .font(.callout).foregroundStyle(.secondary)
         }
         .contentShape(.rect)

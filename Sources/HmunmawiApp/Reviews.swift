@@ -46,7 +46,7 @@ struct ReviewsGlance: View {
                             .foregroundStyle(stars <= 2 ? Brand.bad : stars == 3 ? Brand.caution : Brand.good)
                         Text(e.payload[path: "title"]?.string ?? "").font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
                         Spacer()
-                        Text(Date(timeIntervalSince1970: Double(e.occurredAt) / 1000).formatted(.relative(presentation: .named)))
+                        Text(Ago.text(millis: e.occurredAt))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Text(e.payload[path: "body"]?.string ?? "").font(.callout).foregroundStyle(.secondary)
@@ -206,7 +206,7 @@ struct ReviewsInbox: View {
                 Spacer()
             }
             if let asOf = data.asOf {
-                Text("As of \(asOf.formatted(.relative(presentation: .named)))\(data.more ? " · the newest 50 per app" : ""). A reply you post in App Store Connect drops out on the next check.")
+                Text("As of \(Ago.text(asOf))\(data.more ? " · the newest 50 per app" : ""). A reply you post in App Store Connect drops out on the next check.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             ScrollView {
@@ -222,7 +222,7 @@ struct ReviewsInbox: View {
                                     .foregroundStyle(r.rating <= 2 ? Brand.bad : r.rating == 3 ? Brand.caution : Brand.good)
                                 Text(r.title).font(.callout.weight(.medium))
                                 Spacer()
-                                Text("\(r.app) · \(r.territory) · \(r.created.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
+                                Text("\(r.app) · \(r.territory) · \(Ago.text(r.created))").font(.caption).foregroundStyle(.secondary)
                             }
                             Text(r.body).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                             HStack {

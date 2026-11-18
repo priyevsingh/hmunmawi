@@ -200,7 +200,7 @@ struct UsageCard: View {
                 HStack(spacing: 8) {
                     CardHeader(symbol: "gauge.with.dots.needle.67percent", title: "AI & subscriptions", tint: Brand.Category.users,
                                caption: (hot.isEmpty ? Quips.pick(["Plenty of fuel in every tank.", "All meters chilling below 80%."])
-                                   : "\(hot.count) running hot") + (watch.lastRefresh.map { " · checked \($0.formatted(.relative(presentation: .named)))" } ?? ""))
+                                   : "\(hot.count) running hot") + (watch.lastRefresh.map { " · checked \(Ago.text($0))" } ?? ""))
                     Button { Task { await watch.refresh() } } label: {
                         Image(systemName: "arrow.clockwise").symbolEffect(.rotate, isActive: watch.refreshing)
                     }
@@ -216,9 +216,9 @@ struct UsageCard: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text([r.service, r.detail].compactMap { $0 }.joined(separator: " · "))
                             Text(r.problem ?? ((r.resets.map { $0 < .now } ?? false)
-                                ? "Old reading: it was due to reset \(r.resets!.formatted(.relative(presentation: .named))); waiting for a fresh one from \(r.source)"
-                                : [r.resets.map { "resets \($0.formatted(.relative(presentation: .named)))" },
-                                                "from \(r.source)" + (r.read.map { ", \($0.formatted(.relative(presentation: .named)))" } ?? "")]
+                                ? "Old reading: it was due to reset \(Ago.text(r.resets!)); waiting for a fresh one from \(r.source)"
+                                : [r.resets.map { "resets \(Ago.text($0))" },
+                                                "from \(r.source)" + (r.read.map { ", \(Ago.text($0))" } ?? "")]
                                                .compactMap { $0 }.joined(separator: " · ")))
                                 .font(.caption).foregroundStyle(r.problem == nil && !(r.resets.map { $0 < .now } ?? false) ? Color.secondary : Brand.caution).fixedSize(horizontal: false, vertical: true)
                         }

@@ -227,7 +227,7 @@ struct SearchHealthCard: View {
     }
 
     static func when(_ iso: String) -> String? {
-        SearchHealth.date(iso).map { "checked \($0.formatted(.relative(presentation: .named)))" }
+        SearchHealth.date(iso).map { "checked \(Ago.text($0))" }
     }
 }
 

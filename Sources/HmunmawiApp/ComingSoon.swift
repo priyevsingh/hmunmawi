@@ -95,7 +95,7 @@ struct ComingSoon: View {
             var facts: [String] = []
             if let b = p[path: "build"]?.string {
                 let when = p[path: "build_uploaded"]?.string.flatMap { try? Date($0, strategy: .iso8601) }
-                facts.append("Build \(b)" + (when.map { " · uploaded \($0.formatted(.relative(presentation: .named)))" } ?? ""))
+                facts.append("Build \(b)" + (when.map { " · uploaded \(Ago.text($0))" } ?? ""))
             }
             if let lv = p[path: "live_version"]?.string { facts.append("Live now: \(lv)") }
             return Release(id: app, app: app, version: p[path: "version"]?.string, live: live, stage: stage,

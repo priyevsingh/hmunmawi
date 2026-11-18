@@ -120,7 +120,7 @@ struct OfferCodesPart: View {
                             HStack {
                                 Text(s.code).font(.callout.monospaced())
                                 if let tag = s.campaign { Text(tag).font(.callout) }
-                                Text(s.at.formatted(.relative(presentation: .named))).font(.callout).foregroundStyle(.secondary)
+                                Text(Ago.text(s.at)).font(.callout).foregroundStyle(.secondary)
                                 Spacer()
                                 Button("Undo") { codes.undo(s) }.buttonStyle(.borderless)
                             }

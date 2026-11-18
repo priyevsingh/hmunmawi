@@ -504,7 +504,7 @@ struct AddOnSection: View {
                     // When it last ran, so "Connected" is backed by something you can see.
                     if row.approved, let last = model.audit.first(where: { $0.actor == row.id }) {
                         TimelineView(.periodic(from: .now, by: 30)) { _ in
-                            Text("· checked \(Date(timeIntervalSince1970: Double(last.at) / 1000).formatted(.relative(presentation: .named)))")
+                            Text("· checked \(Ago.text(millis: last.at))")
                         }
                     }
                 }
@@ -721,7 +721,7 @@ private struct LiveSalesSection: View {
                     InfoTip("Also set any address under App → App Information → App Store Server Notifications. Apple keeps the history even if nothing answers there; the app reads it every 5 minutes.")
                 }
                 if let s = history.status { Label(s, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Brand.caution) }
-                else if let t = history.lastCheck { Label("Checked \(t.formatted(.relative(presentation: .named)))", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green) }
+                else if let t = history.lastCheck { Label("Checked \(Ago.text(t))", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green) }
             }
             if mode == "cloudflare" {
                 if let url = live.url {
@@ -774,7 +774,7 @@ private struct LiveSalesSection: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    if let t = live.lastTestAt { Label("Apple's test notification arrived \(t.formatted(.relative(presentation: .named)))", systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
+                    if let t = live.lastTestAt { Label("Apple's test notification arrived \(Ago.text(t))", systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
                     ConfirmButton(title: live.ownWorker ? "Remove from Cloudflare" : "Disconnect", question: live.ownWorker ? "Remove live updates from Cloudflare?" : "Disconnect live updates?", detail: "New purchases stop showing up live until you connect again.") { Task { await live.remove() } }
                 } else {
                     HStack {
@@ -851,7 +851,7 @@ private struct XSourceSection: View {
             }
             PathField(label: "X numbers file (from Grok Bot or a Safari read)", prompt: "Choose the file", text: $feed.path, folders: false)
             if let t = feed.lastRead {
-                Label("File updated \(t.formatted(.relative(presentation: .named)))", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
+                Label("File updated \(Ago.text(t))", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
             } else {
                 HStack(spacing: 6) {
                     Text("Free, no key needed").font(.callout).foregroundStyle(.secondary)

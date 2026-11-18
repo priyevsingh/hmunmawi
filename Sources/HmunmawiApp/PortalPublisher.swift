@@ -144,7 +144,7 @@ enum PortalPublisher {
         sections += extraSections(model)
 
         let feed = MenuBarFacts.feed(model.events, limit: 8).map { e in
-            "\(EventText.describe(e)) · \(Date(timeIntervalSince1970: Double(e.occurredAt) / 1000).formatted(.relative(presentation: .named)))"
+            "\(EventText.describe(e)) · \(Ago.text(millis: e.occurredAt))"
         }
         var latest = S(id: "latest", title: "Latest", lines: feed)
         latest.privateSection = true

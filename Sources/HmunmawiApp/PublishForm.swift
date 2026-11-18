@@ -119,7 +119,7 @@ struct PublishForm: View {
                 if let note { Text(note).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
                 else if model.isDemo { Text("Connect App Store Connect first; sample numbers aren't published.").font(.callout).foregroundStyle(.secondary) }
                 else if let d = PortalPublisher.lastPublished {
-                    Text("Last published \(d.formatted(.relative(presentation: .named))).").font(.callout).foregroundStyle(.secondary)
+                    Text("Last published \(Ago.text(d)).").font(.callout).foregroundStyle(.secondary)
                 }
             }
         }

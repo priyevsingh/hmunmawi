@@ -45,7 +45,7 @@ struct ShieldView: View {
                         }
                         Spacer()
                         let at = report[path: "checked_at"]?.number.map { Date(timeIntervalSince1970: $0 / 1000) }
-                        Text("Checked \(at.map { $0.formatted(.relative(presentation: .named)) } ?? "recently"); next check by \(at.map { $0.addingTimeInterval(6 * 3600).formatted(date: .omitted, time: .shortened) } ?? "the next round"). Changes only when you say so.")
+                        Text("Checked \(at.map { Ago.text($0) } ?? "recently"); next check by \(at.map { $0.addingTimeInterval(6 * 3600).formatted(date: .omitted, time: .shortened) } ?? "the next round"). Changes only when you say so.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }

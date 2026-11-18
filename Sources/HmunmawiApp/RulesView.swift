@@ -79,7 +79,7 @@ private struct RuleRow: View {
         } label: {
             Label {
                 Text(RuleText.sentence(rule))
-                Text(stat.map { "Fired \($0.count)× · last \(Date(timeIntervalSince1970: Double($0.last) / 1000).formatted(.relative(presentation: .named)))" } ?? "Hasn\u{2019}t fired yet")
+                Text(stat.map { "Fired \($0.count)× · last \(Ago.text(millis: $0.last))" } ?? "Hasn\u{2019}t fired yet")
             } icon: { Image(systemName: RuleText.symbol(rule.when)) }
         }
         .contextMenu { Button("Remove Rule", role: .destructive, action: onDelete) }

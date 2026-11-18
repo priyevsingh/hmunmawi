@@ -126,7 +126,7 @@ struct StatusPill: View {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         if seconds < 10 { return "just now" }
         if seconds < 60 { return "\(seconds / 15 * 15 == 0 ? seconds : seconds / 15 * 15) seconds ago" }
-        return date.formatted(.relative(presentation: .named, unitsStyle: .wide))
+        return Ago.text(date, now: now)
     }
 
     var body: some View {
@@ -215,7 +215,7 @@ private struct StatusDetail: View {
                         Text(c.name)
                         Spacer()
                         if let seen = c.lastSeen {
-                            Text(seen, format: .relative(presentation: .named)).font(.callout).foregroundStyle(.secondary)
+                            Text(Ago.text(seen)).font(.callout).foregroundStyle(.secondary)
                         }
                     }
                     .font(.callout)
@@ -260,7 +260,7 @@ private struct StatusDetail: View {
             }
             HStack {
                 Image(systemName: "externaldrive.fill.badge.checkmark").foregroundStyle(.secondary)
-                Text(status.lastBackup.map { "Backed up \($0.formatted(.relative(presentation: .named)))" } ?? "No backup yet")
+                Text(status.lastBackup.map { "Backed up \(Ago.text($0))" } ?? "No backup yet")
                     .font(.callout)
             }
             VStack(alignment: .leading, spacing: 8) {
