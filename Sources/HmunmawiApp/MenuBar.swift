@@ -229,7 +229,7 @@ struct MenuBarPanel: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Image(systemName: icon(e.kind)).foregroundStyle(tint(e)).frame(width: 16)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(e.app ?? "Hmunmawi").font(.callout.weight(.medium)).lineLimit(1)
+                                Text(Self.heading(e)).font(.callout.weight(.medium)).lineLimit(1)
                                 Text(Self.line(e)).font(.caption).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer()
@@ -241,6 +241,17 @@ struct MenuBarPanel: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    /// Who the moment is about. App Store Connect's version updates carry no app of their own (the version line names
+    /// it), so they read "App Store Connect" instead of "Hmunmawi", which made one app's review look like this app's.
+    static func heading(_ e: StoredEvent) -> String {
+        if let app = e.app, !app.isEmpty { return app }
+        switch e.kind {
+        case "asc.webhook": return "App Store Connect"
+        case "ci.build": return "Build"
+        default: return "Hmunmawi"
         }
     }
 

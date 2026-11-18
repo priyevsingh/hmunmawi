@@ -47,9 +47,44 @@ let args = CommandLine.arguments.dropFirst()
 switch args.first {
 case "menubar":
     // ax menubar  — clicks Hmunmawi's own menu bar icon (its status item), opening its panel.
-    guard let bar: AXUIElement = attribute(root, "AXExtrasMenuBar") else { print("no menu bar icon"); exit(1) }
-    guard let item = children(bar).first else { print("no menu bar icon"); exit(1) }
-    print(AXUIElementPerformAction(item, kAXPressAction as CFString) == .success ? "opened" : "press failed")
+    if let bar: AXUIElement = attribute(root, "AXExtrasMenuBar"), let item = children(bar).first {
+        print(AXUIElementPerformAction(item, kAXPressAction as CFString) == .success ? "opened" : "press failed")
+        break
+    }
+    // Newer macOS hosts status items in MenuBarAgent: the app has no AXExtrasMenuBar, and pressing the agent's copy of
+    // the button doesn't reach the app, so it is clicked instead. On a notched screen a full menu bar tucks the icon
+    // behind "Show Hidden Menu Bar Items"; that is opened first.
+    guard let agent = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.MenuBarAgent").first else {
+        print("no menu bar icon"); exit(1)
+    }
+    let agentRoot = AXUIElementCreateApplication(agent.processIdentifier)
+    func find(_ match: (AXUIElement) -> Bool) -> AXUIElement? {
+        var found: AXUIElement?
+        _ = walk(agentRoot) { e, _, _ in if match(e) { found = e; return true }; return false }
+        return found
+    }
+    func frame(_ e: AXUIElement) -> CGRect {
+        var p = CGPoint.zero, s = CGSize.zero
+        if let v: AXValue = attribute(e, kAXPositionAttribute) { AXValueGetValue(v, .cgPoint, &p) }
+        if let v: AXValue = attribute(e, kAXSizeAttribute) { AXValueGetValue(v, .cgSize, &s) }
+        return CGRect(origin: p, size: s)
+    }
+    func icon() -> AXUIElement? { find { (attribute($0, kAXTitleAttribute) as String?)?.hasPrefix(app.localizedName ?? "Hmunmawi") == true } }
+    guard var item = icon() else { print("no menu bar icon (is it switched on in Settings?)"); exit(1) }
+    if let more = find({ (attribute($0, "AXIdentifier") as String?) == "menu-bar-overflow-indicator" }),
+       frame(item).intersects(frame(more)) {
+        AXUIElementPerformAction(more, kAXPressAction as CFString)
+        usleep(800_000)
+        item = icon() ?? item
+        print("the icon was hidden behind Show Hidden Menu Bar Items (menu bar full)")
+    }
+    let r = frame(item), point = CGPoint(x: r.midX, y: r.midY)
+    let source = CGEventSource(stateID: .hidSystemState)
+    for type in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] {
+        CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(80_000)
+    }
+    print("opened")
 case "windows":
     // ax windows  — window number, size and title of each on-screen Hmunmawi window (for screencapture -l).
     let info = (CGWindowListCopyWindowInfo(ProcessInfo.processInfo.environment["HM_AX_ALL"] == nil ? [.optionOnScreenOnly] : [.optionAll], kCGNullWindowID) as? [[String: Any]]) ?? []
