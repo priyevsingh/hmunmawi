@@ -1,5 +1,9 @@
 # Notes for AI coding agents and contributors
 
+## 18 Nov 2026: AI limits and Grok fallback
+
+Owner policy (not part of this app's runtime): API-credit usage limits are not treated as an account-wide pause. Only Team session and weekly AI limits pause the owner's automated jobs; the weekly cap resets Thursday 15:30 IST. During those pauses some scheduled work is deferred or handled by another agent; after reset, finished work is not redone. Search Console and Bing data collection is API-only and is not paused. This app's own routines and local behaviour are unchanged.
+
 Hmunmawi is a calm, local-first Mac app for indie app developers: it reads your numbers, tells you what matters
 and asks before it acts. Users' guide: [README.md](README.md).
 
