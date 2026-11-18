@@ -106,7 +106,7 @@ struct MainView: View {
         .overlay { SaleMoment(event: model.flash) }
         // Startup problems, connections waiting for your OK, or a slow launch step: said plainly at the top.
         // Above the page, never over it (it used to cover the greeting line).
-        .safeAreaInset(edge: .top, spacing: 0) { StartupBanners(model: model) }
+        .safeAreaInset(edge: .top, spacing: 0) { VStack(spacing: 0) { StartupBanners(model: model); HiddenIconHint() } }
         .overlay { ZoomedDetail(presenter: detail).buttonStyle(.pill) }
         .environment(detail)
         .environment(model)
@@ -178,6 +178,7 @@ struct MainView: View {
                 .keyboardShortcut("r", modifiers: .command)   // ⌘R on the same button, no second route
                 .help("Refresh now (⌘R)")
             }
+            ToolbarItem { PanelButton() }
             ToolbarItem {
                 OpenSettingsButton { Label("Settings", systemImage: "gearshape") }
             }

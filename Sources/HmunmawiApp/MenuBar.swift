@@ -60,7 +60,7 @@ enum MenuBarIcon {
         if let cached = cache[key] { return cached }
         let sym = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }?
             .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
-        let size = NSSize(width: 20 + (sym.map { $0.size.width + 4 } ?? 0), height: 16)
+        let size = NSSize(width: width(symbolWidth: sym?.size.width), height: 16)
         let img = NSImage(size: size, flipped: false) { rect in
             if let sym {
                 // Tint the template symbol with the menu bar's label colour at draw time.
@@ -71,17 +71,17 @@ enum MenuBarIcon {
                 }
                 tinted.draw(in: r)
             }
-            let font = NSFont.systemFont(ofSize: 14, weight: .heavy)
+            let font = NSFont.systemFont(ofSize: 13, weight: .heavy)
             let h = NSAttributedString(string: "H", attributes: [.font: font, .foregroundColor: NSColor.labelColor])
             let hs = h.size()
-            h.draw(at: NSPoint(x: 1, y: (rect.height - hs.height) / 2))
+            h.draw(at: NSPoint(x: 0, y: (rect.height - hs.height) / 2))
             let color: NSColor = switch dot {
             case .good: .systemGreen
             case .attention: .systemOrange
             case .broken: .systemRed
             case .idle: .systemGray
             }
-            let d = NSRect(x: 12.5, y: 1, width: 7, height: 7)
+            let d = NSRect(x: baseWidth - 6.5, y: 1, width: 6, height: 6)
             NSColor.windowBackgroundColor.withAlphaComponent(0.9).setFill()
             NSBezierPath(ovalIn: d.insetBy(dx: -1, dy: -1)).fill()
             color.setFill()
@@ -94,6 +94,11 @@ enum MenuBarIcon {
         return img
     }
     @MainActor private static var cache: [String: NSImage] = [:]
+
+    /// The "H" and its dot, in points. Slim on purpose: a full menu bar beside the notch hides the widest-placed icons.
+    static let baseWidth: CGFloat = 16
+    /// The whole image: the "H" plus an optional symbol before the number.
+    static func width(symbolWidth: CGFloat?) -> CGFloat { baseWidth + (symbolWidth.map { $0 + 3 } ?? 0) }
 
     /// Puts the hover text on this app's menu bar button (found in the status bar windows; no private API).
     @MainActor static func setTooltip(_ tip: String) {
@@ -112,13 +117,18 @@ struct MenuBarPanel: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.panelClose) private var panelClose
     @State private var settings = MenuBarSettings.shared
     @State private var checking = false
     @State private var policy = AIPolicyService.shared
 
     private func open(_ page: String) {
-        WindowOpener.open = openWindow
-        dismiss()   // the panel closes once it hands you to a window, instead of floating over it
+        if let panelClose {
+            panelClose()   // the floating copy (shortcut / window button): its openWindow isn't a scene's, keep the saved one
+        } else {
+            WindowOpener.open = openWindow
+            dismiss()   // the panel closes once it hands you to a window, instead of floating over it
+        }
         WindowOpener.show(page: page)
     }
 

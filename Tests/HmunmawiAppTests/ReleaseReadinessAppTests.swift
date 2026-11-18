@@ -119,12 +119,13 @@ import HmunmawiCore
         #expect(cal.component(.hour, from: s.pausedUntil!) == 8)
     }
 
-    @Test func newInstallsShowThingsToFixHiddenAtZero() {
+    /// New installs show the icon alone (narrow, so macOS is less likely to hide it); a chosen number is kept.
+    @Test func newInstallsShowTheIconAloneAndKeepAChosenNumber() {
         let d = UserDefaults(suiteName: "hm-test-defaults-\(UUID().uuidString)")!
         let s = MenuBarSettings(defaults: d)
-        #expect(s.number == .problems && s.hideZero)
-        d.set("none", forKey: "HMMenuBarNumber")
-        #expect(MenuBarSettings(defaults: d).number == .none)
+        #expect(s.number == .none && s.hideZero)
+        d.set("problems", forKey: "HMMenuBarNumber")
+        #expect(MenuBarSettings(defaults: d).number == .problems)
     }
 }
 

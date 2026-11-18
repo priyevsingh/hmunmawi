@@ -2,6 +2,24 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+**Fixes**
+- **Ticker:** a sale's age keeps moving. Yesterday's sale no longer reads "1 minute ago" all day.
+- **Ages everywhere stay current:** "5 minutes ago", "yesterday" and the like now update by themselves every minute in
+  the menu bar panel, Today, Log, Settings, Reviews, Status and the rest of the app, using one shared formatter.
+- **Menu bar panel:** App Store Connect version updates are labelled "App Store Connect" instead of "Hmunmawi", so one
+  app's review status no longer looks like Hmunmawi's own.
+- **UI test helper:** `scripts/uitest/ax.swift menubar` opens the panel on macOS versions where the system hosts
+  menu bar icons, including when the icon is tucked behind the notch.
+
+**Easier to reach the menu bar panel**
+- **Shortcut from anywhere:** ⌃⌥H opens and closes the panel, even when macOS hides the icon behind the notch. Change
+  it or turn it off in Settings → Menu bar. It needs no extra permission.
+- **Panel button** in the window's toolbar, with the shortcut as its hint.
+- **Slimmer icon:** a narrower "H" with its dot. New installs show the icon alone; a number you already chose stays.
+- **A one-time tip** when macOS has hidden the icon: how to open the panel and how to ⌘-drag the icon into view.
+
 ## 1.0.0 (build 100)
 
 The first public version. Hmunmawi is a calm Mac app for indie app developers: it reads your numbers, tells you

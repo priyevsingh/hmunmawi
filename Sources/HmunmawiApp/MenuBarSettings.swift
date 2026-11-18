@@ -41,8 +41,9 @@ final class MenuBarSettings {
     init(defaults: UserDefaults = .standard) {
         d = defaults
         showIcon = (d.object(forKey: "HMMenuBarIcon") as? Bool) ?? true
-        // New installs: things to fix, hidden at 0, so the icon says something useful from day one.
-        number = d.string(forKey: "HMMenuBarNumber").map { Number(rawValue: $0) ?? .none } ?? .problems
+        // New installs: the icon alone (the dot already says whether something needs a look), so it stays narrow and
+        // macOS is less likely to tuck it behind the notch. Anyone who picked a number keeps it.
+        number = d.string(forKey: "HMMenuBarNumber").map { Number(rawValue: $0) ?? .none } ?? .none
         numberSymbol = (d.object(forKey: "HMMenuBarNumberSymbol") as? Bool) ?? true
         hideZero = (d.object(forKey: "HMMenuBarHideZero") as? Bool) ?? true
         showInDock = (d.object(forKey: "HMShowInDock") as? Bool) ?? true

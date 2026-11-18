@@ -10,6 +10,7 @@ struct MenuBarSettingsForm: View {
     var body: some View {
         Form {
             MenuBarBasics()
+            PanelShortcutSection()
             Section {
                 Stepper("Latest moments in the panel: \(s.feedCount)", value: $s.feedCount, in: 3...10)
                 Toggle("Show quick numbers (paying subscribers, X, YouTube, visitors)", isOn: $s.showQuickNumbers)
@@ -117,5 +118,51 @@ struct OwnerExtrasSection: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// The shortcut that opens the panel from anywhere: on/off, change it by typing a new one, or go back to ⌃⌥H.
+struct PanelShortcutSection: View {
+    @State private var shortcut = PanelShortcut.shared
+    @State private var recording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        Section {
+            Toggle("Open the panel from anywhere with a shortcut", isOn: $shortcut.enabled)
+            LabeledContent("Shortcut") {
+                HStack {
+                    Button(recording ? "Type a shortcut… (Esc cancels)" : shortcut.key.display) { recording ? stop() : record() }
+                        .monospaced()
+                    Button("Reset to \(HotKey.standard.display)") { stop(); shortcut.reset() }
+                        .disabled(shortcut.key == .standard && shortcut.enabled)
+                }
+            }
+            .disabled(!shortcut.enabled)
+            if let p = shortcut.problem { Label(p, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Brand.caution) }
+        } header: { Text("Panel shortcut") } footer: {
+            Text("When the menu bar is full, macOS tucks some icons behind the notch. The shortcut, or the panel button in the window's toolbar, opens the same panel either way. Use ⌃, ⌥ or ⌘ with a key. No extra permission is needed.")
+                .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .onDisappear { stop() }
+    }
+
+    private func record() {
+        recording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            if e.keyCode == 53 { stop(); return nil }   // Esc
+            if let k = HotKey.from(keyCode: e.keyCode, flags: e.modifierFlags.intersection(.deviceIndependentFlagsMask),
+                                   characters: e.charactersIgnoringModifiers) {
+                shortcut.key = k
+                stop()
+            }
+            return nil
+        }
+    }
+
+    private func stop() {
+        recording = false
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
     }
 }

@@ -274,6 +274,10 @@ struct OpenSettingsButton<Label: View>: View {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MenuBarSettings.shared.applyDock()
+        if !TestProfile.runningUnitTests {
+            GlobalHotKey.shared.action = { PanelController.shared.toggle() }
+            PanelShortcut.shared.apply()
+        }
     }
 
     /// Clicking the Dock icon with no window open brings the main window back (and the app forward).
