@@ -7,9 +7,9 @@ enum TickerItems {
                                      "revenue.expired", "revenue.billing_issue", "review.new"]
 
     /// The last day's moments, newest first; if the day was quiet, the latest ten from the week.
-    static func recent(_ events: [StoredEvent]) -> [StoredEvent] {
+    static func recent(_ events: [StoredEvent], now: Date = .now) -> [StoredEvent] {
         let moments = events.filter { kinds.contains($0.kind) }.sorted { $0.occurredAt > $1.occurredAt }
-        let dayAgo = Millis(Date.now.timeIntervalSince1970 * 1000) - TodayBuilder.day
+        let dayAgo = Millis(now.timeIntervalSince1970 * 1000) - TodayBuilder.day
         let today = moments.filter { $0.occurredAt > dayAgo }
         return Array((today.count >= 3 ? today : moments).prefix(10))
     }
@@ -46,6 +46,19 @@ enum TickerItems {
         return n.map { Int(safe: $0) }
     }
 
+    /// "21 hours ago": the moment's age measured from `now`, which the ticker passes in from a timeline that ticks every
+    /// minute. Formatting against the clock inside a plain `Text` froze the label at whatever it said when the row was first
+    /// drawn, so yesterday's sale kept reading "1 minute ago".
+    static func age(_ event: StoredEvent, now: Date, locale: Locale = .current) -> String {
+        let f = RelativeDateTimeFormatter()
+        f.locale = locale
+        f.dateTimeStyle = .named
+        f.unitsStyle = .full
+        let at = Date(timeIntervalSince1970: Double(event.occurredAt) / 1000)
+        // A clock a few seconds behind the sender must not turn a fresh moment into "in 3 seconds".
+        return f.localizedString(for: min(at, now), relativeTo: now)
+    }
+
     @MainActor static func text(_ event: StoredEvent) -> String {
         let detail = Money.shared.purchaseLine(event)
         return detail.isEmpty ? EventText.describe(event) : "\(EventText.describe(event)) · \(detail)"
@@ -61,7 +74,12 @@ struct Ticker: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let items = TickerItems.recent(events)
+        // Redrawn every minute so the age keeps moving even when no new event arrives.
+        TimelineView(.everyMinute) { context in row(now: context.date) }
+    }
+
+    @ViewBuilder private func row(now: Date) -> some View {
+        let items = TickerItems.recent(events, now: now)
         if !items.isEmpty {
             let event = items[index % items.count]
             let (badge, tint) = TickerItems.symbol(event.kind)
@@ -70,7 +88,7 @@ struct Ticker: View {
                     AppIcon(app: event.app, size: 26, badge: badge, badgeTint: tint)
                     if let flag = TickerItems.flag(event) { Text(flag).font(.title3) }
                     Text(TickerItems.text(event)).font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-                    Text(Date(timeIntervalSince1970: Double(event.occurredAt) / 1000), format: .relative(presentation: .named))
+                    Text(TickerItems.age(event, now: now))
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
                 }
