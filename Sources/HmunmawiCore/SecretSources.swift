@@ -72,25 +72,74 @@ public struct SecretSourceCatalog: Sendable {
     }
 }
 
+/// Reads each file at most once during one rebind pass and remembers which ones macOS refused (a protected folder
+/// such as Documents, Desktop, Downloads, iCloud or a removable volume). A second key from the same file costs no
+/// second read, so macOS asks at most once per folder per pass. `read` is replaceable so tests can stand in a slow
+/// or refused file.
+public final class SecretReadPass: @unchecked Sendable {
+    private let lock = NSLock()
+    private var texts: [String: String?] = [:]
+    private var refused = Set<String>()
+    private let read: @Sendable (String) -> (text: String?, refused: Bool)
+
+    public init(read: @escaping @Sendable (String) -> (text: String?, refused: Bool) = SecretReadPass.readFile) {
+        self.read = read
+    }
+
+    public static let readFile: @Sendable (String) -> (text: String?, refused: Bool) = { path in
+        do {
+            return (try String(contentsOfFile: path, encoding: .utf8), false)
+        } catch let e as NSError {
+            let underlying = (e.userInfo[NSUnderlyingErrorKey] as? NSError)?.code
+            let denied = (e.domain == NSCocoaErrorDomain && e.code == NSFileReadNoPermissionError)
+                || (e.domain == NSPOSIXErrorDomain && (e.code == Int(EPERM) || e.code == Int(EACCES)))
+                || underlying == Int(EPERM) || underlying == Int(EACCES)
+            return (nil, denied)
+        }
+    }
+
+    public func text(_ path: String) -> String? {
+        lock.lock()
+        if let hit = texts[path] { lock.unlock(); return hit }
+        lock.unlock()
+        let r = read(path)   // never under the lock: a read can wait on a macOS prompt
+        lock.lock()
+        defer { lock.unlock() }
+        if let hit = texts[path] { return hit }
+        texts[path] = .some(r.text)
+        if r.refused { refused.insert(path) }
+        return r.text
+    }
+
+    /// Paths macOS refused to read during this pass.
+    public var refusedPaths: Set<String> { lock.lock(); defer { lock.unlock() }; return refused }
+    public func wasRefused(_ path: String) -> Bool { lock.lock(); defer { lock.unlock() }; return refused.contains(path) }
+}
+
 /// Reads secrets from local files the app is already allowed to read (no network).
 public enum SecretFileReader {
-    public static func value(ref: SecretSourceRef) -> String? {
+    public static func value(ref: SecretSourceRef, pass: SecretReadPass? = nil) -> String? {
         let path = NSString(string: ref.path).expandingTildeInPath
+        let load: (String) -> String? = { p in pass?.text(p) ?? (pass == nil ? try? String(contentsOfFile: p, encoding: .utf8) : nil) }
         switch ref.kind {
         case .envLine:
-            return envValue(path: path, key: ref.field)
+            return load(path).flatMap { envValue(text: $0, key: ref.field) }
         case .tomlKey:
-            return tomlValue(path: path, key: ref.field)
+            return load(path).flatMap { tomlValue(text: $0, key: ref.field) }
         case .wholeFile:
-            return wholeFile(path: path)
+            return load(path)
         case .tomlPathFile:
-            guard let inner = tomlValue(path: path, key: ref.field) else { return nil }
-            return wholeFile(path: inner)
+            guard let inner = load(path).flatMap({ tomlValue(text: $0, key: ref.field) }) else { return nil }
+            return load(inner)
         }
     }
 
     public static func envValue(path: String, key: String) -> String? {
         guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+        return envValue(text: text, key: key)
+    }
+
+    static func envValue(text: String, key: String) -> String? {
         let want = key.uppercased()
         for line in text.split(whereSeparator: \.isNewline) {
             let l = line.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "export ", with: "")
@@ -104,6 +153,10 @@ public enum SecretFileReader {
 
     public static func tomlValue(path: String, key: String) -> String? {
         guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+        return tomlValue(text: text, key: key)
+    }
+
+    static func tomlValue(text: String, key: String) -> String? {
         let pattern = try? NSRegularExpression(pattern: "^\(NSRegularExpression.escapedPattern(for: key))\\s*=\\s*\"([^\"]+)\"", options: [.anchorsMatchLines])
         guard let pattern, let m = pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
               let r = Range(m.range(at: 1), in: text) else { return nil }
@@ -168,11 +221,23 @@ public enum SecretSourceDefaults {
     }
 }
 
+/// What one rebind pass found. `needsAttention` holds `"<add-on>/<key>"` for every key that has a saved file but
+/// could not be imported (macOS refused the file, or it is gone), so the add-on shows as needing attention.
+public struct SecretRebindReport: Sendable, Equatable {
+    public var rebound = 0
+    public var needsAttention: [String] = []
+    public var refusedPaths: [String] = []
+    public init() {}
+    /// Add-on ids with at least one key that needs attention.
+    public var addOnIDs: [String] { Set(needsAttention.compactMap { $0.split(separator: "/").first.map(String.init) }).sorted() }
+}
+
 public enum SecretRebinder {
-  /// Tries to read from the catalog or defaults and write into the Keychain with the current app signature.
-    public static func rebind(store: KeychainSecretStore, catalog: SecretSourceCatalog, plugin: String, name: String) -> Bool {
+    /// Tries to read from the catalog or defaults and write into the Keychain with the current app signature.
+    public static func rebind(store: KeychainSecretStore, catalog: SecretSourceCatalog, plugin: String, name: String,
+                              pass: SecretReadPass? = nil) -> Bool {
         if (try? store.peekSecret(plugin: plugin, name: name))?.isEmpty == false { return true }
-        guard let value = readValue(catalog: catalog, plugin: plugin, name: name), !value.isEmpty else { return false }
+        guard let value = readValue(catalog: catalog, plugin: plugin, name: name, pass: pass), !value.isEmpty else { return false }
         do {
             try store.replaceSecret(value, plugin: plugin, name: name)
             if let ref = catalog.ref(plugin: plugin, name: name) ?? SecretSourceDefaults.ref(plugin: plugin, name: name) {
@@ -184,20 +249,33 @@ public enum SecretRebinder {
         return (try? store.peekSecret(plugin: plugin, name: name))?.isEmpty == false
     }
 
-    public static func rebindAll(store: KeychainSecretStore, catalog: SecretSourceCatalog) -> Int {
-        var ok = 0
+    public static func rebindAll(store: KeychainSecretStore, catalog: SecretSourceCatalog, pass: SecretReadPass? = nil) -> Int {
+        rebindPass(store: store, catalog: catalog, pass: pass ?? SecretReadPass()).rebound
+    }
+
+    /// One pass over every saved key. Each file is read at most once (`pass`), and a key that can't be imported is
+    /// reported instead of retried. Slow or refused reads only ever delay this pass, never the caller's thread
+    /// (the app runs it in the background).
+    public static func rebindPass(store: KeychainSecretStore, catalog: SecretSourceCatalog, pass: SecretReadPass) -> SecretRebindReport {
+        var report = SecretRebindReport()
         var seen = Set<String>()
-        for (plugin, name) in catalog.allPluginNames() {
+        var pairs = catalog.allPluginNames()
+        pairs += Self.builtInConnectionSecrets()
+        for (plugin, name) in pairs {
             let k = "\(plugin)/\(name)"
-            guard seen.insert(k).inserted, rebind(store: store, catalog: catalog, plugin: plugin, name: name) else { continue }
-            ok += 1
+            guard seen.insert(k).inserted else { continue }
+            if rebind(store: store, catalog: catalog, plugin: plugin, name: name, pass: pass) {
+                report.rebound += 1
+            } else if hasSavedSource(catalog: catalog, plugin: plugin, name: name) {
+                report.needsAttention.append(k)
+            }
         }
-        for pair in Self.builtInConnectionSecrets() {
-            let k = "\(pair.0)/\(pair.1)"
-            guard seen.insert(k).inserted, rebind(store: store, catalog: catalog, plugin: pair.0, name: pair.1) else { continue }
-            ok += 1
-        }
-        return ok
+        report.refusedPaths = pass.refusedPaths.sorted()
+        return report
+    }
+
+    private static func hasSavedSource(catalog: SecretSourceCatalog, plugin: String, name: String) -> Bool {
+        catalog.ref(plugin: plugin, name: name) != nil || SecretSourceDefaults.ref(plugin: plugin, name: name) != nil
     }
 
     /// Every built-in connection key as `"<add-on>/<field>"` (used by the legacy migration too).
@@ -212,9 +290,9 @@ public enum SecretRebinder {
         ]
     }
 
-    private static func readValue(catalog: SecretSourceCatalog, plugin: String, name: String) -> String? {
-        if let r = catalog.ref(plugin: plugin, name: name), let v = SecretFileReader.value(ref: r), !v.isEmpty { return v }
-        if let r = SecretSourceDefaults.ref(plugin: plugin, name: name), let v = SecretFileReader.value(ref: r), !v.isEmpty { return v }
+    private static func readValue(catalog: SecretSourceCatalog, plugin: String, name: String, pass: SecretReadPass?) -> String? {
+        if let r = catalog.ref(plugin: plugin, name: name), let v = SecretFileReader.value(ref: r, pass: pass), !v.isEmpty { return v }
+        if let r = SecretSourceDefaults.ref(plugin: plugin, name: name), let v = SecretFileReader.value(ref: r, pass: pass), !v.isEmpty { return v }
         return nil
     }
 }

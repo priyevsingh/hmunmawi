@@ -274,7 +274,8 @@ final class AppModel {
             }
             // Keys saved by an older Hmunmawi (older Keychain name) come across first, then file-backed ones.
             LegacySecretMigrator.migrateKeychain(into: secrets)
-            _ = SecretRebinder.rebindAll(store: secrets, catalog: secretCatalog)
+            // File-backed ones are imported in the background once the window is up (see `startSecretRebind`): a key
+            // file in a protected folder can make macOS show a permission prompt, and that must never freeze launch.
             // Trust settings are signed with a key only Hmunmawi keeps (Keychain): agent permissions and add-on
             // approvals changed outside the app don't count. Today's are trusted once, when this is first on.
             let trust = Self.trustKey(secrets)
@@ -393,6 +394,7 @@ final class AppModel {
                 })
             }
             await refreshAddOns()
+            startSecretRebind()
             startLivePurchases()
             ProjectStore.shared.onChange = { [weak self] in Task { await self?.refresh() } }
             Self.stage("before first refresh")
@@ -734,6 +736,49 @@ final class AppModel {
         Task { await engine?.setRules(config.rules) }
     }
 
+    /// Connections whose saved key file couldn't be imported (macOS refused it, or it is gone), by add-on id.
+    private(set) var secretsNeedingAttention: [String] = []
+    private var secretRebindDone = false
+
+    /// Imports keys from their saved files into the Keychain off the main thread. A slow or refused read only delays
+    /// this task; after `Self.secretRebindPatience` the affected connections are flagged as needing attention, and when
+    /// the pass ends the add-ons check in at once with what was imported.
+    func startSecretRebind(reader: SecretReadPass = SecretReadPass(), patience: Duration = secretRebindPatience) {
+        secretRebindDone = false
+        let store = secrets, catalog = secretCatalog
+        Task.detached(priority: .utility) { [weak self] in
+            let report = SecretRebinder.rebindPass(store: store, catalog: catalog, pass: reader)
+            await self?.finishSecretRebind(report)
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: patience)
+            guard let self, !self.secretRebindDone else { return }
+            Self.logStartup("secret rebind still waiting (a permission prompt may be open); starting without it")
+            try? await self.liveStore?.appendAudit(actor: "app", action: "secrets.read_slow", subject: "key files",
+                                                   detail: .object(["note": .string("Reading saved key files is taking long, possibly because macOS is asking for permission. Connections that need them are marked until it finishes.")]))
+            await self.refreshAddOns()
+        }
+    }
+
+    static let secretRebindPatience: Duration = .seconds(20)
+
+    private func finishSecretRebind(_ report: SecretRebindReport) async {
+        secretRebindDone = true
+        secretsNeedingAttention = report.addOnIDs
+        if !report.needsAttention.isEmpty {
+            let refused = !report.refusedPaths.isEmpty
+            Self.logStartup("secret rebind: \(report.rebound) imported, \(report.needsAttention.count) need attention\(refused ? " (macOS refused \(report.refusedPaths.count) file(s))" : "")")
+            try? await liveStore?.appendAudit(actor: "app", action: refused ? "secrets.read_denied" : "secrets.read_failed",
+                                              subject: report.addOnIDs.joined(separator: ", "),
+                                              detail: .object(["note": .string(refused
+                                                ? "macOS didn't let Hmunmawi read a saved key file. Allow it under System Settings → Privacy & Security → Files and Folders, or choose the key again in Settings."
+                                                : "A saved key file couldn't be read. Choose the key again in Settings.")]))
+        }
+        await refreshAddOns()
+        if report.rebound > 0 { await engine?.pollEverything() }
+        await refresh()
+    }
+
     func refreshAddOns(_ pass: Int = 0) async {
         guard let host else { return }
         var rows: [AddOnRow] = []
@@ -745,7 +790,8 @@ final class AppModel {
                 let isSecret = setting.type.hasPrefix("secret")
                 let hasValue: Bool
                 if isSecret {
-                    if let s = try? secrets.secret(plugin: id, name: setting.key, catalog: secretCatalog), !s.isEmpty {
+                    // peekSecret never reads a key file: this runs on the main thread, where a protected folder's prompt would freeze the app.
+                    if let s = try? secrets.peekSecret(plugin: id, name: setting.key), !s.isEmpty {
                         hasValue = true
                     } else {
                         hasValue = secrets.secretItemExists(plugin: id, name: setting.key)

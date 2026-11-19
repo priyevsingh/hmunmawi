@@ -2,6 +2,11 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+**Fixes**
+- **Launch never freezes on a permission prompt:** if a saved key file is in a protected folder (Documents, Desktop, Downloads, iCloud or an external drive), macOS may ask permission the first time, for example after an update. Hmunmawi now reads those files in the background after the window and menu bar are up, instead of stopping at launch until you answer. Each file is read once per launch. If macOS refuses a file or it takes long, that connection is marked as needing attention (and noted in the activity log), and connections check in as soon as their keys are in.
+
 ## 1.1.1 (build 111), 19 Nov 2026
 
 **Fixes**
