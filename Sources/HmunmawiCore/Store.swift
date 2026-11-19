@@ -9,6 +9,8 @@ public actor Store {
     static let retryCapMillis: Millis = 3_600_000
     /// Events older than this never send an alert (see ingest).
     static let alertMaxAgeMillis: Millis = 48 * 3_600_000
+    /// Events the app records for its own logic (a routine ran fine): never in the activity log, never a rule trigger.
+    public static let internalKinds: Set<String> = ["routine.ok"]
 
     let db: SQLiteConnection
     let now: @Sendable () -> Millis
@@ -67,6 +69,17 @@ public actor Store {
                 return IngestResult(eventID: nil, duplicate: true, jobIDs: [], dryRunRuleIDs: [])
             }
             let eventID = db.lastInsertID
+            if Self.internalKinds.contains(event.kind) {
+                // Bookkeeping, not news: no activity-log row, and only the latest one per routine is kept.
+                if let routine = event.payload[path: "routine"]?.string {
+                    try db.execute("""
+                        DELETE FROM events WHERE kind = ? AND id < ? AND json_extract(payload, '$.routine') = ?
+                          AND id NOT IN (SELECT event_id FROM jobs WHERE event_id IS NOT NULL)
+                        """, [.text(event.kind), .integer(eventID), .text(routine)])
+                    if db.changes > 0 { eventsEpoch += 1 }
+                }
+                return IngestResult(eventID: eventID, duplicate: false, jobIDs: [], dryRunRuleIDs: [])
+            }
             try audit(actor: event.source, action: "event.received", subject: "event:\(eventID)",
                       detail: .object(["kind": .string(event.kind), "key": .string(event.dedupeKey)]))
 

@@ -503,8 +503,8 @@ final class Routines {
             _ = try? await store.ingest(failed, rules: await model.rulesFor(failed))
         }
         if outcome.ok, !(kind == .script && r.params?["try"] == "1") {
-            // A success is recorded too, so a failure of this routine is cleared by any later successful run.
-            let done = Event(source: "routine", kind: "job.finished", app: r.title,
+            // A success is recorded too (internal only: not shown, not a rule trigger), so a failure of this routine is cleared by any later successful run.
+            let done = Event(source: "routine", kind: "routine.ok", app: r.title,
                              payload: .object(["routine": .string(r.id)]),
                              occurredAt: Millis(Date.now.timeIntervalSince1970 * 1000), dedupeKey: "routine-ok:\(key)")
             _ = try? await store.ingest(done, rules: [])

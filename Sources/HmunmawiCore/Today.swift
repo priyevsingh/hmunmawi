@@ -528,7 +528,7 @@ public struct EventWindow: Sendable {
 }
 
 /// A job's failure is news only while the job is still failing. Two things end it, wherever the failure came from:
-/// a later successful run of the same job (a `job.finished` event with the same routine id or launchd label), or
+/// a later successful run of the same job (a `job.finished` or `routine.ok` event with the same routine id or launchd label), or
 /// launchd's latest reading (taken after the failure) saying the job's last run ended fine. The failure then drops
 /// everywhere it shows (Today's worry, Health), not left red for a day. A failure with no later success, newer than
 /// the reading, or for a job launchd no longer lists, still counts.
@@ -540,10 +540,13 @@ public enum JobFailures {
         return nil
     }
 
-    /// Latest success time per job, from `job.finished` events (any other kind is ignored).
+    /// Events that say a job ran fine: launchd's `job.finished` and a routine's internal `routine.ok`.
+    public static let successKinds: Set<String> = ["job.finished", "routine.ok"]
+
+    /// Latest success time per job, from success events (any other kind is ignored).
     static func lastSuccess(_ events: [StoredEvent]) -> [String: Millis] {
         var out: [String: Millis] = [:]
-        for e in events where e.kind == "job.finished" {
+        for e in events where successKinds.contains(e.kind) {
             if let k = jobKey(e) { out[k] = max(out[k] ?? 0, e.occurredAt) }
         }
         return out

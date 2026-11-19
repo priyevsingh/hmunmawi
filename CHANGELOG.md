@@ -5,7 +5,7 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 ## Unreleased
 
 **Fixes**
-- **Mac jobs tile:** a routine that failed and then ran fine again no longer keeps the tile red. Any later successful run clears the earlier failure.
+- **Mac jobs tile:** a routine that failed and then ran fine again no longer keeps the tile red. Any later successful run clears the earlier failure. The record of a successful run is internal only: it never shows in the activity log, Today, notifications or the menu bar, can't trigger a rule, and only the latest one per routine is kept.
 - **Failure messages:** a failed routine now shows the line that explains the problem (an error, a timeout, a denied permission), not just the last line of its output.
 
 ## 1.1.0 (build 110), 19 Nov 2026

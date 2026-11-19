@@ -153,7 +153,7 @@ struct HealthCheck: View {
     static func checks(_ model: AppModel, permissions: MacPermissionSnapshot? = nil) -> [Check] {
         let crashes = latest(model, "crash.daily")
         let crashing = crashes.filter { ($0.payload[path: "crashed"]?.number ?? 0) > 0 }
-        let failed = stillFailing(latest(model, "job.failed", within: 1), successes: model.events.filter { $0.kind == "job.finished" })
+        let failed = stillFailing(latest(model, "job.failed", within: 1), successes: model.events.filter { JobFailures.successKinds.contains($0.kind) })
         let down = latest(model, "site.down", within: 1)
         let trend = crashTrend(model), worstRate = trend.last?.1
         var out: [Check] = []

@@ -58,7 +58,7 @@ public enum MetricExtractor {
                                             // Counts per day with no row on quiet days: read by SubscriptionTruth, not as daily series.
                                             "subscription.events",
                                             // Which of your chosen Mac jobs finished: a notice, not business activity.
-                                            "job.finished"]
+                                            "job.finished", "routine.ok"]
 
     /// The script feed's history series that are running totals since it started counting (they only ever go up), not
     /// values per day. Trends and records must use their day-to-day changes, or they "climb" every day.
