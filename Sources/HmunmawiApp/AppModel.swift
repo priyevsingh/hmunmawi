@@ -272,6 +272,17 @@ final class AppModel {
                     UserDefaults.standard.set(slot.localDay, forKey: "HMWeeklyDigestSent")
                 }
             }
+            // A different signing identity than last launch (development build -> release build, new certificate):
+            // macOS forgets the privacy grants, so say exactly which to switch on again (Settings -> Permissions).
+            if let now = SigningIdentity.current() {
+                let prev = UserDefaults.standard.string(forKey: "HMSigningIdentity")
+                if let note = SigningIdentity.changeNote(previous: prev, current: now) {
+                    Permissions.shared.identityChangeNote = note
+                    UserDefaults.standard.set(note, forKey: "HMSigningChangeNote")
+                    try? await live.appendAudit(actor: "app", action: "app.signing_changed", subject: now, detail: .object(["note": .string(note)]))
+                }
+                UserDefaults.standard.set(now, forKey: "HMSigningIdentity")
+            }
             // Keys saved by an older Hmunmawi (older Keychain name) come across first, then file-backed ones.
             LegacySecretMigrator.migrateKeychain(into: secrets)
             // File-backed ones are imported in the background once the window is up (see `startSecretRebind`): a key
@@ -771,7 +782,7 @@ final class AppModel {
             try? await liveStore?.appendAudit(actor: "app", action: refused ? "secrets.read_denied" : "secrets.read_failed",
                                               subject: report.addOnIDs.joined(separator: ", "),
                                               detail: .object(["note": .string(refused
-                                                ? "macOS didn't let Hmunmawi read a saved key file. Allow it under System Settings → Privacy & Security → Files and Folders, or choose the key again in Settings."
+                                                ? "macOS didn't let Hmunmawi read a saved key file. Allow it under System Settings → Privacy & Security → Files & Folders (or Full Disk Access) → Hmunmawi, or choose the key again in Settings."
                                                 : "A saved key file couldn't be read. Choose the key again in Settings.")]))
         }
         await refreshAddOns()

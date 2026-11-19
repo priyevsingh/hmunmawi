@@ -24,6 +24,8 @@ final class Permissions {
     var files: State = .notAsked
     var notifications: State = .notAsked
     var fullDiskAccess = false
+    /// Set when this launch is signed differently from the last one: which permissions to switch on again.
+    var identityChangeNote: String? = UserDefaults.standard.string(forKey: "HMSigningChangeNote")
     var accessibilityTrusted = false
     /// Live catalogue used by Settings, setup, health, the menu bar and job pre-flight.
     var snapshot = MacPermissionSnapshot.empty
@@ -356,6 +358,16 @@ struct PermissionsList: View {
                     Spacer(minLength: 8)
                     Button("Check again") { Task { await permissions.refresh() } }.buttonStyle(.pill)
                 }
+            }
+            if let note = permissions.identityChangeNote {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(note).font(.callout).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                    Button("Got it") {
+                        permissions.identityChangeNote = nil
+                        UserDefaults.standard.removeObject(forKey: "HMSigningChangeNote")
+                    }.buttonStyle(.pill)
+                }
+                .padding(10).background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             }
             ForEach(visibleItems) { item in
                 row(item)

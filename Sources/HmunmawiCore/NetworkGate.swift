@@ -52,7 +52,53 @@ public enum Keychain {
     public static func neverPrompt() { _ = SecKeychainSetUserInteractionAllowed(false) }
     /// The two answers macOS gives when an item needs a prompt that is switched off.
     public static func needsPrompt(_ status: OSStatus) -> Bool { status == errSecAuthFailed || status == errSecInteractionNotAllowed }
-    public static let cantReadText = "This saved key can't be read by this copy of Hmunmawi (it was saved by a differently signed copy). Remove it in Settings → Connections and enter it again."
+    /// An item this copy may not read or change (made by a differently signed copy): the two prompt answers, "no access", and a name clash with such an item.
+    public static func blocked(_ status: OSStatus) -> Bool { needsPrompt(status) || status == errSecNoAccessForItem || status == errSecDuplicateItem }
+    public static let cantReadText = "This saved key can't be read by this copy of Hmunmawi (it was saved by a differently signed copy) and no new copy could be saved. Remove it in Settings → Connections and enter it again."
+}
+
+/// The Keychain calls the secret store needs, so a test can stand in items "saved by a differently signed copy".
+public protocol KeychainBackend: Sendable {
+    /// Status of reading the item's data (errSecSuccess + the value, errSecItemNotFound, or a refusal).
+    func read(service: String, account: String) -> (status: OSStatus, value: String?)
+    func exists(service: String, account: String) -> Bool
+    func update(service: String, account: String, value: String) -> OSStatus
+    func add(service: String, account: String, value: String) -> OSStatus
+    func delete(service: String, account: String)
+}
+
+public struct SystemKeychainBackend: KeychainBackend {
+    public init() {}
+    private func base(_ service: String, _ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+    }
+    public func read(service: String, account: String) -> (status: OSStatus, value: String?) {
+        var q = base(service, account)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(q as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else { return (status == errSecSuccess ? errSecInternalError : status, nil) }
+        return (status, String(decoding: data, as: UTF8.self))
+    }
+    public func exists(service: String, account: String) -> Bool {
+        var q = base(service, account)
+        q[kSecReturnData as String] = false
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        return SecItemCopyMatching(q as CFDictionary, nil) == errSecSuccess
+    }
+    public func update(service: String, account: String, value: String) -> OSStatus {
+        SecItemUpdate(base(service, account) as CFDictionary,
+                      [kSecValueData as String: Data(value.utf8),
+                       kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary)
+    }
+    public func add(service: String, account: String, value: String) -> OSStatus {
+        var add = base(service, account)
+        add[kSecValueData as String] = Data(value.utf8)
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        return SecItemAdd(add as CFDictionary, nil)
+    }
+    public func delete(service: String, account: String) { SecItemDelete(base(service, account) as CFDictionary) }
 }
 
 public struct KeychainSecretStore: SecretStore {
@@ -60,13 +106,26 @@ public struct KeychainSecretStore: SecretStore {
     public static var service: String { "io.github.priyevsingh.Hmunmawi.keys.v2" + TestProfile.suffix }
     /// When set, unreadable items re-import once from `secret-sources.json` and built-in hub paths.
     nonisolated(unsafe) public static var catalogURL: URL?
+    /// How many items one key may occupy (see `account(_:slot:)`).
+    public static let slots = 6
     private let serviceName: String
-    public init(service: String? = nil) { serviceName = service ?? Self.service; Keychain.neverPrompt() }
+    private let backend: any KeychainBackend
+    private let useBackend: Bool
+    public init(service: String? = nil) { serviceName = service ?? Self.service; backend = SystemKeychainBackend(); useBackend = false; Keychain.neverPrompt() }
+    /// A store over a stand-in Keychain (tests): never switches to the memory profile.
+    public init(service: String, backend: any KeychainBackend) { serviceName = service; self.backend = backend; useBackend = true }
+
+    private var inMemory: Bool { !useBackend && TestProfile.name != nil }
 
     private var catalog: SecretSourceCatalog? {
         Self.catalogURL.map { SecretSourceCatalog(url: $0) }
     }
 
+    /// A key lives in item `plugin/name`. An item saved by a differently signed copy of the app (a development build,
+    /// then the release build, or a changed certificate) can be neither read nor changed without a Keychain password
+    /// box, which Hmunmawi never shows. So the key is saved in the next free item, `plugin/name#1`, `#2`, … made by
+    /// this copy, and read from the newest readable one. Nobody has to click anything or remove the old item.
+    static func account(_ plugin: String, _ name: String, slot: Int) -> String { slot == 0 ? "\(plugin)/\(name)" : "\(plugin)/\(name)#\(slot)" }
 
     /// A test profile never touches the Keychain at all (no prompts, nothing left behind): its secrets live in memory
     /// for the life of that run.
@@ -80,25 +139,18 @@ public struct KeychainSecretStore: SecretStore {
 
     /// Whether an item exists (even when this copy of the app cannot read it without a Keychain prompt).
     public func secretItemExists(plugin: String, name: String) -> Bool {
-        if TestProfile.name != nil { return Memory.shared.get("\(plugin)/\(name)") != nil }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "\(plugin)/\(name)",
-            kSecReturnData as String: false,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+        if inMemory { return Memory.shared.get("\(plugin)/\(name)") != nil }
+        return (0..<Self.slots).contains { backend.exists(service: serviceName, account: Self.account(plugin, name, slot: $0)) }
     }
 
     public func secret(plugin: String, name: String) throws -> String? {
-        if TestProfile.name != nil { return Memory.shared.get("\(plugin)/\(name)") }
-        switch try readKeychainItem(plugin: plugin, name: name) {
+        if inMemory { return Memory.shared.get("\(plugin)/\(name)") }
+        switch readKeychainItem(plugin: plugin, name: name) {
         case .missing: return nil
         case .value(let s): return s
         case .unreadable:
             if let catalog, SecretRebinder.rebind(store: self, catalog: catalog, plugin: plugin, name: name) {
-                switch try readKeychainItem(plugin: plugin, name: name) {
+                switch readKeychainItem(plugin: plugin, name: name) {
                 case .value(let s): return s
                 case .missing, .unreadable: throw WireError("keychain", Keychain.cantReadText)
                 case .failed(let status): throw WireError("keychain", "Keychain read failed (\(status))")
@@ -110,14 +162,14 @@ public struct KeychainSecretStore: SecretStore {
         }
     }
 
-    private enum KeychainRead {
+    private enum KeychainRead: Equatable {
         case missing, value(String), unreadable, failed(OSStatus)
     }
 
     /// Keychain read without auto-rebind (used by `SecretRebinder`).
     public func peekSecret(plugin: String, name: String) throws -> String? {
-        if TestProfile.name != nil { return Memory.shared.get("\(plugin)/\(name)") }
-        switch try readKeychainItem(plugin: plugin, name: name) {
+        if inMemory { return Memory.shared.get("\(plugin)/\(name)") }
+        switch readKeychainItem(plugin: plugin, name: name) {
         case .missing: return nil
         case .value(let s): return s
         case .unreadable: throw WireError("keychain", Keychain.cantReadText)
@@ -125,88 +177,57 @@ public struct KeychainSecretStore: SecretStore {
         }
     }
 
-    private func readKeychainItem(plugin: String, name: String) throws -> KeychainRead {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "\(plugin)/\(name)",
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecItemNotFound { return .missing }
-        guard status == errSecSuccess, let data = item as? Data else {
-            if Keychain.needsPrompt(status) { return .unreadable }
-            return .failed(status)
+    /// The newest item this copy can read wins; unreadable ones (made by another signature) are skipped.
+    private func readKeychainItem(plugin: String, name: String) -> KeychainRead {
+        var unreadable = false
+        var failure: OSStatus?
+        for slot in stride(from: Self.slots - 1, through: 0, by: -1) {
+            let r = backend.read(service: serviceName, account: Self.account(plugin, name, slot: slot))
+            if r.status == errSecSuccess, let v = r.value { return .value(v) }
+            if r.status == errSecItemNotFound { continue }
+            if Keychain.blocked(r.status) { unreadable = true } else { failure = failure ?? r.status }
         }
-        return .value(String(decoding: data, as: UTF8.self))
+        if unreadable { return .unreadable }
+        if let failure { return .failed(failure) }
+        return .missing
     }
 
     /// Removes a saved key (Settings → Remove key). Missing is fine.
     public func deleteSecret(plugin: String, name: String) {
-        if TestProfile.name != nil { Memory.shared.set(nil, "\(plugin)/\(name)"); return }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "\(plugin)/\(name)",
-        ]
-        SecItemDelete(query as CFDictionary)
+        if inMemory { Memory.shared.set(nil, "\(plugin)/\(name)"); return }
+        for slot in 0..<Self.slots { backend.delete(service: serviceName, account: Self.account(plugin, name, slot: slot)) }
     }
 
     public func setSecret(_ value: String, plugin: String, name: String) throws {
-        if TestProfile.name != nil { Memory.shared.set(value, "\(plugin)/\(name)"); return }
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "\(plugin)/\(name)",
-        ]
-        // Update in place first: delete-then-add lost the saved key whenever the add failed (locked, denied), and an
-        // item made by a differently signed copy can't be deleted without a prompt anyway.
-        let changes: [String: Any] = [kSecValueData as String: Data(value.utf8),
-                                      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
-        var status = SecItemUpdate(base as CFDictionary, changes as CFDictionary)
-        if status == errSecItemNotFound {
-            var add = base
-            add.merge(changes) { $1 }
-            status = SecItemAdd(add as CFDictionary, nil)
+        if inMemory { Memory.shared.set(value, "\(plugin)/\(name)"); return }
+        // Update in place first: delete-then-add lost the saved key whenever the add failed (locked, denied). An item
+        // made by a differently signed copy can't be changed (or deleted) without a prompt, so the key goes in the
+        // next item instead.
+        var refusedByOthers = false
+        for slot in 0..<Self.slots {
+            let account = Self.account(plugin, name, slot: slot)
+            var status = backend.update(service: serviceName, account: account, value: value)
+            if status == errSecItemNotFound { status = backend.add(service: serviceName, account: account, value: value) }
+            // macOS can report success for changing an item another signature made while this copy still can't read
+            // it: only a slot that reads back counts.
+            if status == errSecSuccess, Keychain.blocked(backend.read(service: serviceName, account: account).status) {
+                refusedByOthers = true; continue
+            }
+            if status == errSecSuccess {
+                // Older copies of this key that this copy can still delete would otherwise be read instead of the new one.
+                for higher in (slot + 1)..<Self.slots { backend.delete(service: serviceName, account: Self.account(plugin, name, slot: higher)) }
+                return
+            }
+            if Keychain.blocked(status) { refusedByOthers = true; continue }
+            throw WireError("keychain", "Keychain write failed (\(status))")
         }
-        if Keychain.needsPrompt(status) { throw WireError("keychain", Keychain.cantReadText) }
-        guard status == errSecSuccess else { throw WireError("keychain", "Keychain write failed (\(status))") }
+        throw WireError("keychain", refusedByOthers ? Keychain.cantReadText : "Keychain write failed")
     }
 
-    /// Replaces a Keychain item that this app cannot update in place (different signing identity on the old item).
+    /// Saves a key that an item from another signature may be in the way of (same as `setSecret`: it already moves on
+    /// to a fresh item, and never shows a password box).
     public func replaceSecret(_ value: String, plugin: String, name: String) throws {
-        if TestProfile.name != nil {
-            try setSecret(value, plugin: plugin, name: name)
-            return
-        }
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "\(plugin)/\(name)",
-        ]
-        let changes: [String: Any] = [kSecValueData as String: Data(value.utf8),
-                                      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
-        var status = SecItemUpdate(base as CFDictionary, changes as CFDictionary)
-        if status == errSecSuccess { return }
-        if status == errSecItemNotFound {
-            try setSecret(value, plugin: plugin, name: name)
-            return
-        }
-        if Keychain.needsPrompt(status) {
-            SecKeychainSetUserInteractionAllowed(true)
-            defer { Keychain.neverPrompt() }
-            let del = SecItemDelete(base as CFDictionary)
-            if del != errSecSuccess && del != errSecItemNotFound && Keychain.needsPrompt(del) {
-                throw WireError("keychain", Keychain.cantReadText)
-            }
-            var add = base
-            add.merge(changes) { $1 }
-            status = SecItemAdd(add as CFDictionary, nil)
-        }
-        if Keychain.needsPrompt(status) { throw WireError("keychain", Keychain.cantReadText) }
-        guard status == errSecSuccess else { throw WireError("keychain", "Keychain write failed (\(status))") }
+        try setSecret(value, plugin: plugin, name: name)
     }
 
     /// Same as `secret(plugin:name:)` but uses an explicit catalog (for tests).
