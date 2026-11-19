@@ -2,7 +2,7 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
-## Unreleased
+## 1.1.0 (build 110), 19 Nov 2026
 
 **Fixes**
 - **AI pause:** AI-credit messages no longer pause AI routines. Only a real session or weekly limit does, and a date more than about a week away is ignored.
