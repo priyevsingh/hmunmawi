@@ -2,7 +2,7 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
-## Unreleased
+## 1.1.1 (build 111), 19 Nov 2026
 
 **Fixes**
 - **Mac jobs tile:** a routine that failed and then ran fine again no longer keeps the tile red. Any later successful run clears the earlier failure. The record of a successful run is internal only: it never shows in the activity log, Today, notifications or the menu bar, can't trigger a rule, and only the latest one per routine is kept.
