@@ -22,6 +22,12 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 - **Slimmer icon:** a narrower "H" with its dot. New installs show the icon alone; a number you already chose stays.
 - **A one-time tip** when macOS has hidden the icon: how to open the panel and how to ⌘-drag the icon into view.
 
+**For maintainers**
+- **Releases wait for CI:** `scripts/publish-release.sh <version>` pushes `main`, waits for the CI workflow on
+  that commit to pass, and only then tags and publishes the GitHub release. If CI fails, nothing is published.
+- **Build tooling:** CI uses `actions/checkout` and `actions/setup-node` v7, and the live-sales worker tests run on
+  Vitest 5 with the latest Cloudflare test plugin.
+
 ## 1.0.0 (build 100)
 
 The first public version. Hmunmawi is a calm Mac app for indie app developers: it reads your numbers, tells you

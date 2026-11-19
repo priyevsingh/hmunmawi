@@ -29,6 +29,11 @@ zip to Apple (`notarytool submit --wait`), staples the ticket, validates it, run
 If no Developer ID certificate exists the script stops (exit 3) and says which step above is missing. It never makes
 a certificate itself.
 
+Then publish with `scripts/publish-release.sh <version>`. It pushes `main`, waits for the **CI** workflow on that
+commit to pass, and only then tags `v<version>` and publishes the GitHub release with the zip and `appcast.xml`
+(notes from the matching CHANGELOG.md section). If CI fails or never starts, nothing is tagged or published. Never
+tag or run `gh release create` by hand before CI is green. CodeQL runs separately and slowly; check its alerts after.
+
 ## Owner builds
 
 Your own Mac's builds (`scripts/make-app.sh`) keep the Apple Development signature so saved Keychain keys keep working
