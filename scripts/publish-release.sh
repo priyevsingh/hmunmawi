@@ -12,6 +12,9 @@ ZIP="build/Hmunmawi-$VERSION.zip"
 NOTES="$(awk -v v="$VERSION" 'index($0,"## "v)==1{f=1;next} f&&/^## /{exit} f' CHANGELOG.md)"
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "No CHANGELOG.md section for $VERSION" >&2; exit 2; }
 
+# The zip about to be published must be signed with the same designated requirement as the previous release.
+scripts/check-designated-requirement.sh "$ZIP" || { echo "Signature differs from the previous release; not publishing" >&2; exit 4; }
+
 git push origin main
 SHA="$(git rev-parse HEAD)"
 echo "Waiting for CI on $SHA..."

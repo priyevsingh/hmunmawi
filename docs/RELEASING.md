@@ -29,6 +29,13 @@ zip to Apple (`notarytool submit --wait`), staples the ticket, validates it, run
 If no Developer ID certificate exists the script stops (exit 3) and says which step above is missing. It never makes
 a certificate itself.
 
+**Signature gate.** `release.sh` (after building) and `publish-release.sh` (before pushing) run
+`scripts/check-designated-requirement.sh`, which compares `codesign -d -r-` of the new build with the newest earlier
+GitHub release (downloaded with `gh`) and **fails on any difference**. macOS ties Full Disk Access, Files & Folders,
+Calendars, Accessibility, Automation and Keychain "Always Allow" to that requirement, so a different one makes every user
+re-grant everything after updating. There is no override: fix the signing identity instead. Check by hand:
+`scripts/check-designated-requirement.sh build/Hmunmawi-<version>.zip [previous.zip|previous.app|requirement.txt]`.
+
 Then publish with `scripts/publish-release.sh <version>`. It pushes `main`, waits for the **CI** workflow on that
 commit to pass, and only then tags `v<version>` and publishes the GitHub release with the zip and `appcast.xml`
 (notes from the matching CHANGELOG.md section). If CI fails or never starts, nothing is tagged or published. Never

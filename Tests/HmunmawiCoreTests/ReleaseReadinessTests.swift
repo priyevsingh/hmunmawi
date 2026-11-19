@@ -328,3 +328,47 @@ import Testing
         #expect(InsightEngine.plainName("Visitors") == "Visitors")
     }
 }
+
+/// The release gate: a build whose designated requirement differs from the previous release's is refused.
+@Suite struct DesignatedRequirementGateTests {
+    static let script: String = {
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<3 { url.deleteLastPathComponent() }
+        return url.appendingPathComponent("scripts/check-designated-requirement.sh").path
+    }()
+
+    static func run(_ new: String, _ prev: String) throws -> (code: Int32, err: String) {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hm-dr-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let a = dir.appendingPathComponent("new.txt"), b = dir.appendingPathComponent("prev.txt")
+        try new.write(to: a, atomically: true, encoding: .utf8)
+        try prev.write(to: b, atomically: true, encoding: .utf8)
+        let p = Process(), err = Pipe()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = [script, a.path, b.path]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = err
+        try p.run(); p.waitUntilExit()
+        return (p.terminationStatus, String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
+    }
+
+    static let dr = #"designated => identifier "io.github.priyevsingh.Hmunmawi" and anchor apple generic and certificate leaf[subject.OU] = CYPYNR3525"#
+
+    @Test func sameRequirementPasses() throws {
+        #expect(try Self.run(Self.dr + "\n", Self.dr + "\n").code == 0)
+    }
+
+    @Test func differentTeamOrIdentifierFails() throws {
+        let otherTeam = Self.dr.replacingOccurrences(of: "CYPYNR3525", with: "YP7C482RSY")
+        let r = try Self.run(otherTeam, Self.dr)
+        #expect(r.code == 1 && r.err.contains("DIFFERENT"))
+        let otherId = Self.dr.replacingOccurrences(of: "io.github.priyevsingh.Hmunmawi", with: "io.example.Other")
+        #expect(try Self.run(otherId, Self.dr).code == 1)
+    }
+
+    @Test func adHocOrMissingRequirementFails() throws {
+        #expect(try Self.run("Executable=/x\n", Self.dr).code == 1)
+        #expect(try Self.run(Self.dr, "").code == 1)
+    }
+}

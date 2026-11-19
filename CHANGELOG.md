@@ -2,6 +2,11 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+**Release process**
+- A release is refused unless its code-signing designated requirement is identical to the previous release's (`scripts/check-designated-requirement.sh`, run by `release.sh` and again by `publish-release.sh`), so an update can never re-ask macOS permissions or Keychain keys.
+
 ## 1.1.3 (build 113), 20 Nov 2026
 
 **Fixes**
