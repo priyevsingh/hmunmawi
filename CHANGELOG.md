@@ -2,7 +2,7 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
-## Unreleased
+## 1.1.3 (build 113), 20 Nov 2026
 
 **Fixes**
 - **Moving between a development build, the release build or a new certificate:** keys saved by the earlier copy of the app can't be read or changed by the new one without a Keychain password box, which Hmunmawi never shows, so every connection with a key file stayed "needing attention". Hmunmawi now saves such a key in a fresh Keychain item of its own (the old one is left alone) and re-imports it from its saved file at launch, with no click and no password box. The same applies to its other saved settings (trust key, flags).
