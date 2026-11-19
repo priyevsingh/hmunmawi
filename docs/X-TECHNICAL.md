@@ -113,7 +113,7 @@ sent (the last 3,000 are remembered), once a day.
 
 ## Post drafts and X's algorithm
 
-Best posting hours, draft ranking and the weekly check of X's published ranking code
+Best posting hours, draft ranking and the daily check of X's published ranking code
 ([xai-org/x-algorithm](https://github.com/xai-org/x-algorithm), `home-mixer/params/param.rs`) are described in
 [ROUTINES.md → Post drafts that follow X's algorithm](ROUTINES.md#post-drafts-that-follow-xs-algorithm).
 

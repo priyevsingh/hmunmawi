@@ -14,7 +14,7 @@ missed (the Mac was asleep) still starts if it's within the routine's catch-up w
 | Watch a website | Checks an address; tells you after 2 failed checks in a row, and when it's back | the address |
 | Warn before offer codes expire | Warns 30, 7 and 1 day(s) before an App Store offer code expires | App Store Connect |
 | Ask AI about my numbers | Asks your AI about the week's numbers, your search terms or crashes; costs nothing when there's nothing new | an AI key |
-| Post drafts from my bank | A few ready drafts a day from a bank, the best one first; weak drafts (too short, a sentence lifted from an article, nothing to reply to) are skipped. The ranking follows X's published algorithm (checked weekly). The AI writes more only when the bank runs low. You post them yourself | a bank or an AI key |
+| Post drafts from my bank | A few ready drafts a day from a bank, the best one first; weak drafts (too short, a sentence lifted from an article, nothing to reply to) are skipped. The ranking follows X's published algorithm (checked daily). The AI writes more only when the bank runs low. You post them yourself | a bank or an AI key |
 | X reply ideas | One ready X reply at each of your times. From Grok Bot (its daily reply-targets file) or, without Grok Bot, from Hmunmawi itself: a daily X search for your topics through your Safari login, replies drafted free by Apple's on-device AI, or your AI key, or none (you write them). Skips posts older than 48 hours, off your topics, with a link or an outdated version. You post it yourself ([set up](X-SETUP.md#reply-ideas)) | Grok Bot's file, or Read via your Safari login and your topics |
 | X unfollow list | Once a day a short list (10 by default, at most 25) of accounts that don't follow you back, to unfollow by hand, from Grok Bot's list or your own Following page read through Safari (accounts with 50,000+ followers kept); your keeps are never listed. Hmunmawi never unfollows for you ([set up](X-SETUP.md#unfollow-list)) | Grok Bot's list, or Read via your Safari login |
 | Follow-up reminders | Which outreach follow-ups are due (one per outlet) | an outreach list |
@@ -103,7 +103,7 @@ that way when X changes what it rewards, without you reading the code yourself.
 - **The best draft goes first,** scored on: a closing question (replies), 30+ words (reading time), how-to and lesson
   wording (posts people pass on) and concrete numbers.
 - **Weights from X's own code:** X publishes its ranking at
-  [github.com/xai-org/x-algorithm](https://github.com/xai-org/x-algorithm). At most once a week the routine asks GitHub
+  [github.com/xai-org/x-algorithm](https://github.com/xai-org/x-algorithm). At most once a day the routine asks GitHub
   whether it changed. Only then it reads X's weights for replies, copying the link, sharing by DM and time spent (in
   `home-mixer/params/param.rs`) and turns them into the draft weights by fixed formulas, each kept between 0 and 3.
   No AI is involved, so the same X code always gives the same rules. For example, X's 13 November 2026 release set

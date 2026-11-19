@@ -2,7 +2,7 @@ import Foundation
 import HmunmawiCore
 
 /// The post-draft rules on this Mac (x-rules.json in the app's data folder), kept in step with X's published ranking
-/// code: at most once a week the post-drafts routine asks GitHub whether xai-org/x-algorithm changed; only then it
+/// code: at most once a day the post-drafts routine asks GitHub whether xai-org/x-algorithm changed; only then it
 /// reads X's ranking weights and recomputes the rules (XAlgorithm, fixed formulas, no AI). The previous rules are kept
 /// as x-rules.prev.json; delete x-rules.json to go back to the built-in rules.
 enum XRules {
@@ -15,10 +15,10 @@ enum XRules {
         return r.clamped()
     }
 
-    /// Checks X's code if a week has passed. Returns a line for the routine's note when the rules changed, else nil.
+    /// Checks X's code if a day has passed. Returns a line for the routine's note when the rules changed, else nil.
     static func checkIfDue(now: Date = .now) async -> String? {
         let d = UserDefaults.standard
-        if let last = d.object(forKey: checkedKey) as? Date, now.timeIntervalSince(last) < 7 * 86400 { return nil }
+        if let last = d.object(forKey: checkedKey) as? Date, now.timeIntervalSince(last) < 86400 { return nil }
         d.set(now, forKey: checkedKey)
         guard let sha = await latestCommit() else { return nil }
         guard sha != d.string(forKey: shaKey) else { return nil }

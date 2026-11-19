@@ -1012,7 +1012,7 @@ final class Routines {
         }
         var versions: [String: String] = [:]
         for snap in model.snapshots("app.snapshot") { if let a = snap.app, let v = snap.payload[path: "version"]?.string { versions[a] = v } }
-        // Follow X's published ranking (weekly check, off with follow_x=0), then skip weak drafts and send the best first.
+        // Follow X's published ranking (daily check, off with follow_x=0), then skip weak drafts and send the best first.
         let tuned = r.params?["follow_x"] == "0" ? nil : await XRules.checkIfDue()
         if let tuned { try? await model.liveStore?.appendAudit(actor: "routine:\(r.id)", action: "x.rules_tuned", detail: .object(["note": .string(tuned)])) }
         let rules = XRules.current

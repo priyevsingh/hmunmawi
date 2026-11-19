@@ -6,6 +6,7 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 
 **Fixes**
 - **AI pause:** AI-credit messages no longer pause AI routines. Only a real session or weekly limit does, and a date more than about a week away is ignored.
+- **Post drafts:** the routine now checks X's published algorithm daily instead of weekly.
 - **Ticker:** a sale's age keeps moving. Yesterday's sale no longer reads "1 minute ago" all day.
 - **Ages everywhere stay current:** "5 minutes ago", "yesterday" and the like now update by themselves every minute in
   the menu bar panel, Today, Log, Settings, Reviews, Status and the rest of the app, using one shared formatter.
