@@ -19,8 +19,12 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-LIMIT_KINDS = frozenset({"session", "daily", "weekly", "rate", "auth", "network", "spend", "unknown"})
+LIMIT_KINDS = frozenset({"session", "daily", "weekly", "rate", "auth", "network", "spend", "api_credit", "unknown"})
+# API-credit / Workspace usage-limit messages must not become an account-wide pause.
+NONBLOCKING_KINDS = frozenset({"api_credit"})
 CONFIDENCE = frozenset({"high", "medium", "low"})
+# Longest real Claude Team limit (weekly) plus slack; anything later is not a Team limit.
+MAX_TEAM_BLOCK_SECS = 7 * 86400 + 6 * 3600
 
 
 def _hm_path() -> Path:
@@ -218,7 +222,7 @@ def _account(data: dict[str, Any], account_id: str) -> dict[str, Any]:
 
 def effective_until(account: dict[str, Any], now: int | None = None) -> tuple[int, list[dict[str, Any]]]:
     """Return (max_until, reasons[]) for claude jobs on this account."""
-    now = now or _now()
+    now = _now() if now is None else now
     reasons: list[dict[str, Any]] = []
     best = 0
     manual = account.get("manual") or {}
@@ -248,11 +252,15 @@ def effective_until(account: dict[str, Any], now: int | None = None) -> tuple[in
     known = int(manual.get("known_reset_epoch") or 0)
     detected = account.get("detected") or {}
     for lk, block in detected.items():
-        if lk not in LIMIT_KINDS:
+        if lk not in LIMIT_KINDS or _is_nonblocking_detected(lk, block):
             continue
         until = int(block.get("until_epoch") or 0)
         conf = block.get("confidence") or "low"
         if until <= now:
+            continue
+        # Team session/weekly limits reset within 7 days. A detected block further out than that
+        # (e.g. an API-credit "regain access" date weeks away) is never a Team limit, so it never blocks.
+        if until - now > MAX_TEAM_BLOCK_SECS:
             continue
         if conf == "low" and not pause_until and not manual.get("pause_indefinite"):
             # low-confidence alone does not hard-block; only informs scheduling
@@ -310,7 +318,11 @@ def record_detected(
     source: str = "runner",
     detail: str = "",
 ) -> dict[str, Any]:
-    kind = kind if kind in LIMIT_KINDS else "unknown"
+    # Reclassify Workspace API-credit 400s so they are never stored as unknown/until-date blocks.
+    if classify_limit_text(detail or "") == "api_credit" or kind == "api_credit":
+        kind = "api_credit"
+    elif kind not in LIMIT_KINDS:
+        kind = "unknown"
     if confidence not in CONFIDENCE:
         confidence = "medium"
     acct = _account(data, account_id)
@@ -377,13 +389,33 @@ def clear_manual_pause(data: dict[str, Any], account_id: str, *, clear_known_res
     return data
 
 
+def _is_nonblocking_detected(kind: str, block: dict[str, Any] | None) -> bool:
+    """API-credit (Workspace API usage limits) must not hold jobs until a far-away date.
+
+    Session and weekly Team limits still block even if the detail happens to mention credits.
+    """
+    if kind in NONBLOCKING_KINDS:
+        return True
+    if kind in ("session", "daily", "weekly"):
+        return False
+    return classify_limit_text(str((block or {}).get("detail") or "")) == "api_credit"
+
+
 def classify_limit_text(text: str) -> str:
     t = text.lower()
+    if re.search(
+        r"workspace api usage limits|"
+        r"\bapi usage limits\b|"
+        r"\bapi credits?\b|"
+        r"anthropic api (?:usage )?(?:limit|credit)",
+        t,
+    ):
+        return "api_credit"
     if re.search(r"auth|login|sign.?in|credential|unauthorized|401|403", t):
         return "auth"
     if re.search(r"network|timeout|connect|dns|unreachable|503|502", t):
         return "network"
-    if re.search(r"session", t):
+    if re.search(r"session|5.?hour|five.?hour", t):
         return "session"
     if re.search(r"daily", t):
         return "daily"
