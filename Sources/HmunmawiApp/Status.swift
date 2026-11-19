@@ -236,7 +236,7 @@ private struct StatusDetail: View {
                             let running = model.heals[kind] == .running
                             // Not a problem (a build that passed) or over by now (the job has worked since): no amber dot.
                             let benign = kind == "ci.build" && !EventText.describe(m.latest).contains("failed")
-                            let over = kind == "job.failed" && HealthCheck.stillFailing([m.latest]).isEmpty
+                            let over = kind == "job.failed" && HealthCheck.stillFailing([m.latest], successes: model.events.filter { $0.kind == "job.finished" }).isEmpty
                             let resolved = benign || over || healed != nil || { if case .done = model.heals[kind] { return true }; return false }()
                             let color = resolved ? Brand.good : Brand.caution
                             HStack(spacing: 10) {

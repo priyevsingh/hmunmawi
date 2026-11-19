@@ -52,10 +52,10 @@ struct HealthCheck: View {
     /// A job failure counts only while the job is still failing: when launchd now reports its last run as fine
     /// (it recovered on its own), yesterday's error isn't news, and Automations already says "all fine".
     /// A failure newer than launchd's last reading always counts (the reading can't have seen it recover).
-    static func stillFailing(_ events: [StoredEvent]) -> [StoredEvent] {
+    static func stillFailing(_ events: [StoredEvent], successes: [StoredEvent] = []) -> [StoredEvent] {
         let mac = MacAutomations.shared
         if mac.lastRead == nil || Date.now.timeIntervalSince(mac.lastRead!) > 300 { Task { await mac.refresh() } }
-        return JobFailures.stillFailing(events, states: macJobStates(), readAt: macReadAt())
+        return JobFailures.stillFailing(events, states: macJobStates(), readAt: macReadAt(), successes: successes)
     }
 
     /// launchd's latest reading of every job (label -> running / ok / failed / off) and when it was taken.
@@ -153,7 +153,7 @@ struct HealthCheck: View {
     static func checks(_ model: AppModel, permissions: MacPermissionSnapshot? = nil) -> [Check] {
         let crashes = latest(model, "crash.daily")
         let crashing = crashes.filter { ($0.payload[path: "crashed"]?.number ?? 0) > 0 }
-        let failed = stillFailing(latest(model, "job.failed", within: 1))
+        let failed = stillFailing(latest(model, "job.failed", within: 1), successes: model.events.filter { $0.kind == "job.finished" })
         let down = latest(model, "site.down", within: 1)
         let trend = crashTrend(model), worstRate = trend.last?.1
         var out: [Check] = []

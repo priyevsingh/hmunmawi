@@ -502,6 +502,13 @@ final class Routines {
                                occurredAt: Millis(Date.now.timeIntervalSince1970 * 1000), dedupeKey: "routine-failed:\(key)")
             _ = try? await store.ingest(failed, rules: await model.rulesFor(failed))
         }
+        if outcome.ok, !(kind == .script && r.params?["try"] == "1") {
+            // A success is recorded too, so a failure of this routine is cleared by any later successful run.
+            let done = Event(source: "routine", kind: "job.finished", app: r.title,
+                             payload: .object(["routine": .string(r.id)]),
+                             occurredAt: Millis(Date.now.timeIntervalSince1970 * 1000), dedupeKey: "routine-ok:\(key)")
+            _ = try? await store.ingest(done, rules: [])
+        }
         try? await store.appendAudit(actor: by == "agent" ? "agent" : by == "you" ? "owner" : "routine",
                                      action: outcome.ok ? "routine.ran" : "routine.failed", subject: r.id,
                                      detail: .object(["note": .string(outcome.note)]))
@@ -1259,11 +1266,12 @@ final class Routines {
         let limit = min(max(Int(r.params?["limit_min"] ?? "") ?? 10, 1), 60)
         let res = await ScriptRunner.run(exe, args: args, folder: r.params?["folder"], routine: r.id, timeout: TimeInterval(limit * 60),
                                             envFile: r.params?["env"])
-        let last = res.output.split(separator: "\n").last.map { String($0.prefix(160)) } ?? ""
+        let ok = !res.timedOut && (res.exit == 0 || res.exit == 75)
+        // A failed run names the line that explains it, not just the last line of output.
+        let last = ok ? (res.output.split(separator: "\n").last.map { String($0.prefix(160)) } ?? "") : JobFailures.errorLine(res.output)
         let what = res.timedOut ? "stopped after \(limit) minutes" : "exit \(res.exit)"
         ScriptRunner.log(r.id, header: "\(Date.now.formatted(.iso8601)) \(what)\(tryOut ? " (Try out)" : "")", output: res.output)
         // 75 is "not due yet" for scripts that keep their own clock; it counts as fine.
-        let ok = !res.timedOut && (res.exit == 0 || res.exit == 75)
         return (ok, "\(what)\(tryOut ? ", Try out" : "")\(last.isEmpty ? "" : ": \(last)")")
     }
 

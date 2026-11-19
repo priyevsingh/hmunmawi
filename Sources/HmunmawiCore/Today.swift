@@ -527,14 +527,35 @@ public struct EventWindow: Sendable {
     public mutating func reset() { rows = []; lastID = 0; loaded = false; epoch = 0 }
 }
 
-/// A launchd job's failure is news only while the job is still failing. When launchd's latest reading (taken
-/// after the failure) says the job's last run ended fine, it recovered on its own and the failure is dropped
-/// everywhere it shows (Today's worry, Health), not left red for a day. A failure newer than the reading, or one
-/// without a launchd label (a routine), or for a job launchd no longer lists, still counts.
+/// A job's failure is news only while the job is still failing. Two things end it, wherever the failure came from:
+/// a later successful run of the same job (a `job.finished` event with the same routine id or launchd label), or
+/// launchd's latest reading (taken after the failure) saying the job's last run ended fine. The failure then drops
+/// everywhere it shows (Today's worry, Health), not left red for a day. A failure with no later success, newer than
+/// the reading, or for a job launchd no longer lists, still counts.
 public enum JobFailures {
-    public static func stillFailing(_ events: [StoredEvent], states: [String: String], readAt: Millis) -> [StoredEvent] {
-        events.filter { e in
-            guard e.kind == "job.failed", e.occurredAt < readAt, let label = e.payload[path: "label"]?.string,
+    /// What identifies the job behind an event: a routine's id, else a launchd label.
+    static func jobKey(_ e: StoredEvent) -> String? {
+        if let r = e.payload[path: "routine"]?.string, !r.isEmpty { return "routine:" + r }
+        if let l = e.payload[path: "label"]?.string, !l.isEmpty { return "label:" + l }
+        return nil
+    }
+
+    /// Latest success time per job, from `job.finished` events (any other kind is ignored).
+    static func lastSuccess(_ events: [StoredEvent]) -> [String: Millis] {
+        var out: [String: Millis] = [:]
+        for e in events where e.kind == "job.finished" {
+            if let k = jobKey(e) { out[k] = max(out[k] ?? 0, e.occurredAt) }
+        }
+        return out
+    }
+
+    public static func stillFailing(_ events: [StoredEvent], states: [String: String], readAt: Millis,
+                                    successes: [StoredEvent] = []) -> [StoredEvent] {
+        let ok = lastSuccess(successes)
+        return events.filter { e in
+            guard e.kind == "job.failed" else { return true }
+            if let k = jobKey(e), let t = ok[k], t > e.occurredAt { return false }
+            guard e.occurredAt < readAt, let label = e.payload[path: "label"]?.string,
                   let state = states[label] else { return true }
             return state == "failed"
         }
@@ -544,7 +565,18 @@ public enum JobFailures {
     public static func withoutRecovered(_ events: [StoredEvent], states: [String: String], readAt: Millis) -> [StoredEvent] {
         let failed = events.filter { $0.kind == "job.failed" }
         guard !failed.isEmpty else { return events }
-        let keep = Set(stillFailing(failed, states: states, readAt: readAt).map(\.id))
+        let keep = Set(stillFailing(failed, states: states, readAt: readAt, successes: events).map(\.id))
         return events.filter { $0.kind != "job.failed" || keep.contains($0.id) }
+    }
+
+    /// The line of a script's output that explains a failure: the last one that reads like an error, else the last
+    /// line; short (at most `limit` characters).
+    public static func errorLine(_ output: String, limit: Int = 160) -> String {
+        let lines = output.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let words = ["error", "failed", "failure", "exception", "traceback", "timeout", "timed out", "denied", "unable",
+                     "not found", "cannot", "can't", "fatal", "exit status", "exit code"]
+        let pick = lines.last { l in let low = l.lowercased(); return words.contains { low.contains($0) } } ?? lines.last ?? ""
+        return String(pick.prefix(limit))
     }
 }

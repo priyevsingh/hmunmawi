@@ -197,7 +197,7 @@ struct HealthPage: View {
     var body: some View {
         let crashes = latest("crash.daily")
         let crashing = crashes.filter { ($0.payload[path: "crashed"]?.number ?? 0) > 0 }
-        let failed = HealthCheck.stillFailing(latest("job.failed", within: 1))
+        let failed = HealthCheck.stillFailing(latest("job.failed", within: 1), successes: model.events.filter { $0.kind == "job.finished" })
         let down = latest("site.down", within: 1)
         VStack(alignment: .leading, spacing: 14) {
             // Three equal status tiles: each says the outcome in a line, nothing stretched or empty.

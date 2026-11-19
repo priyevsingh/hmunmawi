@@ -3,6 +3,33 @@ import Testing
 @testable import HmunmawiCore
 
 @Suite struct TodayTests {
+    @Test func routineFailureClearsOnlyAfterALaterSuccess() {
+        func ev(_ id: Int64, _ kind: String, _ routine: String, _ at: Millis) -> StoredEvent {
+            StoredEvent(id: id, source: "routine", kind: kind, app: "Daily social to-do", payload: .object(["routine": .string(routine)]), occurredAt: at)
+        }
+        let fail = ev(1, "job.failed", "r1", 1_000)
+        // No later success: still failing.
+        #expect(JobFailures.withoutRecovered([fail], states: [:], readAt: 0).map(\.id) == [1])
+        // A later success of the same routine clears it.
+        #expect(JobFailures.withoutRecovered([fail, ev(2, "job.finished", "r1", 2_000)], states: [:], readAt: 0).isEmpty == false)
+        #expect(JobFailures.withoutRecovered([fail, ev(2, "job.finished", "r1", 2_000)], states: [:], readAt: 0).map(\.id) == [2])
+        // An earlier success, or another routine's success, does not.
+        #expect(JobFailures.withoutRecovered([fail, ev(2, "job.finished", "r1", 500)], states: [:], readAt: 0).map(\.id) == [1, 2])
+        #expect(JobFailures.withoutRecovered([fail, ev(2, "job.finished", "r2", 2_000)], states: [:], readAt: 0).map(\.id) == [1, 2])
+        // A failure after the success is real again.
+        #expect(JobFailures.stillFailing([ev(3, "job.failed", "r1", 3_000)], states: [:], readAt: 0,
+                                         successes: [ev(2, "job.finished", "r1", 2_000)]).map(\.id) == [3])
+    }
+
+    @Test func errorLinePrefersTheLineThatExplainsTheFailure() {
+        let out = "sending message\nError: iMessage send failed (not authorized)\ncalendar event created"
+        #expect(JobFailures.errorLine(out) == "Error: iMessage send failed (not authorized)")
+        #expect(JobFailures.errorLine("step one\nstep two\n") == "step two")
+        #expect(JobFailures.errorLine("") == "")
+        #expect(JobFailures.errorLine("Traceback (most recent call last)\nValueError: bad\ndone").hasPrefix("ValueError"))
+        #expect(JobFailures.errorLine("error: " + String(repeating: "x", count: 400)).count == 160)
+    }
+
     @Test func recoveredMacJobIsNotTodaysWorry() throws {
         let label = "com.example.x-unfollow"
         let failedAt: Millis = 1_000_000
