@@ -49,6 +49,7 @@ Only with your permission, which you give once during setup (or later in Setting
 
 
 - **Find my key** (only when you press it): your Keychain entries whose name mentions the service, `.env` and `config.toml` files in folders you add with "Also look in a folder…", `~/.config` and your home folder, and `AuthKey_*.p8` files in Downloads, Documents, Desktop and iCloud Drive. It does not look in any project folders unless you add them. Values are never shown, only where they were found. When you pick a file, Hmunmawi stores only that file path and field name in `secret-sources.json` (never the secret) so it can re-import after a rebuild.
+- **Saved key files:** files you picked with **Find my key** (path and field name are remembered, never the secret) are read again at launch, in the background and once per launch, to re-import a key after an update. A connection's own sign-in file, such as the YouTube Google sign-in, is read the same way. If macOS refuses a protected folder, that connection is marked as needing attention.
 - **Mac jobs:** the list of your own LaunchAgents (`~/Library/LaunchAgents`) and their log files, to show what ran.
 - **Files you point it to:** offer-code CSVs, a JSON file your bot writes, a folder of App Store Connect reports, a usage folder.
 - **Another tool's usage figure:** if you named your bot "Grok" (Automations → Your routines → Set up your bot), Grok Bot's local cache folder under `~/Library/Application Support/Grok Bot/` is read for its weekly usage figure, only to show it.

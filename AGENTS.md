@@ -73,7 +73,8 @@ and asks before it acts. Users' guide: [README.md](README.md).
   [SECURITY.md](SECURITY.md), the README and the CHANGELOG in the same change.
 - **Add-ons never receive keys.** See [docs/ADD-ONS.md](docs/ADD-ONS.md) before touching the add-on host.
 - **Signing:** sign every build with the same certificate (`SIGN_ID` or `scripts/.sign-id`); a different one makes
-  saved keys unreadable. Check with `Hmunmawi --verify-secrets` (prints ok/fail only). Details in
+  saved keys unreadable. Check with `Hmunmawi --verify-secrets` (prints ok/fail only). A release is refused unless its signing
+  requirement equals the previous release's (`scripts/check-designated-requirement.sh`). Details in
   [docs/RELEASING.md](docs/RELEASING.md).
 - **App Store Connect API:** don't use the v1 In-App Purchase and subscription image, localization or submission
   endpoints (Apple is removing them from early 2027). Use the `/v2/...` resources under the `InAppPurchaseVersion`,

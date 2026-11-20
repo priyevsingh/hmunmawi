@@ -45,7 +45,7 @@ tag or run `gh release create` by hand before CI is green. CodeQL runs separatel
 
 Your own Mac's builds (`scripts/make-app.sh`) keep the Apple Development signature so saved Keychain keys keep working
 across rebuilds, and, with the git-ignored marker `scripts/.owner-build`, include the owner-only Keychain-prompt
-watcher. Owner extras in the app itself come from `owner.json` in the app's data folder (see `OwnerConfig`).
+watcher. `HM_FLAVOR=public`, and `scripts/release.sh` always, leave that watcher out, so public releases never contain it. Owner extras in the app itself come from `owner.json` in the app's data folder (see `OwnerConfig`).
 
 ## Keychain names after a bundle id change
 
@@ -71,18 +71,14 @@ app, Keychain, preferences, database or live stream.
   your only Apple Development certificate. It stops if the pinned identity isn't in the keychain, warns loudly on
   ad-hoc, and prints the certificate name it used. Never sign "just once" with another certificate: keys saved by
   that build are unreadable to normal builds.
-- Check keys with `Hmunmawi --verify-secrets` (ok/fail only, never values) and copy them forward after a
-  certificate change with `--rebind-secrets`.
+- Check keys with `Hmunmawi --verify-secrets` (ok/fail only, never values; a connection satisfied by another
+  credential, such as YouTube's Google sign-in, counts as ok) and copy them forward after a certificate change with
+  `--rebind-secrets`. At every launch the app also re-imports keys from their saved files in the background and
+  re-saves keys it can't read in a fresh Keychain item, so a changed certificate recovers on its own.
 - Don't change `KeychainSecretStore.service`. If you ever must, add the old name to
   `LegacySecretMigrator.legacyServices` so the next launch copies keys forward. (The data protection keychain, which
   needs no access list, requires a provisioning profile; see SECURITY.md "Keychain: why there is never a password
   box".)
-
-## Owner builds
-
-`make-app.sh` builds the *owner* flavour (adds a Keychain-prompt watcher for the maintainer's own Mac) only when
-the git-ignored file `scripts/.owner-build` exists. `HM_FLAVOR=public`, and `scripts/release.sh` always, leave it
-out, so public releases never contain it.
 
 ## Thanking new Wall of Apps entries
 

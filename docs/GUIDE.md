@@ -433,8 +433,6 @@ When and how Apple's on-device AI is used: [Apple's on-device AI](AI-AND-COSTS.m
 
 </details>
 
-</details>
-
 #### ⏳ Expiry watchdog
 **Never get caught by an expired certificate or domain.**
 
@@ -464,6 +462,7 @@ Helpers that should never stop (a relay, a local server), with safety nets and w
 - An **H** in the menu bar with a health dot (green, amber, red, grey), an optional number (sales, downloads,
   reviews, things waiting for you, or things to fix), and a panel with today's headline, connections, the latest
   moments, approvals and quick numbers.
+
 #### 🔔 Notifications
 **Hear about what matters, and only that.**
 
@@ -516,7 +515,7 @@ Appearance, the currency money is shown in, the ad cost per download, **Export y
 
 <details><summary>How it works</summary>
 
-One section per source, keys saved in the Keychain, *Find my key*, Check Now and Disconnect. Also **how fast sales arrive**: next morning (Apple's daily report), within minutes (Apple's notification history, with an In-App Purchase key) or within seconds (a free worker in your own Cloudflare account, see [the relay guide](ASC-WEBHOOK-RELAY.md)), and **Outreach replies** (Apple Mail, or IMAP with presets for Gmail, iCloud, Outlook and Fastmail).
+One section per source, keys saved in the Keychain, *Find my key*, Check Now and Disconnect. A key that was found from a file is re-imported from that file at launch, in the background after the window is up, so a protected folder never freezes the start; if macOS refuses the file, only that connection is marked as needing attention. A key saved by a differently signed copy of the app is re-saved in a fresh Keychain item, with no password box. Also **how fast sales arrive**: next morning (Apple's daily report), within minutes (Apple's notification history, with an In-App Purchase key) or within seconds (a free worker in your own Cloudflare account, see [the relay guide](ASC-WEBHOOK-RELAY.md)), and **Outreach replies** (Apple Mail, or IMAP with presets for Gmail, iCloud, Outlook and Fastmail).
 
 </details>
 
@@ -547,7 +546,7 @@ Group apps into a project or add a website (visitors, enquiries, search); the to
 
 <details><summary>How it works</summary>
 
-Every Mac permission Hmunmawi can use, why, and whether it's allowed, with *Check again*. Asked once at setup, never in the middle of a run.
+Every Mac permission Hmunmawi can use, why, and whether it's allowed, with *Check again*. Asked once at setup, never in the middle of a run. If the app is signed differently from the last launch (a development build, the release build or a new certificate), a banner here, and the activity log, name exactly which permissions to switch on again (Full Disk Access, Files & Folders, Calendars, Accessibility, Automation), because macOS ties each grant to the signature. *Got it* dismisses the banner.
 
 </details>
 
@@ -748,14 +747,14 @@ that can `notify` can add any of them ([Writing a connection](ADD-ONS.md)).
 | Sentry | Crash-free sessions and freezes | Organization, auth token |
 | Google Search Console | Google searches, clicks and pages | A service-account key |
 | Bing Webmaster Tools | Bing searches, clicks and pages | An API key |
-| YouTube | Views and subscribers | An API key |
+| YouTube | Views, subscribers and newest videos | An API key, or the Google sign-in file your own upload scripts already use (client id, client secret and refresh token) |
 | X | Your X numbers, read through your Safari login or from a file Grok Bot writes (no paid X API). Full setup with drafts, reply ideas and an unfollow list: [Set up X](X-SETUP.md) | Nothing |
 | Cloudflare | Website visitors and AI-bot reads | An API token |
 | Mac jobs | Your Mac's scheduled jobs: runs, failures, Run now and Pause | Nothing |
 | Script feed | Any numbers your own scripts print: [Your own numbers](SCRIPT-FEED.md) | Nothing |
 | iMessage, ntfy | Alerts to your phone | Your number, or an ntfy topic |
 
-Each runs as a separate sandboxed add-on that never sees your keys. Write your own: [Writing a connection](ADD-ONS.md).
+Each runs as a separate sandboxed add-on that never sees your keys. Write your own: [Writing a connection](ADD-ONS.md). They check in on their own clock: Mac jobs every 5 minutes, the script feed every 10, X every 30, App Store Connect every hour, Cloudflare, PostHog, RevenueCat and Sentry every 3 hours, Search Console, Bing and YouTube every 6 hours, and ntfy every 6 hours (only to see it answers).
 
 <br>
 

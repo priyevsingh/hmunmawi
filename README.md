@@ -237,6 +237,11 @@ after by it. All of it stays on your Mac.
 - **Find my key** (next to every key field) looks, only when you press it, in your Keychain, in `.env` files in
   folders you choose, and for App Store Connect key files (`AuthKey_<KEY ID>.p8`) in Downloads, Documents,
   Desktop and iCloud Drive. You pick one; values are never shown, only where each came from.
+- **Keys survive an update.** A connection with a known key file (for example the Google sign-in file for
+  YouTube) re-imports it at launch, in the background, so a permission prompt for a protected folder never
+  freezes the start. A key saved by a differently signed copy of the app is re-saved in a fresh Keychain item,
+  never with a password box. Only with owner extras on, a key you type is also kept in a private file in
+  `~/.config/hmunmawi/keys/` for that re-import ([PRIVACY.md](PRIVACY.md)).
 - **Removing a key:** Settings → Connections → the connection → **Disconnect**. Its keys are deleted from the
   Keychain.
 
@@ -290,8 +295,9 @@ Contributors' and coding agents' notes are in [AGENTS.md](AGENTS.md).
 - **The dot is red.** Open the menu-bar panel or Settings → Connections; the broken item is listed first with
   what to do. A failed Mac job is retried by itself before you're told.
 - **macOS asks for a permission again.** That happens when the app's signature changes, for example with a
-  self-built copy signed differently each time. Use the release from GitHub, or always sign with the same
-  certificate.
+  self-built copy signed differently each time. Hmunmawi notices and lists, in Settings → Permissions, which
+  permissions to switch on again. Use the release from GitHub, or always sign with the same certificate. Official
+  releases are refused unless their signing requirement matches the previous release, so updating never asks again.
 - **A Keychain box asks for your password.** Hmunmawi never needs your password. Choose **Allow** or
   **Always Allow**, and never type your password into it (see [SECURITY.md](SECURITY.md)).
 - **A connection shows "needs your approval".** It changed (for example after an update). Settings →

@@ -6,6 +6,7 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 
 **Docs**
 - The README's Win / Worry / Next table now shows what Hmunmawi looks after for your Apple apps and for everything else you run through add-ons. The three flow diagrams in the docs have a plain-text list before them and no `<br/>` in their labels, so they read cleanly in the GitHub iOS app and other viewers.
+- The docs now match 1.1.4: the YouTube Google sign-in file, key re-import and the fresh Keychain item, the signing-identity banner, the release signature gate and the CI-gated publish step, the connection check intervals, and the pull-request rules for `main` (SECURITY and RELEASING agreed). Removed a repeated section in RELEASING and a stray closing tag in the guide.
 
 ## 1.1.4 (build 114), 20 Nov 2026
 
