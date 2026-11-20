@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.4.1 (build 141), 21 Nov 2026
+
+**Fixed**
+- **Settings shows every pane again.** With ten panes, the Settings toolbar ran out of room and hid the last ones (Permissions, Publish, Backups, About) behind a ">>" menu. Settings now lists its panes in a sidebar, like System Settings, so all ten are always in view at any window size. Nothing moved inside the panes.
+- `hm set settings.tab` now also opens Menu bar, Publish and Backups (it only knew seven panes).
+
+Hmunmawi still does everything it did in 1.4.0: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you, with post drafts, reply ideas and opt-in automatic X unfollows), job switches, service watch, link and Python checks, publishing, outreach and mail, crashes and self-healing, money and offer codes, alerts, AI limits, share and show, and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.4.0 (build 140), 20 Nov 2026
 
 **New**

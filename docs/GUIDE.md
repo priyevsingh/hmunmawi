@@ -505,6 +505,8 @@ For 1 hour, until tomorrow, or until you switch them on. *Send a test notificati
 > [!TIP]
 > **What you get:** it works your way: your currency, your quiet hours, your AI (or none), your backups.
 
+Settings (⌘,) lists its panes in a sidebar on the left, like System Settings: General, Menu bar, Connections, Projects, Jobs, Rules, Permissions, Publish, Backups and About. Every pane is always in view, at any window size.
+
 #### 🧩 General
 **Make it behave exactly the way you like.**
 

@@ -71,6 +71,9 @@ and asks before it acts. Users' guide: [README.md](README.md).
   (`hm set key=mac.keep_awake`, off by default). Page-level "seen often, rarely clicked" is `PageCTR` in
   `SearchSites.swift`, shown by `Playbook.pageTitles`.
 - **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, job lists and hand-off files, workflow recipes such as search health, publishing on a schedule, social planning and AI jobs with the pause and one-at-a-time lock, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
+- **Settings panes:** `SettingsPane` in `SettingsView.swift` is the one list (sidebar order, titles, symbols); the
+  window is a sidebar (`NavigationSplitView`), never a toolbar `TabView` (ten tabs overflowed behind ">>" in 1.4.0).
+  A new pane is a new case there; `hm set settings.tab` and `SettingsPaneTests` follow it.
 - **Job switches (Settings → Jobs):** `Sources/HmunmawiCore/SwitchFile.swift` reads and edits the workspace's JSON
   switch file in place (only the flipped value changes; atomic write; checked before saving); the tab is
   `JobSwitchesForm.swift`. New well-known keys go in `SwitchFile.catalog` with a one-line explanation and a test.

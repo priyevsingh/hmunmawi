@@ -4,48 +4,74 @@ import ServiceManagement
 import UniformTypeIdentifiers
 import SwiftUI
 
-/// Settings the way Mac apps do it (Safari, Mail, Xcode): a toolbar of tabs, each a grouped form with
-/// system controls and short footnotes. The window resizes to each tab.
+/// The Settings panes, in sidebar order. One list for the sidebar, `hm set settings.tab` and the tests.
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general, menubar, connections, projects, jobs, rules, permissions, publish, backups, about
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .general: "General"; case .menubar: "Menu bar"; case .connections: "Connections"; case .projects: "Projects"
+        case .jobs: "Jobs"; case .rules: "Rules"; case .permissions: "Permissions"; case .publish: "Publish"
+        case .backups: "Backups"; case .about: "About"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"; case .menubar: "menubar.rectangle"; case .connections: "point.3.connected.trianglepath.dotted"
+        case .projects: "square.stack.3d.up"; case .jobs: "switch.2"; case .rules: "bolt.badge.automatic"
+        case .permissions: "lock.shield"; case .publish: "globe"; case .backups: "clock.arrow.circlepath"; case .about: "info.circle"
+        }
+    }
+    /// Unknown or old values (a remembered tab from another version) open General.
+    static func from(_ raw: String) -> SettingsPane { SettingsPane(rawValue: raw) ?? .general }
+}
+
+/// Settings the way current Mac apps do it (System Settings): a sidebar of panes, each a grouped form with
+/// system controls and short footnotes. A sidebar fits every pane at any window size, so none hides behind
+/// a toolbar's ">>" overflow menu (10 toolbar tabs did not fit at the old width).
 struct SettingsView: View {
     let model: AppModel
-    /// Remembered tab; agents can open one with `defaults write <app> HMSettingsTab projects`.
+    /// Remembered pane; agents can open one with `hm set settings.tab projects`.
     @AppStorage("HMSettingsTab") private var tab = "general"
+    /// Sidebar width and the narrowest a pane may get; the window's minimum is the two together.
+    static let sidebarWidth: CGFloat = 200
+    static let paneMinWidth: CGFloat = 860
 
     var body: some View {
-        TabView(selection: $tab) {
-            Tab("General", systemImage: "gearshape", value: "general") {
-                GeneralSettings(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 230, idealHeight: 560, maxHeight: .infinity)
+        let pane = SettingsPane.from(tab)
+        NavigationSplitView {
+            List(SettingsPane.allCases, selection: Binding(get: { pane }, set: { if let p = $0 { tab = p.rawValue } })) { p in
+                Label(p.title, systemImage: p.symbol)
+                    .tag(p)
+                    .accessibilityIdentifier("settings.tab.\(p.rawValue)")
             }
-            Tab("Menu bar", systemImage: "menubar.rectangle", value: "menubar") {
-                MenuBarSettingsForm(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
-            }
-            Tab("Connections", systemImage: "point.3.connected.trianglepath.dotted", value: "connections") {
-                ConnectionsForm(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
-            }
-            Tab("Projects", systemImage: "square.stack.3d.up", value: "projects") {
-                ProjectsForm().frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
-            }
-            Tab("Jobs", systemImage: "switch.2", value: "jobs") {
-                JobSwitchesForm(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 300, idealHeight: 620, maxHeight: .infinity)
-            }
-            Tab("Rules", systemImage: "bolt.badge.automatic", value: "rules") {
-                RulesEditor(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
-            }
-            Tab("Permissions", systemImage: "lock.shield", value: "permissions") {
-                PermissionsForm(permissions: Permissions.shared).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 250, idealHeight: 720, maxHeight: .infinity)
-            }
-            Tab("Publish", systemImage: "globe", value: "publish") {
-                PublishForm(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 360, idealHeight: 520, maxHeight: .infinity)
-            }
-            Tab("Backups", systemImage: "clock.arrow.circlepath", value: "backups") {
-                BackupsForm(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
-            }
-            Tab("About", systemImage: "info.circle", value: "about") {
-                AboutPane().frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 330, idealHeight: 560, maxHeight: .infinity)
-            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: Self.sidebarWidth, ideal: Self.sidebarWidth, max: Self.sidebarWidth + 40)
+            .toolbar(removing: .sidebarToggle)   // the panes are the only way around, so the sidebar always shows
+        } detail: {
+            detail(pane)
+                .frame(minWidth: Self.paneMinWidth, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
+                .navigationTitle(pane.title)
         }
+        .navigationSplitViewStyle(.balanced)
         .buttonStyle(.pill)   // same button look as the main window (rows that need another style set their own)
         .task { await model.load() }
+    }
+
+    @ViewBuilder private func detail(_ pane: SettingsPane) -> some View {
+        switch pane {
+        case .general: GeneralSettings(model: model)
+        case .menubar: MenuBarSettingsForm(model: model)
+        case .connections: ConnectionsForm(model: model)
+        case .projects: ProjectsForm()
+        case .jobs: JobSwitchesForm(model: model)
+        case .rules: RulesEditor(model: model)
+        case .permissions: PermissionsForm(permissions: Permissions.shared)
+        case .publish: PublishForm(model: model)
+        case .backups: BackupsForm(model: model)
+        case .about: AboutPane()
+        }
     }
 }
 
