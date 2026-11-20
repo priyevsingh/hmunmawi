@@ -4,6 +4,26 @@
 > deploy to your own account from Settings → Connections → Live sales). Users don't need to read it: the app sets
 > the worker up for you.
 
+## How live sales reach your Mac, in plain words
+
+1. You switch on *within seconds* in Settings → Connections; Hmunmawi deploys a small worker to **your own**
+   Cloudflare account and shows its address.
+2. You paste that address into App Store Connect once.
+3. When someone buys or renews, Apple sends a signed notification to your worker. It keeps only Apple-signed ones,
+   for 7 days.
+4. Your Mac collects them from the worker with a private relay key (about once a minute today), and Hmunmawi shows the
+   sale and alerts you by your rules.
+
+```mermaid
+flowchart LR
+    A["Apple"] -->|"signed notification"| W["Your Cloudflare worker"]
+    W --> K["Kept 7 days"]
+    M["Hmunmawi on your Mac"] -->|"asks with your relay key"| W
+    M --> Y["Sale shown and alert sent"]
+```
+
+The rest of this page is the technical design for developers.
+
 ## Problem
 
 Legacy `GET /asc/outbox` lists every `wh:` key in Workers KV on each poll (up to 500 keys per page) before filtering by `since`. On the Workers Free plan, KV **list** reads are tightly capped (~1,000/day per namespace). A Mac client polling once per minute burns through that budget and can drop events when more than 200 share the same millisecond bucket.

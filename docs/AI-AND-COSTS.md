@@ -95,7 +95,7 @@ Any script or bot can report a plan's usage by writing a JSON file to
 If your own scripts run AI jobs (an overnight batch, a research job), the AI job pause lets you stop them until a
 time, or until you say so. Set the first pause with `hm ai-pause-set`; from then on the AI job pause card shows under
 AI & subscriptions, where you can change or clear it, and the menu bar shows when it's on.
-Your scripts ask `hm ai-pause-check` before starting (it answers "available" or "deferred"). Hmunmawi itself never starts a paid AI call without a key you added.
+Your scripts ask `hm ai-pause-check` before starting (it answers "available" or "deferred"). Hmunmawi itself never starts a paid AI call without a key you added. A small wrapper, the whole job flow as a diagram, and an optional second AI while the first is paused: [Running AI jobs on your own Mac](PRIVATE-WORKSPACE.md#running-ai-jobs-on-your-own-mac).
 
 ## Apple's on-device AI
 
@@ -147,5 +147,5 @@ Pick *Apple's on-device AI*, *My AI key* or *No drafts* to use only that; a fixe
 - When Apple's safety check declines a request, that post is skipped, never worked around, as Apple's
   [acceptable use requirements](https://developer.apple.com/apple-intelligence/acceptable-use-requirements-for-the-foundation-models-framework/) ask.
 
-Full rules: [X-TECHNICAL.md → Reply ideas](X-TECHNICAL.md#reply-ideas-does-reply-ideas).
+Full rules: [X-TECHNICAL.md → Reply ideas](X-TECHNICAL.md#reply-ideas-doesreply-ideas).
 

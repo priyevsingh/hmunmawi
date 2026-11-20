@@ -56,9 +56,11 @@ purpose: that's always your decision.) The agent can then press Check Now for yo
 | `title` | The card's heading. |
 | `page` | Where it appears: `overview` (Today), `revenue` (Money), `growth` (Reach), `health` (Health) or `inbox` (Log). |
 | `outcome` | One plain sentence at the top: what the numbers mean. |
-| `figures` | Big numbers, each `{ "label", "value" }`. |
+| `figures` | Big numbers, each `{ "label", "value" }`; optional `format` (`number`, `usd`, `inr` or `percent`), `change` (0.38 = up 38%) and `better` (`up` or `down`, which direction is good). |
 | `bars` | A bar chart, each `{ "label", "value" }`. |
 | `series` | A line over days: `days` (YYYY-MM-DD) and `values` of the same length. |
+| `barsFormat` | `percent` when each bar is already a rate; default `number`. |
+| `items` | Lines on the card, each `{ "title", "outcome", "action", "severity", "figure" }` (all optional but `title`); `action` is a plain sentence saying what to do, so the line reads as a to-do. `severity` is `critical`, `high`, `medium` or `low` (critical and high show red, medium amber). |
 | `symbol` | Optional SF Symbol name for the card's icon. |
 | `order` | Optional number to sort cards on a page (smaller first). |
 
@@ -80,6 +82,17 @@ plan or stats, an Instagram Reel or carousel, a Reddit or Discord post idea, an 
 has no built-in Instagram, Reddit, Discord or Shorts connection: your script (or an AI job you run) does the
 thinking and prints a card whose `items` carry an `action` (a plain sentence saying what to do), so each idea
 shows as a to-do line on its card. Hmunmawi tracks, queues and reminds; it never posts to any platform for you.
+For example, a card with today's two to-dos:
+
+```json
+{ "kind": "section.snapshot", "app": "Social", "occurredAt": 1794600000000, "dedupeKey": "social-2026-11-14",
+  "payload": { "id": "social-today", "title": "Social today", "page": "growth",
+    "outcome": "2 things to post today",
+    "items": [
+      { "title": "Short: setting up widgets", "action": "Record and post the Short at 18:00" },
+      { "title": "Carousel: 5 tips", "action": "Post the carousel from out/carousels/tips/" } ] } }
+```
+
 If you run these as Mac jobs, the Automations map groups jobs whose names mention a post, caption, Instagram or
 short under **Social posts**, with a dot for what happened today. Remind-me routines and the Hmunmawi calendar put the
 due ones on your phone.
@@ -102,3 +115,16 @@ programs) with one event of kind `growth.programs`:
 
 `status` is `approved`, `review` (in review), `next` (apply next) or `later`. Click the card for every program,
 grouped by status.
+
+## Events that start a fix script
+
+The script feed accepts any event kind. Four kinds can start a **fix script** you picked in Settings → General:
+`disk.low` (disk space runs low), `site.down`, `job.failed` and `crash.spike`. Hmunmawi itself has no disk check, so
+`disk.low` comes from your own script, for example one that prints this when free space drops below your limit:
+
+```json
+{ "events": [ { "kind": "disk.low", "app": "This Mac", "occurredAt": 1794600000000, "dedupeKey": "disk-2026-11-14",
+  "payload": { "title": "Only 18 GB free" } } ] }
+```
+
+More recipes (search health, publishing, social planning, AI jobs): [Your private workspace](PRIVATE-WORKSPACE.md#workflows-you-can-build).

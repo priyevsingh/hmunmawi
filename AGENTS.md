@@ -53,7 +53,7 @@ and asks before it acts. Users' guide: [README.md](README.md).
   (every parameter: [docs/X-TECHNICAL.md](docs/X-TECHNICAL.md#agent-reference)). Never post, reply, like,
   follow or unfollow on X for the user.
 
-- **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
+- **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, job lists and hand-off files, workflow recipes such as search health, publishing on a schedule, social planning and AI jobs with the pause and one-at-a-time lock, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
 - **New connection:** copy the closest `AddOns/<name>`, read [docs/ADD-ONS.md](docs/ADD-ONS.md), declare every
   host and event kind in `manifest.json`, save state with `StateFile` (atomic writes are blocked by the sandbox),
   add it to `Package.swift`'s add-on list, and add a test.

@@ -40,21 +40,39 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 | | 🍎 Your Apple apps | 🌐 Everything else you run (via add-ons) |
 |---|---|---|
 | **🌱 Win** | Downloads, proceeds, active subscribers, ratings and new reviews, in one sentence from your own numbers. Every sale shows up as it happens. | Website visits, Google and Bing search clicks, daily active users, subscriptions, YouTube and X growth, in the same sentence. |
-| **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review, offer codes about to expire. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, a website that stopped answering, a crash spike, trouble that one of your own scripts reports, a connection or key that stopped working. Same calm alert on iMessage, your phone or Calendar. |
+| **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review, offer codes about to expire. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, a website that stopped answering, a search problem your own monitor found, a crash spike, trouble that one of your own scripts reports, a connection or key that stopped working. Same calm alert on iMessage, your phone or Calendar. |
 | **➡️ Next** | What to do about it, plus chores that run for you: review replies and X reply ideas drafted for you to edit, offer codes handed out one by one, and share cards sized for posts and stories. | The creative work you run, tracked and queued: YouTube channel stats and Shorts plans, Instagram Reels and carousels, Reddit and Discord post ideas, X posts and reply ideas, articles. Your own scripts or AI jobs write the drafts; each shows up as a to-do and nothing goes out until you say so. |
 
 ### What it can run for you
 
-- **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit, offer codes, featuring nominations and product page tests.
-- **Websites and search:** visitors and AI-bot reads from Cloudflare, Google Search Console and Bing clicks, top searches and pages, a "website down" watch, and next steps like searches that have no page yet.
+- **Your daily answer:** one sentence each morning (Win, Worry, Next), the Today page, a weekly story and the menu bar "H" with a health dot.
+- **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit (and fixes it, then submits, only after you confirm), TestFlight tidy-up, offer codes, featuring nominations, product page tests, and review replies posted only when you press Post.
+- **Live sales:** the next morning, within minutes, or within seconds through a free relay in your own Cloudflare account.
+- **Websites and search:** visitors and AI-bot reads from Cloudflare, Google Search Console and Bing clicks, top searches and pages, a "website down" watch, next steps like searches that have no page yet, and a Search health card with Fix buttons fed by your own monitor script.
 - **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas and an unfollow list; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
 - **Content publishing:** articles and posts you produce show up as to-dos and as jobs on the Automations map, so you can see what is due, what ran and what failed.
-- **Crashes and health:** crash-free sessions from Sentry, failed Mac jobs retried, keys and certificates watched for expiry.
+- **Outreach and mail:** an outreach list with follow-up reminders, and replies matched from your mail for you to confirm.
+- **Crashes and health:** crash-free sessions and freezes from Sentry, failed Mac jobs retried, keys, certificates and domains watched for expiry, and your own fix scripts run when a problem appears.
 - **Money:** payday date, monthly forecast, profit after your costs, AI credits and plan limits, and an export for your accountant.
 - **Alerts:** iMessage, ntfy push and an iPhone and Watch calendar, with quiet hours.
 - **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs, and agents like Claude Code through `hm`. Anything that changes something waits for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
+- **Share and show:** share cards for posts and stories, your numbers as a web page you host yourself, and the Wall of Apps.
 
 No dashboards to open. Free, open source, and your data stays on your Mac. [Full capability list](docs/CAPABILITIES.md) · [Build your private workspace](docs/PRIVATE-WORKSPACE.md) · [See every add-on](docs/ADD-ONS.md).
+
+How it fits together, in plain words: your sources are read by add-ons that never see your keys; your own private
+workspace (optional) adds scripts, Mac jobs and AI jobs; Hmunmawi turns it all into one answer, cards and to-dos;
+anything that changes something waits for your OK; alerts reach your phone and Watch.
+
+```mermaid
+flowchart LR
+    S["Your sources"] --> A["Add-ons"]
+    A --> H["Hmunmawi on your Mac"]
+    W["Your private workspace"] --> H
+    H --> D["Daily answer and to-dos"]
+    H --> Q["Waits for your OK"]
+    H --> P["Phone and Watch alerts"]
+```
 
 ## Every app, side by side
 
@@ -258,6 +276,24 @@ after by it. All of it stays on your Mac.
 - **Removing a key:** Settings → Connections → the connection → **Disconnect**. Its keys are deleted from the
   Keychain.
 
+How a key comes back after an update, in plain words:
+
+1. A release signed like the last one reads every key straight away, with no box.
+2. If the app is signed differently (a build of your own, a new certificate), a key that came from a file is read
+   from that file again at launch and saved in a fresh Keychain item of its own, never with a password box.
+3. A key you typed has no file to read again, so that connection says it needs attention; add the key once more.
+
+```mermaid
+flowchart TD
+    U["App starts after an update"] --> S{"Signed like last time?"}
+    S -->|yes| OK["Keys read, nothing to do"]
+    S -->|no| F{"Key came from a file?"}
+    F -->|yes| R["Read the file again"]
+    F -->|no| N["Connection asks for the key once"]
+    R --> K["Saved in a fresh Keychain item"]
+    K --> OK
+```
+
 </details>
 <details>
 <summary><b>Self-healing and backups</b></summary>
@@ -402,6 +438,19 @@ Apps shipped by indie developers who use Hmunmawi.
   themselves.
 - **Share it:** once your app is on the wall, Hmunmawi offers a ready post for your own X account (you post it).
 - **See everyone's apps in the app:** Settings → About → *Show the community's apps*.
+
+The same steps as a picture: you pick your app, confirm, and a pull request opens from your own GitHub login; a check
+confirms it is a real, live App Store app; after it is merged the wall rebuilds and you can post about it yourself.
+
+```mermaid
+flowchart LR
+    A["Settings, Wall of Apps"] --> L["Looked up on the App Store"]
+    L --> C{"You confirm"}
+    C --> PR["Pull request from your gh login"]
+    PR --> K["Check: real, live, listed once"]
+    K --> M["Merged: wall rebuilds"]
+    M --> X["A ready post you share yourself"]
+```
 
 <!-- wall:start -->
 <p align="center"><a href="docs/WALL-OF-APPS.md"><img src="docs/wall/mosaic.png" alt="Icons of 3 apps on the Wall of Apps" width="234"></a></p>

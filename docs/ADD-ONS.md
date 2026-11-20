@@ -24,6 +24,8 @@ The full list of what Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md). Hm
 
 Hmunmawi tracks, plans, queues and reminds. It never posts to YouTube, Instagram, Reddit, Discord or X for you, and anything that changes something waits for your OK.
 
+The Search Console and Bing add-ons only read: submitting pages or sitemaps to search engines is left to your own scripts. A few things are fed without an add-on, through files your scripts write: the Search health card, job lists on the Automations map, AI usage and the X file. See [Hand-off files](PRIVATE-WORKSPACE.md#hand-off-files).
+
 ## The folder
 
 An add-on is a folder named `<id>.hmplugin` with two files:

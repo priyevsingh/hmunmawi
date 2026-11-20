@@ -77,6 +77,15 @@ Worked out from your own numbers, no AI: search queries with no page, channels p
 
 </details>
 
+#### 🔎 Search health
+**See when Google, Bing or AI search stops seeing your website, and fix it from here.**
+
+<details><summary>How it works</summary>
+
+Each of your websites with its search health (all clear, worth a look, needs attention) and its top problems, from a `search_health.json` report your own monitor script writes. **Problems and fixes** lists every problem in plain words with the fixes your script offers: an API action or an AI code fix (run by your script; an AI fix should only open a pull request for your OK), or Safari steps you do yourself in one new tab that Hmunmawi opens on Bing Webmaster Tools or Search Console after you confirm, and closes when you are done. Hmunmawi itself submits nothing to search engines. A website project with no report shows **Choose file…**. Format and script: [Search health](PRIVATE-WORKSPACE.md#search-health).
+
+</details>
+
 
 ![Your journey and Payday & profit](images/guide/today-money.png)
 
@@ -393,7 +402,7 @@ The signed activity log of everything Hmunmawi, its routines and agents did.
 
 <details><summary>How it works</summary>
 
-Every routine, Mac job and bot on one map: where its data comes from, who works on it (your Mac, your bot, the cloud, you) and where the result lands. A dot shows what happened today. Click one to open it: Run now, Pause, Show log. Each of these asks first unless you allowed it.
+Every routine, Mac job and bot on one map: where its data comes from, who works on it (your Mac, your bot, the cloud, you) and where the result lands. A dot shows what happened today. Click one to open it: Run now, Pause, Show log. Each of these asks first unless you allowed it. Jobs Hmunmawi can't see by itself (a script's own scheduler, a cloud job) can join the map through a small job list file ([format](PRIVATE-WORKSPACE.md#job-list-format)).
 
 </details>
 
@@ -473,7 +482,7 @@ Helpers that should never stop (a relay, a local server), with safety nets and w
 
 <details><summary>How it works</summary>
 
-For new purchases and renewals, refunds, 1- and 2-star reviews, other reviews, build and review changes from Apple, a connection that stops working, and a rating that drops (by the amount you choose). Grouped per app, held during quiet hours, at most 6 an hour; a problem only if it's still there 7 minutes later.
+For new purchases and renewals, refunds, 1- and 2-star reviews, other reviews, build and review changes from Apple, a connection that stops working, and a rating that drops (by the amount you choose). Grouped per app, held during quiet hours, at most 6 an hour; a problem only if it's still there 7 minutes later. The whole path as a picture: [How an alert reaches you](CAPABILITIES.md#how-an-alert-reaches-you).
 
 </details>
 

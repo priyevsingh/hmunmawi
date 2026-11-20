@@ -15,8 +15,8 @@ missed (the Mac was asleep) still starts if it's within the routine's catch-up w
 | Warn before offer codes expire | Warns 30, 7 and 1 day(s) before an App Store offer code expires | App Store Connect |
 | Ask AI about my numbers | Asks your AI about the week's numbers, your search terms or crashes; costs nothing when there's nothing new | an AI key |
 | Post drafts from my bank | A few ready drafts a day from a bank, the best one first; weak drafts (too short, a sentence lifted from an article, nothing to reply to) are skipped. The ranking follows X's published algorithm (checked daily). The AI writes more only when the bank runs low. You post them yourself | a bank or an AI key |
-| X reply ideas | One ready X reply at each of your times. From Grok Bot (its daily reply-targets file) or, without Grok Bot, from Hmunmawi itself: a daily X search for your topics through your Safari login, replies drafted free by Apple's on-device AI, or your AI key, or none (you write them). Skips posts older than 48 hours, off your topics, with a link or an outdated version. You post it yourself ([set up](X-SETUP.md#reply-ideas)) | Grok Bot's file, or Read via your Safari login and your topics |
-| X unfollow list | Once a day a short list (10 by default, at most 25) of accounts that don't follow you back, to unfollow by hand, from Grok Bot's list or your own Following page read through Safari (accounts with 50,000+ followers kept); your keeps are never listed. Hmunmawi never unfollows for you ([set up](X-SETUP.md#unfollow-list)) | Grok Bot's list, or Read via your Safari login |
+| X reply ideas | One ready X reply at each of your times. From Grok Bot (its daily reply-targets file) or, without Grok Bot, from Hmunmawi itself: a daily X search for your topics through your Safari login, replies drafted free by Apple's on-device AI, or your AI key, or none (you write them). Skips posts older than 48 hours, off your topics, with a link or an outdated version. You post it yourself ([set up](X-SETUP.md#-reply-ideas)) | Grok Bot's file, or Read via your Safari login and your topics |
+| X unfollow list | Once a day a short list (10 by default, at most 25) of accounts that don't follow you back, to unfollow by hand, from Grok Bot's list or your own Following page read through Safari (accounts with 50,000+ followers kept); your keeps are never listed. Hmunmawi never unfollows for you ([set up](X-SETUP.md#-unfollow-list)) | Grok Bot's list, or Read via your Safari login |
 | Follow-up reminders | Which outreach follow-ups are due (one per outlet) | an outreach list |
 | Warn when a key stops working | A connection refused, expired or revoked twice in a row: told once, and again when it works | nothing |
 | Judge my changes | After 7 to 28 days, keep / improve / undo for each change you asked it to watch | a change to watch |
@@ -24,6 +24,8 @@ missed (the Mac was asleep) still starts if it's within the routine's catch-up w
 | Outreach replies | Matches replies in your mail to your outreach list; each change waits for your tap | a mail source (Settings → Connections → Outreach replies) and an outreach list |
 | Run my script | Your own script (time limit 1–60 minutes, 10 by default), output kept; optional working folder and a settings file of KEY=VALUE lines the script gets; **Try out** runs it with its dry-run argument and records only | a script |
 | Morning story, Weekly digest | The app's own summaries; switch them off here. The morning story can add one line from your AI | — |
+
+Recipes that combine routines with your own scripts (publishing on a schedule, social planning, search health, AI jobs): [Your private workspace](PRIVATE-WORKSPACE.md#workflows-you-can-build).
 
 Every routine can tell you by iMessage or ntfy, and can also tell you each time it runs. Messages respect quiet
 hours (urgent ones, like a site going down, still go out).

@@ -8,6 +8,37 @@ crash and money alerts, and autopilot with your approval.
 You don't need one to use Hmunmawi. Everything built in works without it. Build one when you want Hmunmawi to
 show and track things that no built-in connection knows about.
 
+## The big picture
+
+In plain words:
+
+1. **Your workspace** holds scripts, small data files, AI briefs and drafts. It runs on your own Mac.
+2. Your scripts hand their results to Hmunmawi in a few simple ways: a **script feed** that prints cards, **routines**
+   and **Mac jobs** that run on a clock, a **job list** for jobs Hmunmawi can't see, and a few **hand-off files**
+   it reads (search health, AI usage, X numbers).
+3. **Hmunmawi** shows all of it next to its built-in connections: cards, to-dos, the Automations map and alerts.
+4. Anything that would change something on an account waits for **your OK**. Posting is always yours.
+
+```mermaid
+flowchart LR
+    subgraph WS["Your private workspace"]
+        S["Scripts"]
+        J["Mac jobs"]
+        F["Hand-off files"]
+        AI["AI jobs"]
+    end
+    S -->|"script feed"| H["Hmunmawi"]
+    J -->|"routines and Mac jobs"| H
+    F -->|"read every few minutes"| H
+    AI -->|"hm, asks first"| H
+    H --> Y["You: approve, post, publish"]
+```
+
+The technical names: the script feed is an add-on that runs one script every 10 minutes; routines are in
+`~/Library/Application Support/Hmunmawi/joblists/my-routines.json` (signed, change them only in the app or with
+`hm`); job lists and hand-off files are described [below](#how-scripts-feed-the-app); agents use the `hm` command
+or its MCP server ([HM-COMMANDS.md](HM-COMMANDS.md)).
+
 ## What it is, and why it is private
 
 - **Hmunmawi** is the app: open source, on GitHub, the same for everyone.
@@ -58,7 +89,7 @@ Make the repo **private** on GitHub, or don't push it at all and keep it in your
 
 ## How scripts feed the app
 
-There are three ways your scripts and Hmunmawi meet. Mix them freely.
+There are five ways your scripts and Hmunmawi meet. Mix them freely.
 
 1. **Script feed: a script that shows numbers.** In **Settings → Connections → Script feed** you give Hmunmawi the
    path to one script. Every 10 minutes it runs the script, which prints a little JSON, and Hmunmawi draws it as a
@@ -71,6 +102,45 @@ There are three ways your scripts and Hmunmawi meet. Mix them freely.
 3. **Mac jobs: scheduled jobs you already have.** The Mac jobs connection watches your scheduled jobs (launchd),
    flags the ones that fail and lets you **Run now** or **Pause**; a routine can also run one of them on a schedule.
    See [ADD-ONS.md](ADD-ONS.md).
+4. **Job lists: jobs Hmunmawi can't see.** A script with its own scheduler, a bot or a cloud job can describe its
+   jobs in a small JSON file of its own in `~/Library/Application Support/Hmunmawi/joblists/` (any name except
+   `my-routines.json`). They appear on the Automations map with today's status. Format below.
+5. **Hand-off files: things Hmunmawi reads directly.** A few cards read a file your script writes, instead of the
+   script feed: see the table below.
+
+### Job list format
+
+```json
+{
+  "source": "My workspace",
+  "who": "mac",
+  "jobs": [
+    { "id": "weekly-seo", "title": "Weekly search report", "detail": "Google and Bing, week over week",
+      "at": "08:10", "days": ["Mon"],
+      "last": { "date": "2026-11-17", "status": "ran" },
+      "proof": "~/my-workspace/out/seo/{date}.md" }
+  ]
+}
+```
+
+- `who` is `mac`, `bot` or `cloud`. `at` is `HH:MM`, or use `"every": "5 min"`. `days` empty means every day.
+- `last.status` is `ran`, `failed` or `missed`. Or give a `proof` file: when it exists (`{date}` becomes today's
+  date), today's run counts as done.
+- Keep the file under 500 KB. Hmunmawi only reads it; it never runs these jobs.
+
+### Hand-off files
+
+| File your script writes | What Hmunmawi does with it | Format |
+|---|---|---|
+| A script that prints JSON (script feed) | Cards, to-dos, the Startup programs card, events such as `disk.low` | [SCRIPT-FEED.md](SCRIPT-FEED.md) |
+| `joblists/<name>.json` | Shows jobs it can't see on the Automations map | [Above](#job-list-format) |
+| `search_health.json` | The Search health card with Fix buttons | [Search health](#search-health) |
+| `usage/<name>.json` in Hmunmawi's data folder | A plan's usage under AI & subscriptions | [AI-AND-COSTS.md](AI-AND-COSTS.md#usage-file-format) |
+| The X file | Your X numbers, best hours and glance | [X-FILE.md](X-FILE.md) |
+| A bot's proof file and `problem-<job>-<date>.txt` in the shared bot folder | Tells you when a bot's job is late or failed | [ROUTINES.md](ROUTINES.md#bots) |
+| A fix script you pick in Settings → General | Runs by itself when disk space runs low, a website goes down, a Mac job fails or crashes jump | [README](../README.md#everything-else) |
+
+Hmunmawi's data folder is `~/Library/Application Support/Hmunmawi/`.
 
 ### A tiny example
 
@@ -112,12 +182,14 @@ Your scripts (or an AI job you run) do the thinking and hand over cards, to-dos 
 | You want | Your workspace does | Hmunmawi shows |
 |---|---|---|
 | **Apple apps** | Nothing needed. Connect App Store Connect and RevenueCat in Settings. Add scripts only for numbers from your own backend | Sales, subscriptions, reviews, releases, the Rejection Shield, offer codes |
-| **Websites and search** | A script that checks a page, a sitemap or your analytics and prints a card; a routine can also watch a website address | Cloudflare, Google Search Console and Bing numbers, "website down", next steps such as searches with no page yet |
+| **Websites and search** | A script that checks a page, a sitemap or your analytics and prints a card; a routine can also watch a website address; a search health monitor writes `search_health.json` | Cloudflare, Google Search Console and Bing numbers, "website down", next steps such as searches with no page yet, the Search health card and its Fix buttons |
 | **Social: Shorts, Reels, carousels, Reddit, Discord, X** | A script or AI job writes plans and drafts into `out/` and prints a card whose `items` have an `action` (a plain sentence). X drafts can sit in a bank (`hm bank-add`) | To-do lines on a card, routine reminders, X drafts at your best hours, the Social posts group on the Automations map |
 | **Publishing: articles and posts** | A job that produces the article or post file and a card saying what is due | To-dos and jobs on the Automations map: what is due, what ran, what failed |
 | **Crashes and health** | Nothing needed for Sentry. A script can print a card for anything else, such as your own server health | Crash-free sessions, failed Mac jobs, keys and certificates nearing expiry |
 | **Money and offer codes** | A script can fill the Startup programs card; tools and plans are typed in the app | Payday, forecast, profit, AI credits, offer codes and their expiry |
 | **Alerts** | Nothing needed. Alerts go out through iMessage, ntfy and the calendar | One message, only if it is still true 7 minutes later, with quiet hours |
+| **Outreach and mail** | Nothing needed. Add outlets with `hm outreach-add` or in the app | Follow-ups due, replies matched from your mail, each change waiting for your tap |
+| **AI limits** | A wrapper that asks `hm ai-pause-check` before each AI job and keeps one job at a time ([below](#running-ai-jobs-on-your-own-mac)) | Plan limits, the AI job pause, the monthly AI budget |
 | **Autopilot with approval** | Scripts you trust become routines; agents call `hm` | Anything that changes something waits in Log → Waiting |
 
 ### Approval comes first
@@ -130,6 +202,282 @@ Your scripts (or an AI job you run) do the thinking and hand over cards, to-dos 
 - **Your drafts are only drafts.** Nothing is posted, sent or changed on any platform without you.
 
 The whole list of commands is in [HM-COMMANDS.md](HM-COMMANDS.md) and `hm guide`.
+
+## Workflows you can build
+
+Each recipe below is something a private workspace can run around Hmunmawi. For each one: what it is for, what
+**your workspace** does, what **Hmunmawi** does, and where your OK comes in. Hmunmawi never posts, publishes or
+merges anything by itself; where a recipe says "merge" or "post", that is your script or you.
+
+<details><summary>Quick index</summary>
+
+- [A daily numbers message](#a-daily-numbers-message)
+- [Live purchase alerts](#live-purchase-alerts)
+- [Crash alerts in plain words](#crash-alerts-in-plain-words)
+- [Search health](#search-health)
+- [Website checks and a pull-request gate](#website-checks-and-a-pull-request-gate)
+- [Articles on a schedule](#articles-on-a-schedule)
+- [Website language versions](#website-language-versions)
+- [Social and content planning](#social-and-content-planning)
+- [X post drafts and reply reminders](#x-post-drafts-and-reply-reminders)
+- [Review reply drafts and store keyword ideas](#review-reply-drafts-and-store-keyword-ideas)
+- [Win-back offers and offer-code checks](#win-back-offers-and-offer-code-checks)
+- [A research job on a monthly AI budget](#a-research-job-on-a-monthly-ai-budget)
+- [Morning batch and weekly pulse](#morning-batch-and-weekly-pulse)
+- [Self-repair: disk space, failed jobs, keep-alive](#self-repair-disk-space-failed-jobs-keep-alive)
+- [A bigger portal of your own](#a-bigger-portal-of-your-own)
+
+</details>
+
+### A daily numbers message
+
+- **For:** one short message each morning with yesterday's numbers.
+- **Built in:** the morning story and the weekly digest (Automations → Your routines) already do this from your
+  connections, by iMessage or ntfy.
+- **Your workspace:** for numbers Hmunmawi doesn't have, a script prints a `section.snapshot` card through the script
+  feed; it then counts in the same Today page. A script that sends its own message can run as a **Run my script**
+  routine.
+- **Your OK:** none needed; it only reads and tells you.
+
+### Live purchase alerts
+
+- **For:** hearing about a purchase or a renewal within seconds.
+- **Built in:** Settings → Connections → App Store Connect → how fast sales arrive → *within seconds*. Hmunmawi deploys
+  a small relay to **your own** Cloudflare account and shows its address; you paste that address into App Store
+  Connect once ([how the relay works](ASC-WEBHOOK-RELAY.md)). A rule ("when a purchase arrives, text me") sends it on.
+- **Your workspace:** nothing needed. If you already run your own receiver, a script can send its events through the
+  script feed instead.
+
+### Crash alerts in plain words
+
+- **For:** one plain sentence per new crash or freeze, not a dashboard.
+- **Built in:** the Sentry connection reads crash-free sessions and freezes; ready-made rules alert on a crash spike.
+- **Your workspace:** a script can read Sentry issues and print one card or event per problem, and an AI job can
+  write an "explain this crash" note into `out/`. The note is only a note; fixing code is yours.
+
+### Search health
+
+- **For:** knowing when Google, Bing or AI search stops seeing your website, and fixing it in one place.
+- **Your workspace:** a monitor script checks each site (sitemap, pages that fail, Search Console and Bing data,
+  pages missing from an index) and writes `search_health.json`. Submitting pages to search engines (a sitemap ping,
+  IndexNow, Bing URL submission) is the script's job: Hmunmawi's Bing and Search Console connections only read.
+- **Hmunmawi:** a **Search health** card on the Today page, grouped under your projects, with **Problems and fixes**.
+  Each fix button runs your monitor script; a Safari fix opens **one new tab** on Bing Webmaster Tools or Search
+  Console after you confirm, stops at a sign-in, and closes only that tab when you press Done.
+- **Your OK:** you press each fix. An "AI code fix" should only open a pull request; keep merging for yourself.
+
+In plain words:
+
+1. Your monitor checks the site and writes a report.
+2. Hmunmawi shows the problems and the fixes your script offers.
+3. You press a fix: your script calls an API, starts an AI job that opens a pull request, or Hmunmawi opens one
+   Safari tab with steps for you.
+4. Your script checks again and writes the new state; the card updates within a minute.
+
+```mermaid
+flowchart LR
+    M["Your monitor script"] --> R["search_health.json"]
+    R --> C["Search health card"]
+    C --> Y{"You press a fix"}
+    Y -->|"API"| M
+    Y -->|"AI code fix"| PR["Pull request for your OK"]
+    Y -->|"Safari"| T["One new tab, steps for you"]
+    PR --> M
+    T --> M
+```
+
+**Where Hmunmawi looks.** Pick the file once on a website project's empty Search health card (**Choose file…**).
+Put the script at `scripts/search_health.py` in the folder **two levels above** the report, for example:
+
+```text
+my-workspace/
+  scripts/search_health.py
+  out/search/search_health.json
+```
+
+Without the script there, the card is **view only**. Hmunmawi runs it with the workspace's `.venv/bin/python` if
+there is one, else `/usr/bin/python3`, from the workspace folder, with these arguments:
+
+| Button | Arguments |
+|---|---|
+| Check again | `run --site <site id> --reason recheck` |
+| An API fix | `fix --site <site id> --issue <issue id> --action <action>` |
+| An AI code fix | `ai-fix --site <site id> --issue <issue id>` |
+| After a Safari fix | `fix-status --site … --issue … --kind safari --state done\|failed --detail <text>` |
+
+**The report** (only `sites`, each site's `id`, `name` and `issues`, and each issue's `id` are required):
+
+```json
+{
+  "generated": "2026-11-20T07:05:00Z",
+  "sites": [
+    {
+      "id": "example", "name": "example.com", "project": "My app", "origin": "https://example.com",
+      "status": "amber", "checked_at": "2026-11-20T07:05:00Z",
+      "issues": [
+        {
+          "id": "not-indexed", "severity": "moderate", "source": "bing",
+          "title": "3 new pages are not in Bing yet",
+          "plain": "Bing hasn't picked up this week's pages.",
+          "urls": ["https://example.com/new-page"],
+          "fix_paths": [
+            { "kind": "api", "action": "submit_urls", "label": "Send them to Bing" },
+            { "kind": "ai_code", "action": "fix_links", "label": "Ask my AI for a fix (pull request)" },
+            { "kind": "safari", "action": "inspect", "label": "Open Bing Webmaster Tools",
+              "start_url": "https://www.bing.com/webmasters/", "steps": ["Open URL inspection", "Request indexing"] }
+          ],
+          "fix_status": { "kind": "api", "state": "done", "at": "2026-11-20T07:10:00Z", "detail": "sent 3 pages" }
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `status`: `red`, `amber` or `green`. `severity`: `high`, `moderate` or `low` (low issues are not on the card,
+  only in the detail).
+- `fix_status.state`: `queued`, `deferred` (your AI is paused; it runs when the pause ends), `running`, `done` or
+  `failed`.
+- A Safari `start_url` must be on `www.bing.com/webmasters` or `search.google.com/search-console`; anything else is
+  refused.
+
+### Website checks and a pull-request gate
+
+- **For:** changing your website safely, by hand or by an AI job.
+- **Built in:** the **Watch a website** routine tells you after 2 failed checks in a row, and when it is back.
+- **Your workspace:** one check script that every change must pass before it is merged (the site builds, every page
+  has a title, description and canonical link, links work, the preview deploy is green). Your AI jobs open a pull
+  request and run that script; only a pass may merge. Run the check script itself as a **Run my script** routine to
+  see it on the Automations map.
+- **Your OK:** decide which kinds of change may merge after a pass and which always wait for you, and write that
+  in your workspace's AGENTS.md.
+
+### Articles on a schedule
+
+- **For:** a steady flow of researched articles without publishing by hand every time.
+- **Your workspace:** an AI job writes each article from a brief into a branch and opens a pull request; your check
+  script gates it; a small publish script merges an approved pull request only on its due date, checks the page is
+  live, and tells search engines about it. A refill job writes new briefs when fewer than a week's worth are left.
+- **Hmunmawi:** run the publish and refill scripts as routines (or Mac jobs); each run, failure and output shows on
+  the Automations map, and a card from your script can list what is due this week as to-dos.
+- **Your OK:** you approve each article (or a list of them) before its date; the publish script merges only those.
+
+In plain words:
+
+1. A brief goes in. An AI job writes the article and opens a pull request.
+2. Your checks run. A failure stops it there.
+3. On the due date, the publish script merges only articles you approved, then checks the page is live.
+4. Hmunmawi shows what ran, what failed and what is due next.
+
+```mermaid
+flowchart LR
+    B["Brief"] --> A["AI job writes it"]
+    A --> PR["Pull request"]
+    PR --> C{"Checks pass?"}
+    C -->|no| F["Stops, you are told"]
+    C -->|yes| D{"Approved and due today?"}
+    D -->|yes| P["Publish script merges"]
+    D -->|no| W["Waits"]
+    P --> H["Hmunmawi: ran, failed, due next"]
+```
+
+### Website language versions
+
+- **For:** deciding, with data, whether a translated version of your site is worth keeping.
+- **Your workspace:** a script reviews each language a few weeks after launch, using Search Console and Bing numbers
+  for that language's pages, and decides one next step: keep, fix indexing, improve, switch off, or start the next
+  language. A small config file says which languages are live or paused, so the script and you agree. Any change it
+  makes goes through the same pull-request gate.
+- **Hmunmawi:** the script prints a card with the decision and the next language, and its runs show on the
+  Automations map.
+
+### Social and content planning
+
+- **For:** YouTube Shorts, Instagram Reels and carousels, Reddit and Discord posts, and X, planned and reminded,
+  never posted for you.
+- **Built in:** YouTube and X numbers; X post drafts and reply ideas ([below](#x-post-drafts-and-reply-reminders)).
+- **Your workspace:** a research or AI job writes plans and drafts into `out/` (a Short's script, a carousel's
+  slides, a Reddit post for a community whose rules allow it). A script prints a `section.snapshot` card whose
+  `items` each carry an `action`, one line per thing to do today. A Mac job whose name mentions a post, caption,
+  Instagram or short is grouped under **Social posts** on the Automations map.
+- **Hmunmawi:** the to-dos on a card, a **Remind me** routine at the times you choose, and the Hmunmawi calendar on
+  your iPhone and Watch.
+- **Your OK:** you post everything yourself. If a script uploads for you (a video upload script, for example), have
+  it wait for your yes first.
+
+In plain words:
+
+1. A research or AI job writes plans and drafts.
+2. Your script turns today's items into a card with one to-do each.
+3. Hmunmawi shows the to-dos and reminds you at your times, on your phone if you like.
+4. You post by hand. Your script marks the item done next time it runs.
+
+```mermaid
+flowchart LR
+    R["Research or AI job"] --> D["Drafts in out/"]
+    D --> S["Your script prints a card"]
+    S --> H["Hmunmawi to-dos"]
+    H --> N["Reminder on phone and Watch"]
+    N --> Y["You post by hand"]
+```
+
+### X post drafts and reply reminders
+
+- **Built in:** **Post drafts from my bank** sends a few ready drafts a day at your best hours, ranked by X's
+  published algorithm; **X reply ideas** sends one ready reply at each of your times; **X unfollow list** sends a
+  short list to unfollow by hand. See [Set up X](X-SETUP.md).
+- **Your workspace:** fill the bank with `hm bank-add` (from your own drafts or an AI job), or have a bot write its
+  daily reply-targets file. A check that each draft's facts are still true (app versions, prices) belongs in the
+  script that adds it.
+- **Your OK:** you post, reply and unfollow yourself.
+
+### Review reply drafts and store keyword ideas
+
+- **Built in:** new App Store reviews, with reply drafts you edit; a reply is posted only when you press Post and
+  confirm, and can be undone. `hm review-list` gives an agent the reviews with no reply yet.
+- **Your workspace:** a batch AI job can draft replies or App Store keyword ideas into files for you to read. Keep
+  them as files; changing your App Store listing stays a step you take.
+
+### Win-back offers and offer-code checks
+
+- **Built in:** offer codes handed out one by one, and warnings 30, 7 and 1 day(s) before a code expires.
+- **Your workspace:** a script that creates win-back offers in App Store Connect, run as a **Run my script**
+  routine with **Try out** on, so it only says what it would do until you switch Try out off. A second script can
+  check that what your website says about a code (its end date) still matches App Store Connect and open a pull
+  request when it drifts.
+- **Your OK:** anything that creates an offer or changes your website goes through you or your gate.
+
+### A research job on a monthly AI budget
+
+- **For:** a bigger AI job (research, drafts for many articles) that must never spend more than you set.
+- **Your workspace:** the job checks the AI job pause, takes the lock, runs within a fixed budget you write in its
+  config, and writes drafts and pull requests that wait for you. If your provider gives you a monthly credit, the
+  job spends only that.
+- **Hmunmawi:** your AI spend and credits under **AI & subscriptions** (with a read-only key), the job's runs on the
+  Automations map, and the pause card. See [Running AI jobs](#running-ai-jobs-on-your-own-mac).
+
+### Morning batch and weekly pulse
+
+- **For:** one AI pass each morning (what changed, what to draft) and a weekly read of your App Store numbers.
+- **Built in:** **Ask AI about my numbers** does a weekly brief on your numbers, search terms or crashes, and costs
+  nothing when there is nothing new.
+- **Your workspace:** longer jobs run as routines through your AI wrapper, so they wait while AI is paused, and send
+  their result as a card or a message.
+
+### Self-repair: disk space, failed jobs, keep-alive
+
+- **Built in:** a failed Mac job is started once more a minute later; stuck connections are restarted; missed runs
+  catch up.
+- **Your workspace:** a script that sends a `disk.low` event through the script feed when free space is low, and a
+  **fix script** (a shell script, picked in Settings → General) that cleans up build caches. Hmunmawi runs the fix
+  by itself, and waits for a new OK if the file changes. The same works for a website that is down, a Mac job that
+  fails and a crash spike.
+
+### A bigger portal of your own
+
+- **Built in:** Settings → Publish writes your numbers as one web page you host yourself ([the portal](GUIDE.md#your-own-portal-)).
+- **Your workspace:** scripts that build a larger private site on top of the same data, kept behind a login. The
+  guide shows [what that can look like](GUIDE.md#what-a-full-portal-can-look-like-the-maintainers-setup).
 
 ## Running AI jobs on your own Mac
 
@@ -158,6 +506,28 @@ What the app supports today:
   monthly AI limit.
 - **Hmunmawi never starts a paid AI call without a key you added.**
 
+In plain words, one AI job from start to finish:
+
+1. A job is due (a routine, a Mac job or you).
+2. The wrapper asks Hmunmawi whether AI may run now. If it is paused, the job waits for a later run.
+3. The wrapper takes the lock, so only one AI job runs and Hmunmawi's own AI routines wait.
+4. Your AI agent does the job from its brief.
+5. If the agent stops at a plan limit, the wrapper pauses AI until the limit resets, so nothing else tries in vain.
+6. The result is a draft, a file or a pull request. It waits for your OK.
+
+```mermaid
+flowchart TD
+    J["A job is due"] --> C{"hm ai-pause-check"}
+    C -->|"deferred"| L["Try again later"]
+    C -->|"available"| K["Take the lock"]
+    K --> A["Your AI agent runs the brief"]
+    A --> X{"Hit a plan limit?"}
+    X -->|"yes"| P["hm ai-pause-set until the reset"]
+    P --> L
+    X -->|"no"| D["Draft, file or pull request"]
+    D --> Y["Waits for your OK"]
+```
+
 A wrapper can be this small:
 
 ```sh
@@ -166,6 +536,7 @@ A wrapper can be this small:
 LOCK="$HOME/.my-workspace/ai.lock"
 mkdir -p "$(dirname "$LOCK")"
 hm ai-pause-check 2>/dev/null | grep -q '"available"' || { echo "AI paused, try later"; exit 0; }
+[ -n "$(find "$LOCK" -mmin -60 2>/dev/null)" ] && { echo "another AI job is running"; exit 0; }  # older = stale
 touch "$LOCK"
 trap 'rm -f "$LOCK"' EXIT
 # start your own AI agent here, giving it the brief at "$1"
@@ -173,6 +544,34 @@ trap 'rm -f "$LOCK"' EXIT
 
 `hm` prints its answer as JSON, with `"result":"available"` or `"result":"deferred"`, so the wrapper looks for the
 word. Run `hm ai-pause-check` once by hand to see it on your copy.
+
+When your agent reports a plan limit, the wrapper can pause every AI job until that limit resets, for example
+`hm ai-pause-set until=2026-11-27T10:00:00Z reason="weekly limit"`. Setting a pause needs the "spending" permission
+for agents (Settings → Rules → Agents); without it the request waits for your OK.
+
+### A second AI while the first is paused (optional)
+
+If you use two AI tools (for example a coding agent and a chat bot), you can let the second one pick up some jobs
+while the first is paused. Hmunmawi does not run this; it is a pattern for your workspace:
+
+1. When the wrapper gets "deferred", it writes the job to a small queue file in `data/` with the status `pending`,
+   but only for jobs you listed as safe to hand over (drafts, not merges).
+2. The second AI takes a `pending` job, marks it `claimed`, does it, and marks it `done` with the path of its output.
+3. When the pause ends, the first AI takes only jobs that are still `pending`. A `done` or `claimed` job is never
+   done twice.
+4. Jobs that change your website or spend money are not on the list; they wait for the pause to end.
+
+```mermaid
+flowchart LR
+    D["AI paused"] --> Q["Queue file: pending"]
+    Q --> B["Second AI: claimed, then done"]
+    Q --> R["After the pause: first AI takes pending only"]
+    B --> O["Draft for your OK"]
+    R --> O
+```
+
+If the second AI is a bot without a shell, list its job as a bot routine with a proof file
+([ROUTINES.md](ROUTINES.md#bots)), so Hmunmawi tells you when it is late.
 
 ## STATE.md: a blank template
 
@@ -224,7 +623,12 @@ Read STATE.md before planning or changing anything. Update it after acting.
 - Never post, reply, send or publish for me on any platform. Produce drafts and to-dos.
 - Before running an AI job, check `hm ai-pause-check`; if it says deferred, stop.
 - One AI job at a time (use scripts/ai_job.sh).
+- If a handed-over job in the queue file is `done` or `claimed`, don't do it again; take only `pending` ones.
+- Website changes go through a pull request and scripts/<your check script>; merge only when it passes, and only
+  the kinds of change listed here: <list them>.
 - Test with --dry-run first.
+- Every new scheduled job goes in STATE.md, and in a Hmunmawi routine or job list so it shows on the Automations
+  map.
 
 ## Docs rule: keep the capability list in sync
 Every docs, README, release-note or description update about this workspace or Hmunmawi must check and keep the

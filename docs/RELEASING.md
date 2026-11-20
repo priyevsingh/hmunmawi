@@ -43,6 +43,28 @@ commit to pass, and only then tags `v<version>` and publishes the GitHub release
 (notes from the matching CHANGELOG.md section). If CI fails or never starts, nothing is tagged or published. Never
 tag or run `gh release create` by hand before CI is green. CodeQL runs separately and slowly; check its alerts after.
 
+### The release gate, as a picture
+
+In plain words:
+
+1. `release.sh` builds, signs with Developer ID and gets Apple's notary ticket.
+2. The signature gate compares the new build's signing requirement with the previous release. Any difference stops
+   the release, so an update never asks users for permissions or keys again.
+3. `publish-release.sh` runs the gate again, pushes `main` and waits for CI.
+4. Only when CI is green is the tag made and the GitHub release published with the zip and `appcast.xml`.
+5. Users' copies find the update through the signed appcast and install it after asking.
+
+```mermaid
+flowchart TD
+    B["release.sh: build, sign, notarize"] --> G{"Same signing requirement as last release?"}
+    G -->|no| S["Stop: fix the signing identity"]
+    G -->|yes| P["publish-release.sh: gate again, push main"]
+    P --> C{"CI green?"}
+    C -->|no| N["Nothing tagged or published"]
+    C -->|yes| R["Tag and GitHub release with appcast"]
+    R --> U["Users update after asking"]
+```
+
 ## Owner builds
 
 Your own Mac's builds (`scripts/make-app.sh`) keep the Apple Development signature so saved Keychain keys keep working
