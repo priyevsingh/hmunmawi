@@ -73,7 +73,7 @@ The last 28 days from *Seen* (Google, YouTube, Bing) → *Visited* → *Saw an a
 
 <details><summary>How it works</summary>
 
-Worked out from your own numbers, no AI: search queries with no page, channels pulling this week, countries that look but don't download. Ads are suggested only above the cost per download you set in Settings → General.
+Worked out from your own numbers, no AI: search queries with no page, pages Google shows on its first page (position 10 or better, 100+ times in 28 days) that get under half your site's own click rate (rewrite the title and description), channels pulling this week, countries that look but don't download. Mark one Done and the number it should move is compared 14 days later, even after the step stops showing. Ads are suggested only above the cost per download you set in Settings → General.
 
 </details>
 
@@ -347,7 +347,7 @@ Every action waiting for approval (yours, a routine's or an agent's), with Appro
 
 <details><summary>How it works</summary>
 
-People you pitched (press, creators, partners) whose follow-up is due. *Open outreach* shows the full list: who, for which app, when you wrote, notes, a do-not-contact mark, and replies matched from your mail. A routine can watch for replies and for coverage (new posts on their site's feed).
+People you pitched (press, creators, partners) whose follow-up is due. *Open outreach* shows the full list: who, for which app, when you wrote, notes, a do-not-contact mark, and replies matched from your mail. A routine can watch for replies and for coverage (new posts on their site's feed). In the outreach editor, paste the outlet's page and press **Check** before adding: Hmunmawi reads that one page and says whether it loads, whether there's an email or contact form, whether it reads paid-only ("sponsored post", "review fee"), its language, and whether the outlet is already on your list (same name, website or address; a shared mail provider like gmail.com never counts). Agents get the same with `hm outreach-check`.
 
 </details>
 
@@ -452,7 +452,7 @@ When and how Apple's on-device AI is used: [Apple's on-device AI](AI-AND-COSTS.m
 
 <details><summary>How it works</summary>
 
-Certificates, provisioning profiles, keys with an end date and domains, with days left.
+Certificates, provisioning profiles, keys with an end date and domains, with days left. Under the slider button, **Plans and trials**: type a service, the day its trial ends or its plan renews, and an optional note (for example "set pay-as-you-go to $0"); it's reminded like a certificate, by your expiry rules. Vendors rarely share these dates through an API, so you type them once (agents: `hm plan-add`).
 
 </details>
 
@@ -510,7 +510,7 @@ For 1 hour, until tomorrow, or until you switch them on. *Send a test notificati
 
 <details><summary>How it works</summary>
 
-Rating-drop alerts, star ratings from the public App Store page, a warning at 80% of a service's request limit, quiet hours, the weekly digest, the add-on sandbox, and fix scripts that run by themselves when a problem appears (they wait for a new OK if the file changes).
+**Keep this Mac awake for routines** (Off, While plugged in, Always; off by default): stops idle sleep while Hmunmawi runs, so routines and Mac jobs run on time; the screen still sleeps and closing a laptop's lid still sleeps the Mac. **Words I never use**: one word or phrase per line, then `|` and why (optional); `re:` starts a pattern. Post drafts and reply ideas that use one are skipped, the drafting AI is told to avoid them, and scripts and agents check any text with `hm lint-text`. Rating-drop alerts, star ratings from the public App Store page, a warning at 80% of a service's request limit, quiet hours, the weekly digest, the add-on sandbox, and fix scripts that run by themselves when a problem appears (they wait for a new OK if the file changes).
 
 </details>
 
@@ -550,6 +550,8 @@ Group apps into a project or add a website (visitors, enquiries, search); the to
 <details><summary>How it works</summary>
 
 The on/off switches your own scripts read, from a small JSON file in your workspace: each channel (Reddit, Discord, Instagram, YouTube Shorts, X), Instagram details (post suggestions, new carousels, warm-up sessions), "account warmed up" per platform (on = no warm-up steps, only real post ideas), and any other true/false your file has. Each switch has a one-line explanation. Hmunmawi changes only the value you flip, writes the file atomically and keeps every other key and note as it was; your scripts see the change on their next run. Every flip is written to the activity log. No file yet? The tab says how to add one, or press **Choose…**. To stop a whole scheduled Mac job instead, use **Pause** on its row in Automations. File format: [Job switches](PRIVATE-WORKSPACE.md#job-switches).
+
+At the top, **Run by Hmunmawi** lists the jobs Hmunmawi itself runs for you: X unfollows (automatic), Watch my services, Mac-alive heartbeat (Sentry), Check links on my site and Check my workspace Python. Each shows "Not set up" until you add it in Automations → +, then an on/off switch with when it runs and its last result. Nothing there deploys, repairs or posts without your OK.
 
 </details>
 
@@ -767,19 +769,20 @@ that can `notify` can add any of them ([Writing a connection](ADD-ONS.md)).
 | App Store Connect | Sales, payouts, subscriptions, reviews, ratings, versions, TestFlight, Xcode Cloud builds, offer codes, nominations, product page tests, certificates and profiles | An API key (Admin role) and your vendor number |
 | RevenueCat | Active subscriptions, trials, MRR and 28-day revenue | A read-only key |
 | PostHog | People using your app each day | Project ID and a personal key |
-| Sentry | Crash-free sessions and freezes | Organization, auth token |
+| Sentry | Crash-free sessions and freezes; with the `event:read` scope, your open problems (crashes, Sentry Uptime, Sentry Crons) for Watch my services | Organization, auth token |
 | Google Search Console | Google searches, clicks and pages | A service-account key |
 | Bing Webmaster Tools | Bing searches, clicks and pages | An API key |
 | YouTube | Views, subscribers and newest videos | An API key, or the Google sign-in file your own upload scripts already use (client id, client secret and refresh token) |
 | X | Your X numbers, read through your Safari login or from a file Grok Bot writes (no paid X API). Full setup with drafts, reply ideas and unfollows (by hand or automatic): [Set up X](X-SETUP.md) | Nothing |
 | Cloudflare | Website visitors and AI-bot reads | An API token |
+| Vercel | Website visitors and page views (Web Analytics), which commit production runs, and whether your branch has a newer one that never got a deploy; Redeploy only after your OK | Project name or ID, an access token; optional Team ID, GitHub repository and a read-only GitHub token for a private repo |
 | Mac jobs | Your Mac's scheduled jobs: runs, failures, Run now and Pause | Nothing |
 | Script feed | Any numbers your own scripts print: [Your own numbers](SCRIPT-FEED.md) | Nothing |
 | iMessage, ntfy | Alerts to your phone | Your number, or an ntfy topic |
 
 Beyond these, the **Script feed** and **Mac jobs** connections are how everything else you run reaches Hmunmawi: a YouTube Shorts plan, Instagram Reels and carousels, Reddit and Discord post ideas, X posts, articles or a research job each appear as a card or a job on the Automations map, with a to-do when something needs you. Hmunmawi tracks, queues and reminds; anything that posts or changes something waits for your OK. See [Your own numbers](SCRIPT-FEED.md#post-ideas-and-to-dos).
 
-Each runs as a separate sandboxed add-on that never sees your keys. Write your own: [Writing a connection](ADD-ONS.md). They check in on their own clock: Mac jobs every 5 minutes, the script feed every 10, X every 30, App Store Connect every hour, Cloudflare, PostHog, RevenueCat and Sentry every 3 hours, Search Console, Bing and YouTube every 6 hours, and ntfy every 6 hours (only to see it answers).
+Each runs as a separate sandboxed add-on that never sees your keys. Write your own: [Writing a connection](ADD-ONS.md). They check in on their own clock: Mac jobs every 5 minutes, the script feed every 10, X every 30, App Store Connect every hour, Vercel every 15 minutes (visitors every 3 hours), Sentry every 30 minutes, Cloudflare, PostHog and RevenueCat every 3 hours, Search Console, Bing and YouTube every 6 hours, and ntfy every 6 hours (only to see it answers).
 
 <br>
 

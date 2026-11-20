@@ -245,13 +245,13 @@ Your scripts (or an AI job you run) do the thinking and hand over cards, to-dos 
 | You want | Your workspace does | Hmunmawi shows |
 |---|---|---|
 | **Apple apps** | Nothing needed. Connect App Store Connect and RevenueCat in Settings. Add scripts only for numbers from your own backend | Sales, subscriptions, reviews, releases, the Rejection Shield, offer codes |
-| **Websites and search** | A script that checks a page, a sitemap or your analytics and prints a card; a routine can also watch a website address; a search health monitor writes `search_health.json` | Cloudflare, Google Search Console and Bing numbers, "website down", next steps such as searches with no page yet, the Search health card and its Fix buttons |
+| **Websites and search** | A script that checks a page, a sitemap or your analytics and prints a card; a routine can also watch a website address; a search health monitor writes `search_health.json` | Cloudflare, Vercel, Google Search Console and Bing numbers, "website down", deploy health with a Redeploy that waits for your OK, dead outside links (Check links on my site), next steps such as searches with no page yet and ranking pages nobody clicks, the Search health card and its Fix buttons |
 | **Social: Shorts, Reels, carousels, Reddit, Discord, X** | A script or AI job writes plans and drafts into `out/` and prints a card whose `items` have an `action` (a plain sentence). X drafts can sit in a bank (`hm bank-add`) | To-do lines on a card, routine reminders, X drafts at your best hours, the Social posts group on the Automations map |
 | **Publishing: articles and posts** | A job that produces the article or post file and a card saying what is due | To-dos and jobs on the Automations map: what is due, what ran, what failed |
-| **Crashes and health** | Nothing needed for Sentry. A script can print a card for anything else, such as your own server health | Crash-free sessions, failed Mac jobs, keys and certificates nearing expiry |
+| **Crashes and health** | Nothing needed for Sentry. A script can print a card for anything else, such as your own server health | Crash-free sessions, Sentry's open problems in plain words, the Mac-alive heartbeat, failed Mac jobs, broken Python environments, keys, certificates, plans and trials nearing expiry |
 | **Money and offer codes** | A script can fill the Startup programs card; tools and plans are typed in the app | Payday, forecast, profit, AI credits, offer codes and their expiry |
 | **Alerts** | Nothing needed. Alerts go out through iMessage, ntfy and the calendar | One message, only if it is still true 7 minutes later, with quiet hours |
-| **Outreach and mail** | Nothing needed. Add outlets with `hm outreach-add` or in the app | Follow-ups due, replies matched from your mail, each change waiting for your tap |
+| **Outreach and mail** | Nothing needed. Add outlets with `hm outreach-add` or in the app | Check before adding (`hm outreach-check`), a duplicate note on `outreach-add`, follow-ups due, replies matched from your mail, each change waiting for your tap |
 | **AI limits** | A wrapper that asks `hm ai-pause-check` before each AI job and keeps one job at a time ([below](#running-ai-jobs-on-your-own-mac)) | Plan limits, the AI job pause, the monthly AI budget |
 | **Autopilot with approval** | Scripts you trust become routines; agents call `hm` | Anything that changes something waits in Log → Waiting |
 
@@ -289,6 +289,11 @@ merges anything by itself; where a recipe says "merge" or "post", that is your s
 - [Morning batch and weekly pulse](#morning-batch-and-weekly-pulse)
 - [Self-repair: disk space, failed jobs, keep-alive](#self-repair-disk-space-failed-jobs-keep-alive)
 - [A bigger portal of your own](#a-bigger-portal-of-your-own)
+- [Checked plan steps](#checked-plan-steps)
+- [Search titles with a ledger](#search-titles-with-a-ledger)
+- [Claims check in your PR gate](#claims-check-in-your-pr-gate)
+- [Keep your workspace in step with GitHub](#keep-your-workspace-in-step-with-github)
+- [Sentry uptime monitors](#sentry-uptime-monitors)
 
 </details>
 
@@ -315,8 +320,10 @@ merges anything by itself; where a recipe says "merge" or "post", that is your s
 
 - **For:** one plain sentence per new crash or freeze, not a dashboard.
 - **Built in:** the Sentry connection reads crash-free sessions and freezes; ready-made rules alert on a crash spike.
-- **Your workspace:** a script can read Sentry issues and print one card or event per problem, and an AI job can
-  write an "explain this crash" note into `out/`. The note is only a note; fixing code is yours.
+- **Built in (1.4.0):** give the Sentry token the `event:read` scope and add **Watch my services**
+  (Automations → +): each new open Sentry problem comes as one plain sentence, and again when it closes.
+- **Your workspace:** an AI job can write an "explain this crash" note into `out/`. The note is only a note; fixing
+  code is yours.
 
 ### Search health
 
@@ -537,6 +544,51 @@ flowchart LR
   by itself, and waits for a new OK if the file changes. The same works for a website that is down, a Mac job that
   fails and a crash spike.
 
+### Checked plan steps
+
+- **For:** next steps that were researched before you see them, not guesses.
+- **Built in:** Next steps are worked out from your own numbers, each with the figures behind it and measured 14
+  days after you mark it Done. A plan step a script sends is hidden once the app version it names is live.
+- **Your workspace:** a script or an agent (for example Claude Code, which can read your code and the vendor's
+  docs) researches each step and sends it through the script feed as a `plan.step` event with its evidence and a
+  `next_check` date. Hmunmawi shows it under Planned steps and drops it when it goes stale.
+- **Why not built in:** an AI inside Hmunmawi can't read your code or the vendor's current docs, so its "check" would
+  be more unverified text. The research belongs where the sources are.
+
+### Search titles with a ledger
+
+- **For:** pages that rank but nobody clicks get a better title, and you find out whether it worked.
+- **Built in:** Next steps names pages Google shows on its first page that get under half your site's own click
+  rate. Mark one Done when the new title is live: its clicks are compared 14 days later. For a longer or custom
+  window, register it with `hm change-add` and the **Judge my changes** routine says keep, improve or undo.
+- **Your workspace:** a script or AI job reads `hm data-read kind=growth.search`, drafts a new title and description,
+  opens a pull request on your site, and keeps its own ledger (old title, new title, date) so you can revert.
+- **Your OK:** the pull request and any revert are yours; Hmunmawi only suggests and measures.
+
+### Claims check in your PR gate
+
+- **For:** no page or post goes out with a claim you can't back up.
+- **Built in:** Settings → General → **Words I never use**; drafts and reply ideas that use one are skipped.
+- **Your workspace:** your pre-merge script runs `hm lint-text file=<changed file>` for each changed page and stops
+  when the answer has `"clean": false` (each hit says which rule and why). Agents can add rules to
+  `wording-rules.json` in Hmunmawi's folder.
+
+### Keep your workspace in step with GitHub
+
+- **For:** work merged elsewhere (a cloud agent's pull request, another Mac) reaching this Mac without anyone pulling.
+- **Your workspace:** a Mac job that runs `git pull --ff-only` on your main branch every hour or so, and only logs
+  and stops when git refuses (a local edit, a diverged branch). It never merges, rebases or resets. Hmunmawi shows it
+  on the Automations map and tells you when it fails.
+
+### Sentry uptime monitors
+
+- **For:** hearing that your website is down even when this Mac is off.
+- **Your workspace / Sentry:** create the uptime monitors in Sentry's own web app (a minute per page). Hmunmawi
+  doesn't create them, because they count against your Sentry plan.
+- **Built in:** **Watch my services** tells you when Sentry Uptime sees a page down and when it's back; **Watch a
+  website** checks from this Mac while it's on; the **Mac-alive heartbeat** makes Sentry tell you when this Mac
+  itself stops.
+
 ### A bigger portal of your own
 
 - **Built in:** Settings → Publish writes your numbers as one web page you host yourself ([the portal](GUIDE.md#your-own-portal-)).
@@ -685,6 +737,8 @@ Read STATE.md before planning or changing anything. Update it after acting.
 - Scripts that feed Hmunmawi only read and print JSON (see Hmunmawi's docs/SCRIPT-FEED.md). Anything that changes
   something goes through Hmunmawi (`hm`) so it waits for my OK.
 - Never post, reply, send or publish for me on any platform. Produce drafts and to-dos.
+- Check drafts and pages against my Words I never use with `hm lint-text` before handing them over. Redeploys and
+  Python repairs go through `hm deploy-redeploy` / `hm python-repair`, which always wait for me.
 - Before running an AI job, check `hm ai-pause-check`; if it says deferred, stop.
 - One AI job at a time (use scripts/ai_job.sh).
 - If a handed-over job in the queue file is `done` or `claimed`, don't do it again; take only `pending` ones.

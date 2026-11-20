@@ -114,7 +114,7 @@ Open the X card: 📌 your pinned post · 📰 your latest article · 🔥 a pos
 #### 💬 Reply ideas
 **Show up in the right conversations, every day.**
 
-One ready reply at each time you choose, to a fresh post in your niche. Never a stale post, a link or an outdated app version.
+One ready reply at each time you choose, to a fresh post in your niche. Never a stale post, a link or an outdated app version. Topics match from the start of a word ("health" finds "HealthKit"); add a **Never about** list for subjects to stay away from, and your **Words I never use** (Settings → General) keep drafts and replies free of claims you can't back up.
 
 > [!TIP]
 > **Free drafts, private by design.** No Grok Bot and no AI key? **Apple's on-device AI** writes the drafts on your

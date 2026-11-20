@@ -110,7 +110,9 @@ travels as its own event, `growth.x_glance`, so another X feed (a script) can't 
 5. Save `x-reply-finds/<day>.json`. Without an AI key, `reply_text` is empty and you get the post to reply to yourself.
 
 **Both routes, every target:** skipped if not an X post link, older than 48 hours (from the post id's timestamp),
-off your topics, a reply over 280 characters or with a link, or naming an app version that isn't current
+off your topics (a topic must start a word, any case: "health" matches "HealthKit", "ai" doesn't match "said"),
+about anything on the routine's `avoid` list (whole words), a reply over 280 characters or with a link, a reply using
+one of your Words I never use (`wording-rules.json`, `WordingRules`), or naming an app version that isn't current
 (`DraftGuard`). One target per run; the routine's times are the reply slots; `per_day` caps the day.
 
 ## Unfollow list (`does=unfollow-list`)
@@ -159,6 +161,10 @@ Best posting hours, draft ranking and the daily check of X's published ranking c
 ([xai-org/x-algorithm](https://github.com/xai-org/x-algorithm), `home-mixer/params/param.rs`) are described in
 [ROUTINES.md → Post drafts that follow X's algorithm](ROUTINES.md#post-drafts-that-follow-xs-algorithm).
 
+Before a bank draft is sent it must also pass `DraftGuard` (no app version other than the current one, no longer than
+`max`), the routine's `topics` and `avoid` lists (`TopicFilter`) and your Words I never use (`WordingRules`). When the
+bank runs low, the AI that writes more is told the same topics and avoided words, and its drafts are checked again.
+
 ## In your published portal
 
 The X section of the portal shows what the app shows, styled like the hub portal's X card: followers (big number,
@@ -182,7 +188,8 @@ Routine parameters (`hm routine-add`, need the *routines* permission):
 | Parameter | For | Value |
 |---|---|---|
 | `source` | reply-ideas, unfollow-list | `bot` (Grok Bot's files) or `safari` (Hmunmawi via Safari) |
-| `topics` | reply-ideas | up to 20 comma-separated words or phrases (≤ 40 characters each) |
+| `topics` | reply-ideas, post-drafts | up to 20 comma-separated words or phrases (≤ 40 characters each); for post drafts optional (empty = any topic) |
+| `avoid` | reply-ideas, post-drafts | up to 40 comma-separated words or phrases (≤ 60 characters each) a target or draft must never mention |
 | `about` | reply-ideas, `source=safari` | one line (≤ 200 characters) on what the user works on |
 | `drafts` | reply-ideas, `source=safari` | `auto` (Apple's on-device AI first, else the AI key), `ondevice`, `ai` or `none` |
 | `folder` | reply-ideas, `source=bot` | Grok Bot's reply-targets folder (must exist) |

@@ -55,6 +55,21 @@ and asks before it acts. Users' guide: [README.md](README.md).
   `Sources/HmunmawiCore/XUnfollow.swift`) is the owner's own opt-in routine: agents can't add, change or start it,
   only pause or resume it; keep its safety stops, pacing and frozen list when changing it.
 
+- **Watch my services, heartbeat, link and Python checks** (1.4.0): the routines live in
+  `Sources/HmunmawiApp/ServiceRoutines.swift`; their pure rules in `Sources/HmunmawiCore/ServiceWatch.swift`
+  (`SentryIssues`, `DeployWatch`, `Heartbeat`), `LinkCheck.swift` and `PythonEnv.swift`. Sentry problems arrive as
+  `issues.snapshot` (Sentry add-on, needs `event:read`), deploys as `deploy.snapshot` (`AddOns/vercel`). A redeploy
+  (`hm deploy-redeploy`, action `vercel.redeploy`) and a Python repair (`hm python-repair`) **always** wait for the
+  owner, even when allowed or in Full Autopilot; `repair=auto` is owner-only (agents may set only `repair=ask`). Keep
+  these rules when changing them. A new routine kind that runs for the user goes in `JobSwitchesForm.ownJobKinds` too
+  (Settings → Jobs → Run by Hmunmawi).
+- **Words I never use, topics and avoid:** `Sources/HmunmawiCore/WordingRules.swift` and `TopicFilter.swift`; the
+  file is `wording-rules.json` in the app's folder (`Sources/HmunmawiApp/Wording.swift`). Check any text with
+  `hm lint-text`. Post drafts and reply ideas also keep `DraftGuard` (no outdated app versions).
+- **Outreach check, plans and trials, keep awake:** `OutreachCheck.swift` (core; `hm outreach-check`, and
+  `outreach-add` answers `duplicate_of` but never refuses), `ExpiryWatch.Plan` (`hm plan-add`), `KeepAwake.swift`
+  (`hm set key=mac.keep_awake`, off by default). Page-level "seen often, rarely clicked" is `PageCTR` in
+  `SearchSites.swift`, shown by `Playbook.pageTitles`.
 - **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, job lists and hand-off files, workflow recipes such as search health, publishing on a schedule, social planning and AI jobs with the pause and one-at-a-time lock, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
 - **Job switches (Settings → Jobs):** `Sources/HmunmawiCore/SwitchFile.swift` reads and edits the workspace's JSON
   switch file in place (only the flipped value changes; atomic write; checked before saving); the tab is

@@ -2,6 +2,33 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.4.0 (build 140), 20 Nov 2026
+
+**New**
+- **Watch my services** (routine, Automations → +). Every 15 minutes it reads what the Sentry and Vercel connections found. Each new open Sentry problem comes as one plain sentence (a new crash, a website Sentry Uptime saw down, a job Sentry Crons saw late), and again when it closes; the first read only remembers, so connecting never floods you. When a website's production doesn't run its branch's newest commit (no deploy started after 10 minutes, or the build failed or ran over 30 minutes), it tells you once per commit and puts a **Redeploy** in Log → Waiting. Nothing deploys until you approve it.
+- **Vercel connection.** Visitors and page views from Vercel Web Analytics (every 3 hours, a card on the Reach page), and every 15 minutes which commit production runs and whether your branch (read from GitHub; a read-only token only for a private repo) has a newer one. Its one action, Redeploy, runs only after your OK and is refused if the branch moved on since you approved.
+- **Mac-alive heartbeat (Sentry)** (routine). A check-in to a Sentry Crons monitor every 5 to 60 minutes; Sentry makes the monitor from the first check-in. When check-ins stop because the Mac is asleep, off or Hmunmawi isn't running, Sentry tells you by its own email or app. Optional: report "error" while a Mac job Hmunmawi watches is failing.
+- **Check links on my site** (routine, weekly by default). Reads your sitemap (up to 200 pages, 50 by default), checks up to 400 outside links four at a time, and calls a link dead only after two runs in a row found it gone (404, 410 or no such site); sites that block checkers or are briefly down never count. App Store links are checked with Apple's public lookup. New dead links are told once, with the page they're on. It never edits your site.
+- **Check my workspace Python** (routine). Finds the Python environments your script routines and Mac jobs run with, tells you once when an upgrade broke one (with the exact fix), and keeps each working one's package list. **Repair…** keeps the old folder as `<name>.broken-<date>`, makes a fresh one and reinstalls the packages. Automatic repair is a switch only you can turn on.
+- **Words I never use** (Settings → General). One word, phrase or `re:` pattern per line, with an optional reason. Post drafts and reply ideas that use one are skipped, the AI that refills your bank is told to avoid them, and scripts and agents check any text or file with `hm lint-text`.
+- **Topics and "Never about" for post drafts**, and "Never about" for reply ideas. Topics now match from the start of a word ("health" matches "HealthKit", "ai" no longer matches "said").
+- **Check before adding** in the outreach editor and `hm outreach-check`: is the page there, an email or contact form, paid-only wording, its language, and is the outlet already on your list (same name, website or address). `hm outreach-add` takes `url=` and `contact=` and answers `duplicate_of` for a likely duplicate (it still saves).
+- **Plans and trials** in the expiry watchdog (and `hm plan-add`): a trial that ends or a plan that renews, reminded like a certificate.
+- **Keep this Mac awake for routines** (Settings → General; Off, While plugged in, Always; off by default). Stops idle sleep while Hmunmawi runs; the screen still sleeps and a closed lid still sleeps the Mac. Agents: `hm set key=mac.keep_awake`.
+- **Next steps: pages nobody clicks.** A page Google shows on its first page 100+ times in 28 days with under half your site's own click rate is suggested for a new title and description. Marked Done, its clicks are compared 14 days later, even after it stops showing as a suggestion (this now works for search-query steps too).
+- New agent commands: `services`, `deploy-redeploy` and `python-repair` (both always wait for the owner), `links-dead`, `lint-text`, `outreach-check`, `python-check`, `plan-list`, `plan-add`, `plan-remove`.
+
+**Changed**
+- **Settings → Jobs → Run by Hmunmawi** lists every job Hmunmawi runs for you (X unfollows, Watch my services, the heartbeat, link and Python checks), with "Not set up" or an on/off switch.
+- **Key watch** can also tell you when a connection hasn't worked for a day for any reason (on when you add a key-watch routine in the app; switch it on in older ones).
+- **Sentry connection 0.2.0:** checks every 30 minutes and, with the token's `event:read` scope, reads your open issues; without that scope the crash numbers arrive as before.
+- **Search Console** reads 50 pages with their average position (the Google detail still shows the top 10).
+
+**Docs**
+- Capability list, README, guide, routines, hm commands, add-ons, privacy, security, X setup and the private workspace guide updated; new diagram "How Watch my services works". New workspace recipes: checked plan steps, search titles with a ledger, a claims check in your PR gate, keeping your workspace in step with GitHub, Sentry uptime monitors.
+
+Hmunmawi still does everything it did in 1.3.0: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you, with post drafts, reply ideas and opt-in automatic X unfollows), job switches, publishing, outreach and mail, crashes and self-healing, money and offer codes, alerts, AI limits, share and show, and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.3.0 (build 130), 20 Nov 2026
 
 **New**

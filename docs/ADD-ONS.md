@@ -13,10 +13,11 @@ The full list of what Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md). Hm
 | App Store Connect | Reviews, icons, version status, daily downloads and proceeds, hourly |
 | RevenueCat | Active subscriptions, trials, MRR and 28-day revenue |
 | PostHog | Daily active users |
-| Sentry | Sessions and crashes each day (crash-free rate) |
+| Sentry | Sessions and crashes each day (crash-free rate) and, with the `event:read` scope, your open problems, every 30 minutes |
 | Cloudflare | Website visitors each day |
-| Google Search Console, Bing Webmaster Tools | Search clicks, impressions, top searches and pages |
-| YouTube | Subscribers, views and newest videos |
+| Vercel | Website visitors and page views, and production deploy health; Redeploy only after your OK |
+| Google Search Console, Bing Webmaster Tools | Search clicks, impressions, top searches and pages (Search Console: 50 pages with their average position) |
+| YouTube | Subscribers, views and newest videos. A Google sign-in file from an OAuth app still in "Testing" stops working after 7 days (Google expires its refresh token); the Key watch routine tells you when that happens |
 | X | Followers, views and engagement from your daily X file; no key needed |
 | Script feed | Anything your own scripts print: numbers, plans and to-dos for Shorts, Reels, carousels, Reddit, Discord, X posts and articles ([how](SCRIPT-FEED.md#post-ideas-and-to-dos)) |
 | Mac jobs | Your scheduled Mac jobs: runs, failures, Run now and Pause |
@@ -25,6 +26,31 @@ The full list of what Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md). Hm
 Hmunmawi tracks, plans, queues and reminds. It never posts to YouTube, Instagram, Reddit, Discord or X for you, and anything that changes something waits for your OK.
 
 The Search Console and Bing add-ons only read: submitting pages or sitemaps to search engines is left to your own scripts. A few things are fed without an add-on, through files your scripts write: the Search health card, job lists on the Automations map, AI usage and the X file. See [Hand-off files](PRIVATE-WORKSPACE.md#hand-off-files).
+
+## Notes on some built-in add-ons
+
+**Vercel** (`AddOns/vercel`). Settings: project name or ID, Team ID (optional, `team_…`), the website name to show,
+a GitHub repository (`owner/name`, optional; read from the project's Git link when empty), the production branch
+(optional; Vercel's own when empty), an access token (Vercel → Account Settings → Tokens, scoped to the team that owns
+the project) and an optional GitHub token (fine-grained, read-only Contents, only for a private repository).
+Hosts: `api.vercel.com` and `api.github.com`; each token may only go to its own host (`secretHosts`).
+- Every 15 minutes: the newest production deploy (`GET /v9/projects/{id}`, `GET /v7/deployments?target=production`),
+  the branch's newest commit from GitHub (`GET /repos/{owner}/{repo}/commits/{branch}`, no token for a public repo)
+  and any deploy for that commit (`GET /v7/deployments?sha=…`), as one `deploy.snapshot` event.
+- Every 3 hours: visitors and page views for 7 and 28 days and visitors per day, from Vercel Web Analytics
+  (`GET /v1/query/web-analytics/visits/count` and `/visits/aggregate?by=day`), as a card on the Reach page. A plan or
+  project without Web Analytics only skips this card.
+- One action, `vercel.redeploy`: deploys the branch's newest commit to production (`POST /v13/deployments` with
+  `gitSource`; refused if the branch moved since you approved), or rebuilds a given deployment (`deploymentId`). It
+  runs only after the owner's OK in Log → Waiting (put there by Watch my services or `hm deploy-redeploy`).
+
+**Sentry** (0.2.0). Every 30 minutes. Besides sessions and crash-free rate, it reads your unresolved issues of the
+last 14 days (`GET /api/0/organizations/{org}/issues/?query=is:unresolved`, up to 50) as one `issues.snapshot`
+event. That needs the token's `event:read` scope; without it the issues part is skipped (noted in the add-on's log)
+and the crash numbers still arrive.
+
+**Google Search Console.** Reads 50 top pages (by clicks) with their average position, so Next steps can name pages
+that rank on Google's first page but get under half your site's own click rate.
 
 ## The folder
 
