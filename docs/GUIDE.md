@@ -413,6 +413,8 @@ A 24-hour strip of every run today, and what runs next.
 
 The weekly routines, day by day. **+** adds a routine. Kinds include reminders, website watch, offer-code expiry, AI briefs on your numbers, post drafts from your bank, outreach follow-ups and replies, keys that stop working, judging your changes, your own scripts and your Mac's jobs. A routine can also put its message in a calendar named "Hmunmawi", so it reaches your iPhone and Watch. Post drafts skip weak drafts and follow X's published algorithm by themselves ([how](ROUTINES.md#post-drafts-that-follow-xs-algorithm)). Full list: [Routines](ROUTINES.md).
 
+</details>
+
 #### 𝕏 Your X, on autopilot (you still post)
 **Show up in the right conversations every day, with or without Grok Bot.**
 
