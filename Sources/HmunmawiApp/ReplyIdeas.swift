@@ -16,9 +16,8 @@ enum ReplyIdeas {
         return URL.hmSupport.appending(path: "reply-targets", directoryHint: .isDirectory)
     }
 
-    static func topics(_ r: MyRoutine) -> [String] {
-        (r.params?["topics"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
-    }
+    static func topics(_ r: MyRoutine) -> [String] { TopicFilter.list(r.params?["topics"]) }
+    static func avoid(_ r: MyRoutine) -> [String] { TopicFilter.list(r.params?["avoid"]) }
 
     static func load(_ r: MyRoutine, day: String) -> [Target]? {
         guard let d = try? Data(contentsOf: folder(r).appending(path: day + ".json")),
@@ -37,15 +36,14 @@ enum ReplyIdeas {
     }
 
     /// Why a target isn't handed on, or nil when it's good to go.
-    static func problem(_ t: Target, topics: [String], versions: [String: String], now: Date) -> String? {
+    static func problem(_ t: Target, topics: [String], avoid: [String] = [], wording: WordingRules = WordingRules(),
+                        versions: [String: String], now: Date) -> String? {
         guard t.url.wholeMatch(of: /https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/status\/[0-9]{5,25}(\?.*)?/) != nil else { return "not an X post link" }
         if t.reply.count > 280 { return "reply longer than 280 characters" }
         if t.reply.contains("http") { return "a link in the reply" }
         if let posted = postedAt(t.url), now.timeIntervalSince(posted) > 48 * 3600 { return "post older than 48 hours" }
-        if !topics.isEmpty {
-            let hay = (t.tweet + " " + t.reply).lowercased()
-            if !topics.contains(where: { hay.contains($0) }) { return "off your topics" }
-        }
+        if let why = TopicFilter.problem(t.tweet + " " + t.reply, topics: topics, avoid: avoid) { return why }
+        if !t.reply.isEmpty, let why = wording.problem(t.reply) { return why }
         if !t.reply.isEmpty, let why = DraftGuard.problem(t.reply, versions: versions) { return why }
         return nil
     }

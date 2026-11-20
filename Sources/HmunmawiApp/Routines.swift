@@ -22,6 +22,10 @@ enum RoutineKind: String, CaseIterable, Identifiable {
     case replyIdeas = "reply-ideas"       // one ready X reply per run, from Grok Bot's targets or a Safari search
     case unfollowList = "unfollow-list"   // a short daily list of accounts that don't follow back, to unfollow by hand
     case xUnfollows = "x-unfollows"       // opt-in: unfollows a few non-followbacks a day through your Safari login
+    case serviceWatch = "service-watch"   // Sentry problems and website deploys in plain words; redeploy waits for your OK
+    case heartbeat = "heartbeat"          // Sentry Crons check-ins, so Sentry tells you when this Mac stops
+    case linkCheck = "link-check"         // dead outside links on your site (twice-checked), told once
+    case pythonCheck = "python-check"     // Python environments your scripts use that an upgrade broke
     var id: String { rawValue }
 
     var title: String {
@@ -42,6 +46,10 @@ enum RoutineKind: String, CaseIterable, Identifiable {
         case .replyIdeas: "X reply ideas"
         case .unfollowList: "X unfollow list"
         case .xUnfollows: "X unfollows (automatic)"
+        case .serviceWatch: "Watch my services"
+        case .heartbeat: "Mac-alive heartbeat (Sentry)"
+        case .linkCheck: "Check links on my site"
+        case .pythonCheck: "Check my workspace Python"
         }
     }
 
@@ -187,7 +195,14 @@ final class Routines {
             Bankfile.read(r.params?["bank"] ?? "posts").isEmpty && !AISettings.shared.hasKey
                 ? "posts in its bank (hm bank-add) or an AI key to write some" : nil
         case .script: ScriptRunner.executable(r.params?["command"] ?? "") == nil ? "a script this Mac can run (full path)" : nil
-        case .offerExpiry, .morningStory, .weeklyDigest, .followUps, .keyWatch, .judge: nil
+        case .offerExpiry, .morningStory, .weeklyDigest, .followUps, .keyWatch, .judge, .pythonCheck: nil
+        case .linkCheck: (r.params?["url"]).flatMap(InputCheck.httpsURL) == nil ? "your website's address" : nil
+        case .heartbeat:
+            Heartbeat.parse(dsn: r.params?["dsn"] ?? "") == nil ? "your Sentry project's DSN (Sentry → Settings → Projects → Client Keys)"
+                : !Heartbeat.validSlug(r.params?["slug"].flatMap { $0.isEmpty ? nil : $0 } ?? "hmunmawi-mac") ? "a monitor name (lowercase, digits, - or _)" : nil
+        case .serviceWatch:
+            model?.addOns.contains { ($0.id == "sentry" || $0.id == "vercel") && $0.approved } == true ? nil
+                : "the Sentry or Vercel connection (Settings → Connections)"
         case .outreachReplies: Outreach.items().isEmpty ? "an outreach list (Outreach → Setup)" : nil
         case .macJob: MacJobRoutine.plist(r.params?["label"] ?? "") == nil ? "one of your Mac jobs (its name)" : nil
         case .replyIdeas:
@@ -494,6 +509,10 @@ final class Routines {
         case .replyIdeas: outcome = await replyIdeas(r, key: key)
         case .unfollowList: outcome = await unfollowList(r, key: key)
         case .xUnfollows: outcome = await xUnfollows(r, key: key)
+        case .serviceWatch: outcome = await serviceWatch(r, key: key)
+        case .heartbeat: outcome = await heartbeat(r)
+        case .linkCheck: outcome = await linkCheck(r, key: key)
+        case .pythonCheck: outcome = await pythonCheck(r, key: key)
         case .morningStory, .weeklyDigest: outcome = (true, "")
         }
         record(r.id, ok: outcome.ok)
@@ -592,16 +611,26 @@ final class Routines {
                list.contains(where: { $0.outlet.caseInsensitiveCompare(outlet) == .orderedSame && $0.followed_up == true }) {
                 return fail("A follow-up to \(outlet) was already sent; one per outlet.")
             }
+            let url = args["url"].flatMap(InputCheck.httpsURL)?.absoluteString
+            if args["url"] != nil, url == nil { return fail("url must be a full https:// address.") }
+            let contact = args["contact"].map { String(InputRule.text(200).clean($0)) }
+            // Likely the same outlet already on the list (same name, website or address): said, never refused.
+            let dup = i == nil ? OutreachCheck.duplicates(url: url, email: contact, outlet: outlet,
+                                                          existing: list.map { (outlet: $0.outlet, where: [$0.contact, $0.url].compactMap { $0 }.joined(separator: " ")) }) : []
             if let i {
                 if let st = args["status"] { list[i].status = InputRule.identifier.clean(st) }
                 if let f = args["follow_up"] { list[i].follow_up = f }
+                if let url { list[i].url = url }
+                if let contact { list[i].contact = contact }
             } else {
                 list.append(OutreachEntry(outlet: outlet, app: app, type: InputRule.name.clean(args["type"] ?? "press pitch"),
                                           status: InputRule.identifier.clean(args["status"] ?? "submitted"),
-                                          date: args["date"] ?? today, follow_up: args["follow_up"]))
+                                          date: args["date"] ?? today, follow_up: args["follow_up"], contact: contact, url: url))
             }
             if !dryRun { Outreachfile.write(list) }
-            return ["ok": true, "result": "Saved outreach to \(outlet) for \(app)."]
+            var out: [String: Any] = ["ok": true, "result": "Saved outreach to \(outlet) for \(app)." + (dup.isEmpty ? "" : " Note: looks like one you already have: \(dup.joined(separator: ", ")).")]
+            if !dup.isEmpty { out["duplicate_of"] = dup }
+            return out
         }
     }
 
@@ -746,6 +775,42 @@ final class Routines {
                 guard words.count <= 20, words.allSatisfy({ $0.count <= 40 }) else { return fail("topics is up to 20 comma-separated words or phrases.") }
                 p["topics"] = words.joined(separator: ",")
             }
+            if let t = args["avoid"] {
+                let words = t.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                guard words.count <= 40, words.allSatisfy({ $0.count <= 60 }) else { return fail("avoid is up to 40 comma-separated words or phrases.") }
+                p["avoid"] = words.joined(separator: ",")
+            }
+            if let v = args["dsn"] {
+                guard Heartbeat.parse(dsn: v) != nil else { return fail("dsn is your Sentry project's DSN (https://<key>@o<n>.ingest.sentry.io/<project>).") }
+                p["dsn"] = v.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if let v = args["slug"] {
+                guard Heartbeat.validSlug(v) else { return fail("slug is a monitor name: lowercase letters, digits, - or _ (up to 50).") }
+                p["slug"] = v
+            }
+            for flag in ["issues", "deploys", "jobs", "long"] {
+                if let v = args[flag] {
+                    guard v == "0" || v == "1" else { return fail("\(flag) is 1 or 0.") }
+                    p[flag] = v
+                }
+            }
+            if let v = args["behind"] {
+                guard let n = Int(v), (3...240).contains(n) else { return fail("behind is minutes, 3 to 240.") }
+                p["behind"] = String(n)
+            }
+            if let v = args["pages"] {
+                guard let n = Int(v), (1...LinkCheck.maxPages).contains(n) else { return fail("pages is 1 to \(LinkCheck.maxPages).") }
+                p["pages"] = String(n)
+            }
+            if let v = args["repair"] {
+                guard v == "ask" else { return fail("repair can only be ask here; automatic repair is switched on by the owner, in the app.") }
+                p["repair"] = v
+            }
+            if let v = args["folders"] {
+                let list = v.split(separator: ",").map { ($0.trimmingCharacters(in: .whitespaces) as NSString).expandingTildeInPath }
+                guard list.count <= 20, list.allSatisfy({ $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) }) else { return fail("folders is a comma-separated list of existing venv folders.") }
+                p["folders"] = list.joined(separator: ",")
+            }
             if let src = args["source"] {
                 guard ["bot", "safari"].contains(src.lowercased()) else { return fail("source is bot (Grok Bot's files) or safari (Hmunmawi through your Safari login).") }
                 p["source"] = src.lowercased()
@@ -834,7 +899,7 @@ final class Routines {
         return ["imessage", "ntfy"].first(where: allowed.contains)
     }
 
-    private func tell(_ r: MyRoutine, text: String, key: String, urgent: Bool) async -> (ok: Bool, note: String) {
+    func tell(_ r: MyRoutine, text: String, key: String, urgent: Bool) async -> (ok: Bool, note: String) {
         guard let model, let store = model.liveStore else { return (false, "The app isn't ready.") }
         let words = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(900))
         guard !words.isEmpty else { return (false, "Nothing to say.") }
@@ -1037,8 +1102,11 @@ final class Routines {
         if let tuned { try? await model.liveStore?.appendAudit(actor: "routine:\(r.id)", action: "x.rules_tuned", detail: .object(["note": .string(tuned)])) }
         let rules = XRules.current
         var refused: [String] = []
+        let topics = ReplyIdeas.topics(r), avoid = ReplyIdeas.avoid(r), wording = Wording.rules
         guard let item = Bank.next(items, today: today, allowed: { i in
             if let why = DraftGuard.problem(i.text, versions: versions, maxLength: maxLength) { refused.append("\(i.id): \(why)"); return false }
+            if let why = TopicFilter.problem(i.text, topics: topics, avoid: avoid) { refused.append("\(i.id): \(why)"); return false }
+            if let why = wording.problem(i.text) { refused.append("\(i.id): \(why)"); return false }
             if let why = PostQuality.problem(i.text, rules: rules) { refused.append("\(i.id): \(why)"); return false }
             return true
         }, score: { PostQuality.score($0.text, rules: rules) }) else { return (true, refused.isEmpty ? "The bank is empty." : "Every unused draft was refused: " + refused.prefix(3).joined(separator: "; ")) }
@@ -1079,7 +1147,7 @@ final class Routines {
         let topics = ReplyIdeas.topics(r)
         var skipped: [String] = []
         for t in targets where !sent.contains(t.url) {
-            if let why = ReplyIdeas.problem(t, topics: topics, versions: versions, now: .now) { skipped.append(why); sent.insert(t.url); continue }
+            if let why = ReplyIdeas.problem(t, topics: topics, avoid: ReplyIdeas.avoid(r), wording: Wording.rules, versions: versions, now: .now) { skipped.append(why); sent.insert(t.url); continue }
             let n = sent.count + 1
             let who = t.author.map { "@" + $0.trimmingCharacters(in: CharacterSet(charactersIn: "@")) } ?? "the author"
             let text = t.reply.isEmpty
@@ -1153,12 +1221,21 @@ final class Routines {
     }
 
     /// Five new drafts from your own numbers, added to the bank (still drafts: each goes to you before anything else).
+    /// The topics, avoided words and "words I never use" a drafting AI is told to keep to (drafts are checked again after).
+    static func draftRules(_ r: MyRoutine) -> String {
+        var out = ""
+        let topics = ReplyIdeas.topics(r), avoid = ReplyIdeas.avoid(r) + Wording.rules.rules.filter { !$0.isPattern }.map(\.text)
+        if !topics.isEmpty { out += " Stay on these topics: \(topics.joined(separator: ", "))." }
+        if !avoid.isEmpty { out += " Never use these words or subjects: \(avoid.prefix(40).joined(separator: ", "))." }
+        return out
+    }
+
     private func refill(_ r: MyRoutine, bank: String, maxLength: Int) async -> [BankItem] {
         let data = context("numbers")
         guard !data.isEmpty else { return [] }
         let prompt = """
         Write 5 short social posts (each under \(maxLength) characters, no links, no hashtags) about my apps, from the \
-        numbers below. Only facts from these numbers. One post per line, nothing else.
+        numbers below. Only facts from these numbers. One post per line, nothing else.\(Self.draftRules(r))
 
         \(data)
         """
@@ -1203,13 +1280,33 @@ final class Routines {
             let plain = err.split(separator: ":", maxSplits: 1).last.map { $0.trimmingCharacters(in: .whitespaces) } ?? err
             lines.append("\(row.manifest.name) stopped accepting its key or login (\(String(plain.prefix(160)))). Reconnect it in Settings → Connections.")
         }
+        // Optional (long=1): a connection that has failed for a whole day for any other reason (an outage that
+        // doesn't end, a changed API, a full disk) is told once too, and again when it works.
+        var since = (d.dictionary(forKey: "HMKeyWatchFailingSince") as? [String: Double]) ?? [:]
+        var toldLong = (d.dictionary(forKey: "HMKeyWatchToldLong") as? [String: Double]) ?? [:]
+        if r.params?["long"] == "1" {
+            let nowMs = Date.now.timeIntervalSince1970 * 1000
+            for row in model.addOns where row.approved {
+                if (failing[row.id] ?? 0) > 0 { if since[row.id] == nil { since[row.id] = nowMs } } else { since[row.id] = nil }
+                if let at = toldLong[row.id] {
+                    if let ok = succeeded[row.id], Double(ok) > at { toldLong[row.id] = nil; lines.append("\(row.manifest.name) works again.") }
+                    continue
+                }
+                guard told[row.id] == nil, let first = since[row.id], nowMs - first >= 24 * 3600 * 1000 else { continue }
+                let err = (try? await store.latestAudit(actor: row.id, action: "plugin.poll_failed"))??.detail[path: "error"]?.string ?? "no detail"
+                toldLong[row.id] = nowMs
+                lines.append("\(row.manifest.name) hasn't worked for a day (\(String(err.prefix(160)))). Open Settings → Connections → \(row.manifest.name) → Check Now.")
+            }
+            since = since.filter { current.contains($0.key) }
+        }
         guard !lines.isEmpty else {
-            d.set(told, forKey: "HMKeyWatchTold")
+            d.set(told, forKey: "HMKeyWatchTold"); d.set(since, forKey: "HMKeyWatchFailingSince"); d.set(toldLong, forKey: "HMKeyWatchToldLong")
             return (true, failing.isEmpty ? "Every connection works." : "Failures look like outages, not keys.")
         }
         // Remembered only once you've been told; a failed send tells you on the next run.
         let sent = await tell(r, text: lines.joined(separator: "\n"), key: key, urgent: false)
-        if sent.ok { d.set(told, forKey: "HMKeyWatchTold") }
+        d.set(since, forKey: "HMKeyWatchFailingSince")
+        if sent.ok { d.set(told, forKey: "HMKeyWatchTold"); d.set(toldLong, forKey: "HMKeyWatchToldLong") }
         return sent
     }
 

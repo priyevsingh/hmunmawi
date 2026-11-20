@@ -45,7 +45,7 @@ final class Permissions {
         switch kind {
         case .remind, .morningStory, .weeklyDigest:
             if imessage { needs.append(.messages) }
-        case .script, .keyWatch:
+        case .script, .keyWatch, .pythonCheck:
             needs.append(.files)
         case .outreachReplies:
             switch MailWatch.kind {
@@ -60,7 +60,7 @@ final class Permissions {
         case .xUnfollows:
             needs.append(.files); needs.append(.safari)   // always through your Safari login
             if imessage { needs.append(.messages) }
-        case .siteWatch, .offerExpiry, .aiBrief, .postDrafts, .followUps, .judge, .macJob:
+        case .siteWatch, .offerExpiry, .aiBrief, .postDrafts, .followUps, .judge, .macJob, .serviceWatch, .heartbeat, .linkCheck:
             break
         }
         if routine.params?["done"] == "1", imessage { needs.append(.messages) }

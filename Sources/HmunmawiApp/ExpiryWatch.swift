@@ -20,6 +20,20 @@ final class ExpiryWatch {
         var days: Int? { expires.map { Int(($0.timeIntervalSinceNow / 86_400).rounded(.down)) } }
     }
 
+    /// Plans and trials you type in (a vendor's trial end, a plan that renews or changes price): reminded like
+    /// any other expiry. Vendors rarely publish an API for this, so the date is yours to enter.
+    struct Plan: Codable, Hashable, Identifiable {
+        var service: String
+        var date: String          // YYYY-MM-DD
+        var note: String?
+        var id: String { service + "|" + date }
+    }
+    static let plansKey = "HMWatchPlans"
+    var plans: [Plan] {
+        get { (UserDefaults.standard.data(forKey: Self.plansKey)).flatMap { try? JSONDecoder().decode([Plan].self, from: $0) } ?? [] }
+        set { UserDefaults.standard.set(try? JSONEncoder().encode(Array(newValue.prefix(50))), forKey: Self.plansKey) }
+    }
+
     static let domainsKey = "HMWatchDomains"
     static let membershipKey = "HMMembershipRenews"
     private(set) var web: [Item] = []
@@ -50,6 +64,10 @@ final class ExpiryWatch {
         }
         out += web
         if let m = membership { out.append(Item(kind: "Membership", name: "Apple Developer Program", expires: m, note: nil)) }
+        for p in plans {
+            guard let date = try? Date(p.date + "T12:00:00Z", strategy: .iso8601) else { continue }
+            out.append(Item(kind: "Plan or trial", name: p.service + (p.note.map { " (\($0))" } ?? ""), expires: date, note: nil))
+        }
         return out.sorted { ($0.expires ?? .distantFuture) < ($1.expires ?? .distantFuture) }
     }
 
@@ -183,6 +201,7 @@ struct ExpiryCard: View {
                             Button("Cancel", role: .cancel) {}
                         } message: { Text("Their expiry dates won't be checked any more. You can add them again.") }
                 }
+                PlanRows(watch: watch)
                 DatePicker("Apple Developer membership renews", selection: Binding(get: { watch.membership ?? .now.addingTimeInterval(365 * 86_400) },
                                                                                     set: { watch.membership = $0 }), displayedComponents: .date)
                 Text("Apple doesn't share this date through its API; find it in your developer account under Membership.")
@@ -190,5 +209,41 @@ struct ExpiryCard: View {
             }
         }
         .task { await watch.checkWeb() }
+    }
+}
+
+
+/// "Plans and trials": a service, the day its trial ends or plan renews, and a note (what to change before then).
+private struct PlanRows: View {
+    let watch: ExpiryWatch
+    @State private var service = ""
+    @State private var date = Date.now.addingTimeInterval(14 * 86_400)
+    @State private var note = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Plans and trials").font(.callout.weight(.semibold))
+            ForEach(watch.plans) { p in
+                HStack {
+                    Text("\(p.service): \(p.date)" + (p.note.map { " · \($0)" } ?? "")).font(.callout)
+                    Spacer()
+                    Button("Remove") { watch.plans.removeAll { $0 == p } }.buttonStyle(.pill)
+                }
+            }
+            HStack {
+                TextField("Service, e.g. Sentry trial", text: $service).input(.name, $service)
+                DatePicker("Ends or renews", selection: $date, displayedComponents: .date).labelsHidden()
+                TextField("Note (optional), e.g. set pay-as-you-go to $0", text: $note).input(.text(120), $note)
+                Button("Add") {
+                    let day = date.formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month().day())
+                    watch.plans += [ExpiryWatch.Plan(service: service.trimmingCharacters(in: .whitespaces), date: day,
+                                                     note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note.trimmingCharacters(in: .whitespaces))]
+                    service = ""; note = ""
+                }
+                .buttonStyle(.pill).disabled(service.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Text("A trial that ends or a plan that renews or changes price: reminded like a certificate (alerts by your expiry rules). Vendors rarely share these dates through an API, so you type them once.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

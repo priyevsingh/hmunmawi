@@ -73,6 +73,9 @@ struct OutreachEditor: View {
     @State private var type = "press pitch"
     @State private var followUp = Calendar.current.date(byAdding: .day, value: 7, to: .now) ?? .now
     @State private var withFollowUp = true
+    @State private var page = ""
+    @State private var checking = false
+    @State private var checkNote: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -115,6 +118,16 @@ struct OutreachEditor: View {
                         TextField("Type", text: $type, prompt: Text("press pitch")).input(.name, $type)
                     }
                     GridRow {
+                        TextField("Their page", text: $page, prompt: Text("https://… (optional: checked before adding)")).input(.url, $page)
+                            .gridCellColumns(2)
+                        Button(checking ? "Checking…" : "Check") { Task { await check() } }
+                            .disabled(checking || InputCheck.httpsURL(page) == nil)
+                            .help("Is the page there, is there an email or contact form, is it paid-only, which language, and is it already on your list?")
+                    }
+                    if let checkNote {
+                        GridRow { Text(checkNote).font(.callout).foregroundStyle(.secondary).gridCellColumns(3).fixedSize(horizontal: false, vertical: true) }
+                    }
+                    GridRow {
                         Toggle("Follow up on", isOn: $withFollowUp)
                         DatePicker("Follow up on", selection: $followUp, displayedComponents: .date).labelsHidden().disabled(!withFollowUp)
                         Button("Add") { add() }.disabled(outlet.trimmingCharacters(in: .whitespaces).isEmpty || app.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -142,14 +155,26 @@ struct OutreachEditor: View {
             if let i = l.firstIndex(where: { $0.outlet == o && $0.app == a }) {
                 if let when, l[i].followed_up != true { l[i].follow_up = when }
             } else {
-                l.append(OutreachEntry(outlet: o, app: a, type: t, status: "submitted", date: Date.now.localDay, follow_up: when))
+                l.append(OutreachEntry(outlet: o, app: a, type: t, status: "submitted", date: Date.now.localDay, follow_up: when,
+                                       url: InputCheck.httpsURL(page)?.absoluteString))
             }
         }
-        outlet = ""
+        outlet = ""; page = ""; checkNote = nil
     }
 
     private func change(_ edit: (inout [OutreachEntry]) -> Void) {
         var l = Outreachfile.read(); edit(&l); Outreachfile.write(l); entries = l
+    }
+
+    /// "Check before adding": reads the outlet's page (one request) and compares it with your list.
+    private func check() async {
+        guard let url = InputCheck.httpsURL(page), !InputCheck.isInternalHost(url.host ?? "") else { return }
+        checking = true; defer { checking = false }
+        let existing = Outreachfile.read().map { (outlet: $0.outlet, where: [$0.contact, $0.url].compactMap { $0 }.joined(separator: " ")) }
+        let got = await Routines.fetch(url, maxBytes: 1_500_000)
+        var r = OutreachCheck.check(html: got.body ?? "", status: got.status, finalURL: got.final?.absoluteString, candidateURL: url.absoluteString, existing: existing)
+        r.duplicateOf = OutreachCheck.duplicates(url: url.absoluteString, email: r.emails.first, outlet: outlet, existing: existing)
+        checkNote = r.summary
     }
 }
 

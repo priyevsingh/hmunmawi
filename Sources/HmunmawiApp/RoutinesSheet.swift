@@ -440,6 +440,10 @@ private struct RoutineForm: View {
     }
 
     @State private var alsoAt = ""
+    /// An on/off parameter that is on unless set to "0".
+    private func flag(_ key: String) -> Binding<Bool> {
+        Binding(get: { routine.params?[key] != "0" }, set: { on in var p = routine.params ?? [:]; p[key] = on ? nil : "0"; routine.params = p.isEmpty ? nil : p })
+    }
     init(draft: RoutineDraft, onSave: @escaping (MyRoutine) -> Void) {
         let routine = draft.routine
         _routine = State(initialValue: routine)
@@ -461,7 +465,10 @@ private struct RoutineForm: View {
                 if !v.isEmpty { routine.who = "mac"; if v == RoutineKind.siteWatch.rawValue, routine.every == nil { routine.every = "30 min" } }
                 if v == RoutineKind.postDrafts.rawValue || v == RoutineKind.keyWatch.rawValue { routine.every = "60 min"; routine.catchUp = 60 }
                 else if v == RoutineKind.xUnfollows.rawValue { routine.every = "5 min"; routine.catchUp = 5 }
-                else if v != RoutineKind.siteWatch.rawValue { routine.every = nil }
+                else if v == RoutineKind.serviceWatch.rawValue || v == RoutineKind.heartbeat.rawValue { routine.every = "15 min"; routine.catchUp = 15 }
+                else if v == RoutineKind.linkCheck.rawValue { routine.every = nil; if routine.days.isEmpty { routine.days = ["Mon"] } }
+                else if v != RoutineKind.siteWatch.rawValue && v != RoutineKind.linkCheck.rawValue { routine.every = nil }
+                if v == RoutineKind.keyWatch.rawValue, routine.params?["long"] == nil { var p = routine.params ?? [:]; p["long"] = "1"; routine.params = p }
             })) {
                 Text("Just list it (a bot's, cloud or manual routine)").tag("")
                 ForEach(RoutineKind.allCases.filter { !$0.builtIn }) { Text($0.title).tag($0.rawValue) }
@@ -501,10 +508,13 @@ private struct RoutineForm: View {
                                                               set: { var p = routine.params ?? [:]; p["follow_x"] = $0 ? "1" : "0"; routine.params = p }))
                 Text("Ready drafts come from the bank first, the best one first; weak ones are skipped. Once a week it checks X's published ranking code and re-ranks when X changes what it rewards. When the bank runs low and an AI key is set, the AI writes 5 more from your numbers. You post them yourself.")
                     .font(.callout).foregroundStyle(.secondary)
+                TextField("Stay on these topics (optional)", text: param("topics"), prompt: Text("e.g. SwiftUI, indie apps")).input(.list, param("topics"))
+                TextField("Never about (optional)", text: param("avoid"), prompt: Text("e.g. crypto, politics")).input(.list, param("avoid"))
                 Button("Edit the bank") { let b = bankName; openSheet?({ AnyView(BankEditor(bank: b).buttonStyle(.pill)) }) }
             case .replyIdeas?:
                 sourcePicker
                 TextField("Your topics", text: param("topics"), prompt: Text("e.g. HealthKit, SwiftUI, indie apps")).input(.list, param("topics"))
+                TextField("Never about (optional)", text: param("avoid"), prompt: Text("e.g. crypto, politics")).input(.list, param("avoid"))
                 TextField("Replies a day", text: param("per_day"), prompt: Text("4")).input(.number, param("per_day"))
                 if source == "safari" {
                     TextField("What you work on", text: param("about"), prompt: Text("e.g. a sleep tracking app for iPhone")).input(.short, param("about"))
@@ -624,8 +634,46 @@ private struct RoutineForm: View {
                 Text("Every 30 minutes it reads your mail list (every folder) and matches it to your outreach: answers, listing decisions, bounces, auto-replies and follow-ups you sent. Each one waits in Log → Outreach for your tap; nothing is sent.")
                     .font(.callout).foregroundStyle(.secondary)
             case .keyWatch?:
-                Text("Checks every hour. When a connection fails twice in a row because its key or login was refused, expired or revoked, it tells you once; and again when it works. Network outages don't count.")
+                Toggle("Also tell me when a connection hasn't worked for a day", isOn: Binding(get: { routine.params?["long"] == "1" }, set: { on in
+                    var p = routine.params ?? [:]; p["long"] = on ? "1" : nil; routine.params = p.isEmpty ? nil : p
+                }))
+                Text("Checks every hour. When a connection fails twice in a row because its key or login was refused, expired or revoked, it tells you once; and again when it works. With the switch on, a connection that has failed for 24 hours for any other reason is told once too.")
                     .font(.callout).foregroundStyle(.secondary)
+            case .serviceWatch?:
+                Toggle("Sentry problems (crashes, website down, late jobs)", isOn: flag("issues"))
+                Toggle("Website deploys (Vercel)", isOn: flag("deploys"))
+                TextField("Minutes a new commit may wait for a deploy", text: param("behind"), prompt: Text("10")).input(.number, param("behind"))
+                Text("Every 15 minutes it reads what your Sentry and Vercel connections found: each new open Sentry problem once in plain words (a new crash, a website Sentry Uptime saw down, a job Sentry Crons saw late), and again when it closes. When production doesn't run your branch's newest commit (no deploy started, or the build failed), it tells you and puts a Redeploy in Log → Waiting: nothing deploys until you approve it. Sentry needs the event:read scope for problems.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            case .heartbeat?:
+                TextField("Sentry DSN", text: param("dsn"), prompt: Text("https://…@o….ingest.sentry.io/…")).input(.url, param("dsn"))
+                TextField("Monitor name", text: param("slug"), prompt: Text("hmunmawi-mac")).input(.identifier, param("slug"))
+                Picker("Check in every", selection: Binding(get: { routine.every ?? "15 min" }, set: { routine.every = $0; routine.catchUp = Int($0.prefix { $0.isNumber }) })) {
+                    ForEach(["5 min", "15 min", "30 min", "60 min"], id: \.self) { Text($0).tag($0) }
+                }
+                Toggle("Report a problem when a Mac job I watch is failing", isOn: Binding(get: { routine.params?["jobs"] == "1" }, set: { on in
+                    var p = routine.params ?? [:]; p["jobs"] = on ? "1" : nil; routine.params = p.isEmpty ? nil : p
+                }))
+                Text("Sends a check-in to a Sentry Crons monitor (Sentry makes the monitor itself on the first one). When check-ins stop because this Mac is asleep, off or Hmunmawi isn't running, Sentry tells you by its own email or app, the one problem Hmunmawi can't tell you itself. The DSN is in Sentry → Settings → Projects → your project → Client Keys. Sentry's free plan includes one cron monitor.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            case .linkCheck?:
+                TextField("Website or sitemap address", text: param("url"), prompt: Text("https://mysite.com")).input(.url, param("url"))
+                TextField("Pages to read (up to \(LinkCheck.maxPages))", text: param("pages"), prompt: Text("50")).input(.number, param("pages"))
+                Text("Reads your sitemap (or the page you give), collects every link to another website and checks it, four at a time. A link is called dead only when two runs in a row found it gone (404, 410 or no such site); sites that block checkers or are briefly down never count. App Store links are checked with Apple's public lookup. It tells you new dead links once and never edits your site.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let st = try? JSONDecoder().decode(LinkCheck.State.self, from: Data(contentsOf: Routines.linkStateURL(routine.id))) {
+                    Text("Last run \(st.lastRun ?? "-"): \(st.pages ?? 0) pages, \(st.checked ?? 0) links, \(st.dead.count) dead, \(st.suspects.count) to check again.")
+                        .font(.callout.monospacedDigit()).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            case .pythonCheck?:
+                TextField("Also check these venv folders (optional)", text: param("folders"), prompt: Text("~/work/.venv")).input(.text(800), param("folders"))
+                Picker("When one is broken", selection: Binding(get: { routine.params?["repair"] ?? "ask" }, set: { var p = routine.params ?? [:]; p["repair"] = $0 == "ask" ? nil : $0; routine.params = p.isEmpty ? nil : p })) {
+                    Text("Tell me, I repair it").tag("ask")
+                    Text("Repair it at once").tag("auto")
+                }
+                Text("Finds the Python environments (venvs) your script routines and Mac jobs run with. When one breaks (usually after Homebrew upgrades Python), it tells you once with the fix. A repair keeps the old folder beside it (.broken-<date>), makes a fresh one with this Mac's python3 and puts back the packages it noted while the venv still worked.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                PythonVenvList(extra: routine.params?["folders"])
             default: EmptyView()
             }
             if let kind = RoutineKind(rawValue: routine.does ?? ""), !kind.builtIn {

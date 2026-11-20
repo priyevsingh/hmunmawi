@@ -8,7 +8,7 @@ import SwiftUI
 /// You mark a suggestion Done or Not useful; 14 days after Done it checks whether the number moved and
 /// ranks that kind of suggestion higher or lower next time.
 struct Suggestion: Identifiable, Equatable {
-    enum Kind: String, Codable, CaseIterable { case searchGap, channel, storePage, retention, ads, countryPrice }
+    enum Kind: String, Codable, CaseIterable { case searchGap, pageTitle, channel, storePage, retention, ads, countryPrice }
     let id: String          // stable: the same advice keeps the same id across days
     let kind: Kind
     let app: String?
@@ -23,6 +23,7 @@ struct Suggestion: Identifiable, Equatable {
     var symbol: String {
         switch kind {
         case .searchGap: "magnifyingglass"
+        case .pageTitle: "textformat"
         case .channel: "chart.line.uptrend.xyaxis"
         case .storePage: "app.badge.fill"
         case .retention: "person.2.slash.fill"
@@ -33,7 +34,7 @@ struct Suggestion: Identifiable, Equatable {
 
     var tint: Color {
         switch kind {
-        case .searchGap, .channel: Brand.Category.web
+        case .searchGap, .pageTitle, .channel: Brand.Category.web
         case .storePage: Brand.Category.users
         case .retention, .ads, .countryPrice: Brand.Category.money
         }
@@ -51,7 +52,7 @@ enum Playbook {
     }
 
     static func all(_ model: AppModel) -> [Suggestion] {
-        searchGaps(model) + bestChannel(model) + storePages(model) + countryPrices(model) + retention(model) + ads(model)
+        searchGaps(model) + pageTitles(model) + bestChannel(model) + storePages(model) + countryPrices(model) + retention(model) + ads(model)
     }
 
     /// Ranked by importance × what has worked for you before, without hidden ones (Not useful, or Done and
@@ -82,6 +83,39 @@ enum Playbook {
                     score: min(1, impressions / 400), metric: clicks, higherIsBetter: true)
             }
         }
+    }
+
+    /// Pages Google shows on its first page (average position 10 or better) at least 100 times in 28 days but
+    /// that get under half your site's own click rate: their title and description don't make people click.
+    /// Judged against your site's average, not an outside rule of thumb.
+    static func pageTitles(_ model: AppModel) -> [Suggestion] {
+        model.snapshots("growth.search").flatMap { e -> [Suggestion] in
+            let site = e.app ?? "your site"
+            return PageCTR.weak(e.payload).map { p in
+                Suggestion(
+                    id: "page|\(site)|\(p.page)", kind: .pageTitle, app: site,
+                    title: "\(p.page): seen \(Int(p.impressions)) times at position \(String(format: "%.1f", p.position)), clicked \(Int(p.clicks))",
+                    why: "That's \(PageCTR.percent(p.ctr)) of searchers; your site's pages average \(PageCTR.percent(p.siteCTR)). It already ranks, so the title and description are what people judge.",
+                    action: "Rewrite its title and description so they answer the search directly (keep the address). Mark Done when the new title is live; clicks are compared 14 days later.",
+                    score: min(1, p.impressions / 1000), metric: p.clicks, higherIsBetter: true)
+            }
+        }
+    }
+
+    /// Today's value for every query and page Search Console reports, so advice marked Done can still be
+    /// measured after it stops qualifying as a suggestion.
+    static func searchMetrics(_ model: AppModel) -> [String: Double] {
+        var out: [String: Double] = [:]
+        for e in model.snapshots("growth.search") {
+            let site = e.app ?? "your site"
+            for q in e.payload[path: "top_queries_28d"]?.array ?? [] {
+                if let query = q[path: "query"]?.string { out["search|\(site)|\(query)"] = n(q[path: "clicks"]) }
+            }
+            for p in e.payload[path: "top_pages_28d"]?.array ?? [] {
+                if let page = p[path: "page"]?.string { out["page|\(site)|\(page)"] = n(p[path: "clicks"]) }
+            }
+        }
+        return out
     }
 
     /// The channel with the biggest share of its month in the last 7 days is pulling now; feed it.
@@ -345,7 +379,7 @@ struct NextSteps: View {
 
     /// Today's value of every piece of advice that is waiting to be measured.
     private func measure() {
-        var current: [String: Double] = [:]
+        var current = Playbook.searchMetrics(model)
         for s in Playbook.all(model) { if let m = s.metric { current[s.id] = m } }
         store.measure(current: current)
     }

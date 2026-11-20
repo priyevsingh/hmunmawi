@@ -659,7 +659,7 @@ extension GrowthPage {
             guard let text = q[path: "query"]?.string else { return nil }
             return InfoModel.Fact(symbol: "magnifyingglass", label: text, value: Format.parts(q, [("impressions", "seen"), ("clicks", "clicks")]))
         }
-        let pages = (search[path: "top_pages_28d"]?.array ?? []).compactMap { q -> InfoModel.Fact? in
+        let pages = (search[path: "top_pages_28d"]?.array ?? []).prefix(10).compactMap { q -> InfoModel.Fact? in
             guard let page = q[path: "page"]?.string else { return nil }
             return InfoModel.Fact(symbol: "doc.text", label: page, value: Format.parts(q, [("impressions", "seen"), ("clicks", "clicks")]))
         }

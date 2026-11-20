@@ -155,6 +155,7 @@ enum AgentSetting: String, CaseIterable {
     case liveMode = "live.mode", webDashboard = "web.dashboard"
     case botName = "bot.name", botFolder = "bot.folder"
     case xSafariRead = "x.safari_read", xHandle = "x.handle", xGlanceFile = "x.glance_file"
+    case keepAwake = "mac.keep_awake"
 
     var defaultsKey: String {
         switch self {
@@ -164,6 +165,7 @@ enum AgentSetting: String, CaseIterable {
         case .liveMode: "HMLiveMode"; case .webDashboard: "HMWebDashboard"
         case .botName: "HMBotName"; case .botFolder: BotSetup.folderKey
         case .xSafariRead: XSafariReader.enabledKey; case .xHandle: XSafariReader.handleKey; case .xGlanceFile: "HMXGlanceFile"
+        case .keepAwake: KeepAwake.modeKey
         }
     }
     /// Changing these needs the matching permission.
@@ -171,6 +173,7 @@ enum AgentSetting: String, CaseIterable {
         switch self {
         case .aiEnabled, .aiBudget: .spending
         case .botFolder: .routines   // where routines.md is written and problem notes are read from
+        case .keepAwake: .jobs       // keeps the Mac from sleeping so jobs run
         case .xFile, .webDashboard, .xSafariRead, .xHandle, .xGlanceFile: .connections   // point the app at a file or an address it then reads
         default: nil
         }
@@ -194,6 +197,7 @@ enum AgentSetting: String, CaseIterable {
         case .webDashboard: "https address"
         case .botName: "what you call your bot, e.g. My Bot"
         case .botFolder: "path of the folder you and your bot share"
+        case .keepAwake: "off, plugged-in or always (keep this Mac from idle sleep so routines run on time)"
         }
     }
 
@@ -218,6 +222,7 @@ enum AgentSetting: String, CaseIterable {
         case .botFolder: let c = InputRule.path.clean(v); return c.isEmpty ? nil : c
         case .xPlanPrice: return InputRule.short.clean(v)
         case .project: return InputRule.name.clean(v)
+        case .keepAwake: return oneOf(["off", "plugged-in", "always"])
         }
     }
 }
@@ -416,6 +421,11 @@ final class AgentBridge {
         case "approve", "skip": .decisions
         case "promo-next", "promo-mark", "promo-undo": .codes
         case "shield-fix": .releases
+        // A website deploy and a Python rebuild change things outside Hmunmawi: they always wait for the owner.
+        case "deploy-redeploy": .releases
+        case "plan-add": .routines
+        case "plan-remove": .deletes
+        case "python-repair": .jobs
         case "set": AgentSetting(rawValue: args["key"] ?? "")?.action
         default: nil
         }
@@ -451,7 +461,8 @@ final class AgentBridge {
         }
         // Submitting for review always waits for the owner, even when allowed or in Full Autopilot.
         // Judge the cleaned value the fix will actually use ("sub mit" and " Submit" clean to "submit").
-        let alwaysAsk = command == "shield-fix" && InputRule.identifier.clean(args["item"] ?? "").lowercased() == "submit"
+        let alwaysAsk = (command == "shield-fix" && InputRule.identifier.clean(args["item"] ?? "").lowercased() == "submit")
+            || command == "deploy-redeploy" || command == "python-repair"
         // Handing out a code can't wait for your OK: an approved request would mark a code shared with nobody to
         // receive it. Without the permission it's refused outright, never parked.
         if need == .codes, !approved, !AgentPolicy.shared.allows(.codes, agent: agent) {
@@ -690,6 +701,90 @@ final class AgentBridge {
             }
             if command == "approve" { await model.approve(w.job) } else { await model.skip(w.job) }
             return ["ok": true, "result": "\(command == "approve" ? "Approved" : "Skipped"): \(w.title)"]
+        case "services":
+            // Sentry's open problems and each website's deploy state, as Hmunmawi last read them (read only).
+            let issues = model.snapshots("issues.snapshot").flatMap { SentryIssues.parse($0.payload) }.prefix(50).map { i in
+                ["id": i.id, "title_untrusted_text": i.title, "project": i.project, "kind": SentryIssues.kind(i).rawValue, "count": i.count,
+                 "link": i.permalink ?? ""] as [String: Any] }
+            let deploys: [[String: Any]] = model.snapshots("deploy.snapshot").compactMap { e in
+                guard let s = DeployWatch.Snapshot(e.payload) else { return nil }
+                return ["project": s.project, "status": DeployWatch.status(s).rawValue, "branch": s.branch ?? "", "head": s.headSHA ?? "",
+                        "production": s.productionSHA ?? "", "production_state": s.productionState ?? "", "url": s.productionURL ?? ""]
+            }
+            return ["ok": true, "result": ["sentry_open": Array(issues), "deploys": deploys,
+                                           "note": "Watch my services tells the owner about new problems; redeploy with deploy-redeploy (always waits for the owner)."]]
+        case "deploy-redeploy":
+            let name = InputRule.name.clean(args["project"] ?? "")
+            let snaps = model.snapshots("deploy.snapshot").compactMap { e in DeployWatch.Snapshot(e.payload).map { (e, $0) } }
+            guard let (e, s) = snaps.first(where: { name.isEmpty || $0.1.project.caseInsensitiveCompare(name) == .orderedSame }) ?? (snaps.count == 1 ? snaps.first : nil) else {
+                return ["ok": false, "error": snaps.isEmpty ? "No Vercel connection has reported a deploy yet." : "Name the project: " + snaps.map(\.1.project).joined(separator: ", ")]
+            }
+            let flagged = args["deployment"].map { InputRule.identifier.clean($0) }.flatMap { $0.isEmpty ? nil : $0 }
+            let sha = args["sha"].map { InputRule.identifier.clean($0) } ?? (flagged == nil ? s.headSHA : nil)
+            let r = await Routines.shared.redeploy(project: s.project, sha: sha, deployment: sha == nil ? (flagged ?? e.payload[path: "production_id"]?.string) : nil)
+            return r.ok ? ["ok": true, "result": r.message] : ["ok": false, "error": r.message]
+        case "plan-list":
+            return ["ok": true, "result": ["plans": ExpiryWatch.shared.plans.map { ["service": $0.service, "date": $0.date, "note": $0.note ?? ""] }]]
+        case "plan-add", "plan-remove":
+            let service = InputRule.name.clean(args["service"] ?? ""), date = args["date"] ?? ""
+            guard !service.isEmpty, DayNumber.of(date) != nil else { return ["ok": false, "error": "Give service=<name> date=YYYY-MM-DD."] }
+            if command == "plan-remove" {
+                let before = ExpiryWatch.shared.plans.count
+                ExpiryWatch.shared.plans.removeAll { $0.service == service && $0.date == date }
+                return before == ExpiryWatch.shared.plans.count ? ["ok": false, "error": "No plan \(service) on \(date)."] : ["ok": true, "result": "Removed \(service) (\(date))."]
+            }
+            let note = args["note"].map { InputRule.text(120).clean($0) }.flatMap { $0.isEmpty ? nil : $0 }
+            ExpiryWatch.shared.plans += [ExpiryWatch.Plan(service: service, date: date, note: note)]
+            return ["ok": true, "result": "Watching \(service): \(date). Reminded by your expiry rules."]
+        case "links-dead":
+            // Dead outside links each "Check links on my site" routine found (two runs in a row), read only.
+            let rows: [[String: Any]] = MyRoutines.read().filter { $0.does == RoutineKind.linkCheck.rawValue }.compactMap { r in
+                guard let st = try? JSONDecoder().decode(LinkCheck.State.self, from: Data(contentsOf: Routines.linkStateURL(r.id))) else { return nil }
+                return ["routine": r.id, "site": r.params?["url"] ?? "", "last_run": st.lastRun ?? "", "pages": st.pages ?? 0, "links_checked": st.checked ?? 0,
+                        "dead": st.dead.sorted { $0.key < $1.key }.map { ["link": $0.key, "page": $0.value.page, "status": $0.value.status, "since": $0.value.since] },
+                        "to_check_again": st.suspects.count]
+            }
+            return ["ok": true, "result": ["sites": rows]]
+        case "lint-text":
+            // Checks text (text=…, or text=- on stdin) or a file against the owner's "Words I never use" (read only).
+            var text = args["text"] ?? ""
+            if let f = args["file"] {
+                let path = (f as NSString).expandingTildeInPath
+                guard let attrs = try? FileManager.default.attributesOfItem(atPath: path), (attrs[.size] as? Int ?? 0) <= 2_000_000,
+                      let t = try? String(contentsOfFile: path, encoding: .utf8) else { return ["ok": false, "error": "file must be a readable text file under 2 MB."] }
+                text = t
+            }
+            let rules = Wording.rules
+            let hits = rules.hits(text).map { ["rule": $0.rule, "found": $0.found, "why": $0.why ?? ""] }
+            return ["ok": true, "result": ["clean": hits.isEmpty, "hits": hits, "rules": rules.rules.count, "rule_problems": rules.problems,
+                                           "file": Wording.url.path]]
+        case "outreach-check":
+            // Checks a candidate before it's added: the page, a contact, paid-only wording, language, already pitched (read only).
+            guard let url = (args["url"]).flatMap(InputCheck.httpsURL), !InputCheck.isInternalHost(url.host ?? "") else { return ["ok": false, "error": "url must be a public https:// address."] }
+            let existing = Outreach.items().map { (outlet: $0.outlet, where: [$0.contact, $0.url].compactMap { $0 }.joined(separator: " ")) }
+            let page = await Routines.fetch(url, maxBytes: 1_500_000)
+            let r = OutreachCheck.check(html: page.body ?? "", status: page.status, finalURL: page.final?.absoluteString, candidateURL: url.absoluteString,
+                                        candidateEmail: args["email"], existing: existing)
+            let dup = OutreachCheck.duplicates(url: url.absoluteString, email: args["email"], outlet: args["outlet"], existing: existing)
+            return ["ok": true, "result": ["verdict": dup.isEmpty ? r.verdict : "already_pitched", "summary": dup.isEmpty ? r.summary : "Already on your list: \(dup.joined(separator: ", "))."
+                                           , "status": r.status ?? 0, "final_url": r.finalURL ?? "", "emails": r.emails, "contact_form": r.contactForm,
+                                           "contact_page": r.contactPage ?? "", "paid_words": r.paidWords, "language": r.language ?? "", "duplicate_of": dup]]
+        case "python-check":
+            await MacAutomations.shared.refresh()
+            let rows = Routines.shared.venvs(extra: args["folders"]).map { v -> [String: Any] in
+                var o: [String: Any] = ["venv": v.root, "used_by": v.usedBy, "ok": v.health.isOK]
+                if case .broken(let why) = v.health { o["problem"] = why; o["repair"] = "hm python-repair venv=\(v.root)" }
+                return o
+            }
+            return ["ok": true, "result": ["venvs": rows]]
+        case "python-repair":
+            let root = ((args["venv"] ?? "") as NSString).expandingTildeInPath
+            await MacAutomations.shared.refresh()
+            guard Routines.shared.venvs(extra: root).contains(where: { $0.root == root && !$0.health.isOK }) else {
+                return ["ok": false, "error": "venv must be a broken one from python-check."]
+            }
+            let r = await Routines.shared.repairPython(root)
+            return r.ok ? ["ok": true, "result": r.message] : ["ok": false, "error": r.message]
         case "shield":
             let list: [[String: Any]] = model.snapshots("release.check").map { e in
                 ["app": ComingSoon.shortName(e.app ?? ""), "version": e.payload[path: "version"]?.string ?? "",
@@ -801,6 +896,7 @@ final class AgentBridge {
         case .xFile: XFileFeed.shared.path = value
         case .xSafariRead: XSafariReader.shared.enabled = value == "true"
         case .xHandle: XSafariReader.shared.handle = value
+        case .keepAwake: KeepAwake.shared.mode = KeepAwake.Mode(rawValue: value) ?? .off
         case .xPlanSource: XPlan.shared.source = value
         case .xPlan: XPlan.shared.name = value
         case .xPlanPrice: XPlan.shared.price = value
@@ -829,7 +925,7 @@ enum AgentGuide {
         ["name": "routine-list", "does": "Your routines: what each does, when, its state and last run", "needs": "nothing"],
         ["name": "calendar-test", "does": "Add one test event to the Hmunmawi calendar (needs the Calendar permission in Settings)", "needs": "routines"],
         ["name": "routine-run|routine-pause|routine-resume", "args": "id=<routine id>", "does": "Run a routine now (at most once per 10 minutes), or switch it off/on (X unfollows (automatic) is owner-only: agents may only pause or resume it)", "needs": "routines"],
-        ["name": "routine-add|routine-set", "args": "[id=<id>] title=<name> does=<remind|site-watch|offer-expiry|ai-brief|post-drafts|reply-ideas|unfollow-list|follow-ups|key-watch|judge-changes|mac-job> [at=HH:MM or HH:MM,HH:MM,…] [every=<1|5|15|30|60> min] [label=<your Mac job, for mac-job>] [takeover=1 (Hmunmawi owns its schedule; its own timer is backed up)] [days=Mon,Thu] [text=<message>] [url=https://…] [warn=30,7,1] [brief=<what to ask the AI>] [input=numbers|search|crashes] [cap=<USD a month>] [bank=posts] [per_day=3] [gap=<hours>] [max=280] [follow_x=1|0 (post drafts follow X's published algorithm; on by default)] [best_hours=1|0 (send drafts at your best hours from your X posts; on by default)] [source=bot|safari (who reads X for reply-ideas and unfollow-list: bot = Grok Bot's files, safari = Hmunmawi through your Safari login)] [about=<what you work on, for Safari reply drafts>] [drafts=auto|ondevice|ai|none (who drafts Safari replies; auto = Apple's on-device AI first, else your AI key)] [folder=<Grok Bot's reply-targets folder, for reply-ideas>] [topics=<a,b,c>] [file=<Grok Bot's unfollow list, for unfollow-list>] [keep=<handles to always keep>] [tell=imessage|ntfy] [done=1 (also tell me each time it runs)]", "does": "Make or change a routine Hmunmawi runs", "needs": "routines"],
+        ["name": "routine-add|routine-set", "args": "[id=<id>] title=<name> does=<remind|site-watch|offer-expiry|ai-brief|post-drafts|reply-ideas|unfollow-list|follow-ups|key-watch|judge-changes|mac-job|service-watch|heartbeat|link-check|python-check> [at=HH:MM or HH:MM,HH:MM,…] [every=<1|5|15|30|60> min] [label=<your Mac job, for mac-job>] [takeover=1 (Hmunmawi owns its schedule; its own timer is backed up)] [days=Mon,Thu] [text=<message>] [url=https://…] [warn=30,7,1] [brief=<what to ask the AI>] [input=numbers|search|crashes] [cap=<USD a month>] [bank=posts] [per_day=3] [gap=<hours>] [max=280] [follow_x=1|0 (post drafts follow X's published algorithm; on by default)] [best_hours=1|0 (send drafts at your best hours from your X posts; on by default)] [source=bot|safari (who reads X for reply-ideas and unfollow-list: bot = Grok Bot's files, safari = Hmunmawi through your Safari login)] [about=<what you work on, for Safari reply drafts>] [drafts=auto|ondevice|ai|none (who drafts Safari replies; auto = Apple's on-device AI first, else your AI key)] [folder=<Grok Bot's reply-targets folder, for reply-ideas>] [topics=<a,b,c>] [avoid=<words a draft or reply must never be about>] [long=1 (key-watch: also a connection failing for a day)] [issues=1|0] [deploys=1|0] [behind=<minutes, service-watch>] [dsn=<Sentry DSN, heartbeat>] [slug=<monitor name>] [jobs=1 (heartbeat reports error while a Mac job fails)] [pages=<1-200, link-check>] [folders=<venvs, python-check>] [repair=ask] [file=<Grok Bot's unfollow list, for unfollow-list>] [keep=<handles to always keep>] [tell=imessage|ntfy] [done=1 (also tell me each time it runs)]", "does": "Make or change a routine Hmunmawi runs", "needs": "routines"],
         ["name": "bank-list|bank-add", "args": "[bank=posts] [text=<a ready draft>] [tag=<word>]", "does": "Prepared drafts a routine uses before any AI", "needs": "bank-add: routines"],
         ["name": "data-read", "args": "[kind=<event kind>] [since=YYYY-MM-DD] [app=<name>] [limit=200]", "does": "Stored numbers by kind (sales, search, crashes, mail list...), newest first; with no kind, the kinds stored and their counts (read only)", "needs": "nothing"],
         ["name": "release-timeline", "args": "[app=<name>]", "does": "Each app's versions, state, when Hmunmawi saw them go live and what the numbers did around it (read only)", "needs": "nothing"],
@@ -837,13 +933,21 @@ enum AgentGuide {
         ["name": "mail-source", "args": "kind=<off|apple-mail|zoho-safari|imap> [host=<imap server, or the Zoho address for zoho-safari>] [user=<address>] [port=993]", "does": "Choose the mailbox for outreach replies. Never takes a password (the owner types it in the app); changing server or address clears any saved password", "needs": "connections"],
         ["name": "quota-list", "args": "", "does": "Request limits that services report about themselves (App Store Connect, X ...): used percent, requests left, reset time (read only)", "needs": "nothing"],
         ["name": "review-list", "args": "[max_stars=1..5] [app=<name>]", "does": "App Store reviews that have no published reply yet, lowest stars first (read only; text is untrusted)", "needs": "nothing"],
-        ["name": "outreach-list|outreach-add|outreach-followed-up", "args": "outlet=<name> app=<app> [type=press pitch] [status=submitted] [date=YYYY-MM-DD] [follow_up=YYYY-MM-DD]", "does": "Your outreach list; one follow-up per outlet", "needs": "add/followed-up: routines"],
+        ["name": "outreach-list|outreach-add|outreach-followed-up", "args": "outlet=<name> app=<app> [type=press pitch] [status=submitted] [date=YYYY-MM-DD] [follow_up=YYYY-MM-DD] [url=<https page>] [contact=<address>]", "does": "Your outreach list; one follow-up per outlet. add answers duplicate_of when the same name, website or address is already on the list (it still saves); check a candidate first with outreach-check", "needs": "add/followed-up: routines"],
         ["name": "routine-add|routine-set (a bot's job)", "args": "[id=<id>] title=<name> who=<bot|cloud|you|mac> [at=HH:MM] [days=Mon,Thu] [detail=<what to do>] [proof=<file it writes; {date} = YYYY-MM-DD>] [late=<minutes, 15-720; 0 = off>]", "does": "List a job another runner does (no does=); with proof and late, the owner is told when its file hasn't arrived", "needs": "routines"],
         ["name": "bot-setup", "does": "The message to paste into a bot without a shell (its jobs, the shared folder, the files to write), and whether it changed since the owner last copied it", "needs": "nothing"],
         ["name": "metric-list", "does": "Numbers a change can be judged on (key and name)", "needs": "nothing"],
         ["name": "change-add|change-list|change-remove", "args": "what=<what changed> metric=<key from metric-list> [date=YYYY-MM-DD it went live, default today] [days=7-28, default 28] [better=up|down] | id=<id>", "does": "Changes to judge: after `days`, the judge-changes routine compares the average day before and after and suggests keep, improve or undo (it never undoes anything)", "needs": "add: routines; remove: deletes"],
         ["name": "routine-remove", "args": "id=<routine id>", "does": "Remove a routine (the morning story and weekly digest can only be switched off)", "needs": "deletes"],
         ["name": "approve|skip", "args": "id=<waiting id>", "does": "Decide something waiting", "needs": "decisions"],
+        ["name": "services", "does": "Sentry's open problems (crash, website down, late job) and each website's production deploy state: ok, building, behind or failed (read only)", "needs": "nothing"],
+        ["name": "deploy-redeploy", "args": "[project=<site name>] [sha=<commit>]", "does": "Redeploy a website's production on Vercel (its branch's newest commit, or a rebuild). Always waits for the owner's OK", "needs": "releases (and always the owner)"],
+        ["name": "plan-list|plan-add|plan-remove", "args": "service=<name> date=YYYY-MM-DD [note=<what to change before then>]", "does": "Plans and trials in the expiry watchdog (a vendor trial that ends, a plan that renews); reminded like certificates", "needs": "add: routines; remove: deletes"],
+        ["name": "links-dead", "does": "Dead outside links each Check links on my site routine found (twice-checked), with the page they're on (read only)", "needs": "nothing"],
+        ["name": "lint-text", "args": "text=<text> | text=- (stdin) | file=<path>", "does": "Check text against the owner's Words I never use (Settings → Rules); clean=false lists each hit and why (read only)", "needs": "nothing"],
+        ["name": "outreach-check", "args": "url=<https page> [email=<address>] [outlet=<name>]", "does": "Before adding an outlet: page status, contact email or form, paid-only wording, page language, and whether it's already on the outreach list (read only)", "needs": "nothing"],
+        ["name": "python-check", "args": "[folders=<venv,venv>]", "does": "Python environments the owner's script routines and Mac jobs use, and which are broken (read only)", "needs": "nothing"],
+        ["name": "python-repair", "args": "venv=<path from python-check>", "does": "Rebuild a broken venv (old folder kept as .broken-<date>, saved packages reinstalled). Always waits for the owner's OK", "needs": "jobs (and always the owner)"],
         ["name": "shield", "does": "Rejection Shield: what would get each version in progress rejected", "needs": "nothing"],
         ["name": "shield-fix", "args": "app=<name> item=<build|promo|contact|review_notes|submit> [notes=<text>]", "does": "Sort it for me: fix one Shield item (reversible); submit always waits for the owner's OK", "needs": "releases"],
         ["name": "usage", "does": "AI & subscription usage: % used, reset time and where each number came from", "needs": "nothing"],

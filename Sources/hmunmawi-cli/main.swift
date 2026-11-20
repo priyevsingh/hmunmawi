@@ -79,9 +79,9 @@ func printJSON(_ obj: Any) {
 
 // MARK: MCP (stdio, JSON-RPC 2.0). Works with stateless (2026-07-28) and older clients that still initialize.
 
-let readCommands: Set<String> = ["status", "review-list", "quota-list", "data-read", "release-timeline", "routine-list", "bank-list", "outreach-list", "change-list", "metric-list", "usage", "ai-pause-status", "ai-pause-check", "promo-status", "shield", "bot-setup"]
+let readCommands: Set<String> = ["status", "review-list", "quota-list", "data-read", "release-timeline", "routine-list", "bank-list", "outreach-list", "change-list", "metric-list", "usage", "ai-pause-status", "ai-pause-check", "promo-status", "shield", "bot-setup", "services", "links-dead", "lint-text", "outreach-check", "python-check", "plan-list"]
 /// Commands that remove or undo something: they only run through hm_change, so a client can show them as destructive.
-let changeCommands: Set<String> = ["remove-connection", "routine-remove", "change-remove", "promo-undo"]
+let changeCommands: Set<String> = ["remove-connection", "routine-remove", "change-remove", "promo-undo", "plan-remove"]
 
 let tools: [[String: Any]] = [
     ["name": "hm_status",
@@ -98,7 +98,7 @@ let tools: [[String: Any]] = [
      "inputSchema": [
         "type": "object",
         "properties": [
-            "command": ["type": "string", "enum": ["status", "review-list", "quota-list", "data-read", "release-timeline", "routine-list", "bank-list", "outreach-list", "change-list", "metric-list", "usage", "ai-pause-status", "ai-pause-check", "promo-status", "shield", "bot-setup"]],
+            "command": ["type": "string", "enum": ["status", "review-list", "quota-list", "data-read", "release-timeline", "routine-list", "bank-list", "outreach-list", "change-list", "metric-list", "usage", "ai-pause-status", "ai-pause-check", "promo-status", "shield", "bot-setup", "services", "links-dead", "lint-text", "outreach-check", "python-check"]],
             "args": ["type": "object", "additionalProperties": ["type": "string", "maxLength": 4096]],
         ] as [String: Any],
         "required": ["command"],
@@ -232,6 +232,11 @@ default:
         }
         let input = FileHandle.standardInput.readData(ofLength: 16_384)
         kv["value"] = String(decoding: input, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    // Text to check can be long or contain anything: `text=-` reads it from stdin (up to 50,000 bytes).
+    if command == "lint-text", kv["text"] == "-" {
+        let input = FileHandle.standardInput.readData(ofLength: 50_000)
+        kv["text"] = String(decoding: input, as: UTF8.self)
     }
     let answer = send(command, kv, agent: agent, reason: reason)
     printJSON(answer)

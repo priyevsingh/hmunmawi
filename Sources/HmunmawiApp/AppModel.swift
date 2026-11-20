@@ -130,6 +130,8 @@ final class AppModel {
     private var morningBusy = false   // the AI line takes a few seconds; a refresh meanwhile mustn't start a second story
     /// Connections whose last checks failed in a row (for the key-watch routine).
     func failingConnections() async -> [String: Int] { await engine?.failing() ?? [:] }
+    /// For add-on actions the owner approved (Vercel redeploy).
+    var engineForActions: Engine? { engine }
     func succeededConnections() async -> [String: Millis] { await engine?.succeeded() ?? [:] }
     private var loops: [Task<Void, Never>] = []
     private var loadStarted = false
@@ -257,6 +259,7 @@ final class AppModel {
             config = try AppConfig.load(from: configURL)
             Routines.shared.seedIfNeeded(freshInstall: freshInstall)
             Routines.shared.start(model: self)
+            KeepAwake.shared.start()
             // The weekly digest rule is switched on once for you (Monday 9 am by iMessage); deleting it is respected.
             // Only once iMessage is set up (a new install without it adds the digest later from Automations; no text is sent before then).
             if !UserDefaults.standard.bool(forKey: "HMWeeklyDigestAdded"), !freshInstall || config.plugins["imessage"]?.isEmpty == false {

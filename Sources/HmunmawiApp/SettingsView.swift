@@ -93,6 +93,8 @@ private struct GeneralSettings: View {
                     }
                 }
             } header: { Label("Next steps", systemImage: "lightbulb") }
+            KeepAwakeSection()
+            WordingSection()
             AlertsAndSafetySection(model: model)
             ExportSection(model: model)
             AISection()
@@ -108,6 +110,50 @@ private struct GeneralSettings: View {
     @AppStorage(AppDelegate.appearanceKey) private var appearance = "system"
 
     @State private var adCost: Double = Playbook.adCostPerDownload
+}
+
+/// Keep this Mac awake so routines run on time (off by default).
+private struct KeepAwakeSection: View {
+    @State private var mode = KeepAwake.shared.mode
+    var body: some View {
+        Section {
+            Picker("Keep this Mac awake for routines", selection: $mode) {
+                Text("Off").tag(KeepAwake.Mode.off)
+                Text("While plugged in").tag(KeepAwake.Mode.pluggedIn)
+                Text("Always").tag(KeepAwake.Mode.always)
+            }
+            .accessibilityIdentifier("settings.keepAwake")
+        } footer: {
+            Text("Stops this Mac from going to sleep on its own while Hmunmawi runs, so routines and Mac jobs run at their times. The screen still sleeps, and closing a laptop's lid still sleeps the Mac. \"Always\" uses more battery.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .onChange(of: mode) { _, v in KeepAwake.shared.mode = v }
+    }
+}
+
+/// "Words I never use": claims you can't back up, wording a store forbids, names you mustn't mention yet.
+private struct WordingSection: View {
+    @State private var text = Wording.lines(Wording.rules.rules)
+    @State private var problems = Wording.rules.problems
+    @State private var saved = false
+    var body: some View {
+        Section {
+            TextEditor(text: $text)
+                .font(.callout.monospaced()).frame(minHeight: 70, maxHeight: 140)
+                .accessibilityLabel("Words I never use, one per line")
+                .accessibilityIdentifier("settings.wording")
+            HStack {
+                ForEach(problems, id: \.self) { Label($0, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Brand.caution).font(.callout) }
+                Spacer()
+                if saved { Text("Saved").font(.callout).foregroundStyle(.secondary) }
+                Button("Save") { problems = Wording.save(Wording.parseLines(text)); saved = true }
+            }
+        } header: { Label("Words I never use", systemImage: "text.badge.xmark") } footer: {
+            Text("One per line: a word or phrase, then | and why (optional); re: starts a pattern. Post drafts and reply ideas that use one are skipped, the drafting AI is told to avoid them, and your scripts and agents check any text with hm lint-text. Saved as wording-rules.json in Hmunmawi's folder.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .onChange(of: text) { _, _ in saved = false }
+    }
 }
 
 /// Quiet hours for alerts, and the sandbox connections run in.

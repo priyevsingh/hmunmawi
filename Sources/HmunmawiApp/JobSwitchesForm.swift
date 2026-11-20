@@ -16,30 +16,30 @@ struct JobSwitchesForm: View {
     @State private var note: String?
     private let tick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
-    /// Jobs Hmunmawi itself runs that act for you (today: X unfollows), switched on and off here as in Automations.
+    /// Jobs Hmunmawi itself runs that act for you or watch your services, switched on and off here as in Automations.
     @State private var builtIn: [MyRoutine] = []
+    static let ownJobKinds: [RoutineKind] = [.xUnfollows, .serviceWatch, .heartbeat, .linkCheck, .pythonCheck]
 
     var body: some View {
         Form {
             Section {
-                if builtIn.isEmpty {
-                    LabeledContent("X unfollows (automatic)") { Text("Not set up").foregroundStyle(.secondary) }
-                    Text("Off until you add it: Automations → + → X unfollows (automatic). It unfollows a few accounts that don't follow you back each day through your Safari login.")
-                        .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                ForEach(Self.ownJobKinds.filter { k in !builtIn.contains { $0.does == k.rawValue } }, id: \.self) { k in
+                    LabeledContent(k.title) { Text("Not set up").foregroundStyle(.secondary) }
+                        .help("Off until you add it: Automations → + → \(k.title).")
                 }
                 ForEach(builtIn, id: \.id) { r in
                     Toggle(isOn: Binding(get: { r.off != true }, set: { setOn(r, $0) })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r.title)
-                            Text(XUnfollower.shared.status(r)).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            Text(status(r)).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .toggleStyle(.switch)
                     .accessibilityIdentifier("switch.routine.\(r.id)")
                 }
             } header: { Text("Run by Hmunmawi") } footer: {
-                Text("The X switch below (or X unfollows (automatic) in your switch file) also stops it.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Text("Each is off until you add it in Automations → +. X unfollows also stop with the X switch below (or X unfollows (automatic) in your switch file). Nothing here deploys, repairs or posts without your OK.")
+                    .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if let loaded {
                 ForEach(SwitchFile.groupOrder, id: \.self) { group in
@@ -103,6 +103,13 @@ struct JobSwitchesForm: View {
         .accessibilityLabel(s.label)
     }
 
+    private func status(_ r: MyRoutine) -> String {
+        if r.does == RoutineKind.xUnfollows.rawValue { return XUnfollower.shared.status(r) }
+        let when = r.every.map { "Every \($0)" } ?? MyRoutines.when(r)
+        let last = r.last.map { " · last \($0["status"] ?? "") \($0["date"] ?? "")" } ?? ""
+        return when + last
+    }
+
     private func setOn(_ r: MyRoutine, _ on: Bool) {
         var list = MyRoutines.read()
         guard let i = list.firstIndex(where: { $0.id == r.id }) else { return }
@@ -114,7 +121,8 @@ struct JobSwitchesForm: View {
     }
 
     private func reload() {
-        let mine = MyRoutines.read().filter { $0.does == RoutineKind.xUnfollows.rawValue }
+        let kinds = Set(Self.ownJobKinds.map(\.rawValue))
+        let mine = MyRoutines.read().filter { kinds.contains($0.does ?? "") }
         if mine != builtIn { builtIn = mine }
         let u = SwitchFile.locate(chosen: chosen)
         url = u
