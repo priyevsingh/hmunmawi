@@ -5,7 +5,8 @@ GitHub description all point here. When a capability is added, changed or remove
 and keep everything else in step (see [the docs rule](../AGENTS.md#docs-rule-keep-the-capability-list-in-sync)).
 
 Hmunmawi tracks, plans, queues and reminds. It never posts to YouTube, Instagram, Reddit, Discord or X for you, and
-anything that changes something waits for your OK.
+anything that changes something waits for your OK. Every row can be fed by your own scripts, kept in a private
+repo of yours: see [Your private workspace](PRIVATE-WORKSPACE.md).
 
 | Area | What it does | More |
 |---|---|---|

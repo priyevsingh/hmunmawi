@@ -53,6 +53,7 @@ and asks before it acts. Users' guide: [README.md](README.md).
   (every parameter: [docs/X-TECHNICAL.md](docs/X-TECHNICAL.md#agent-reference)). Never post, reply, like,
   follow or unfollow on X for the user.
 
+- **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
 - **New connection:** copy the closest `AddOns/<name>`, read [docs/ADD-ONS.md](docs/ADD-ONS.md), declare every
   host and event kind in `manifest.json`, save state with `StateFile` (atomic writes are blocked by the sandbox),
   add it to `Package.swift`'s add-on list, and add a test.
@@ -67,7 +68,7 @@ and asks before it acts. Users' guide: [README.md](README.md).
 
 ### Docs rule: keep the capability list in sync
 
-Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it.
+Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it. [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (and the AGENTS.md starter inside it) must stay in sync with the list too.
 
 - **No secrets, real data or personal details** in code, tests, fixtures, comments or commit messages. Use
   `example.com`-style names and invented numbers. Keys live only in the macOS Keychain.

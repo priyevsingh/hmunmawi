@@ -40,7 +40,7 @@ Replies come when there is time. If something is urgent (a security problem), us
 
 ### Docs
 
-Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it.
+Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it. This includes [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md), whose AGENTS.md starter carries the same rule.
 
 ### Style
 

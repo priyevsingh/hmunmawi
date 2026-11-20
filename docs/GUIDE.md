@@ -18,7 +18,7 @@
 > always waits for your OK.
 
 > [!TIP]
-> The short list of everything Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md).
+> The short list of everything Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md). To drive it with your own scripts, drafts and AI briefs, see [Your private workspace](PRIVATE-WORKSPACE.md).
 
 ---
 

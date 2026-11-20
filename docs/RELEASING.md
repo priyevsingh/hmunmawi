@@ -16,7 +16,7 @@ the hardened runtime, Apple's notary check and a stapled ticket. `scripts/releas
 
 ## Each release
 
-Before tagging, tick the docs checklist: Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](CAPABILITIES.md); other docs point to it. The release notes and the GitHub release description must not drop any capability either.
+Before tagging, tick the docs checklist: Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](CAPABILITIES.md); other docs point to it, including [PRIVATE-WORKSPACE.md](PRIVATE-WORKSPACE.md) and the AGENTS.md starter inside it. The release notes and the GitHub release description must not drop any capability either.
 
 ```sh
 # bump CFBundleShortVersionString / CFBundleVersion in Resources/Info.plist, update CHANGELOG.md, then:

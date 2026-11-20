@@ -54,7 +54,7 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 - **Alerts:** iMessage, ntfy push and an iPhone and Watch calendar, with quiet hours.
 - **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs, and agents like Claude Code through `hm`. Anything that changes something waits for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
 
-No dashboards to open. Free, open source, and your data stays on your Mac. [Full capability list](docs/CAPABILITIES.md) · [See every add-on](docs/ADD-ONS.md).
+No dashboards to open. Free, open source, and your data stays on your Mac. [Full capability list](docs/CAPABILITIES.md) · [Build your private workspace](docs/PRIVATE-WORKSPACE.md) · [See every add-on](docs/ADD-ONS.md).
 
 ## Every app, side by side
 
@@ -143,6 +143,7 @@ Hmunmawi updates itself: Hmunmawi → Check for Updates…
 | [X, technical](docs/X-TECHNICAL.md) | How the X features work: pages read, how posts are picked, limits, agent parameters |
 | [The X file](docs/X-FILE.md) | Feed X numbers from Grok Bot or your own script (no paid X API) |
 | [Every capability](docs/CAPABILITIES.md) | The one canonical list of what Hmunmawi does |
+| [Your private workspace](docs/PRIVATE-WORKSPACE.md) | Build your own private repo of scripts, data and AI briefs that drives Hmunmawi, with a folder layout, STATE.md and AGENTS.md starters |
 | [Writing a connection](docs/ADD-ONS.md) | Build your own add-on, in any language |
 | [For AI agents](AGENTS.md) | `hm`, MCP and the approval rules for Claude Code, Cursor and others |
 | [Wall of Apps](docs/WALL-OF-APPS.md) | Every app on the wall, and how to add yours |
