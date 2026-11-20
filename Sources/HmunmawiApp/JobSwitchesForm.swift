@@ -16,8 +16,31 @@ struct JobSwitchesForm: View {
     @State private var note: String?
     private let tick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
+    /// Jobs Hmunmawi itself runs that act for you (today: X unfollows), switched on and off here as in Automations.
+    @State private var builtIn: [MyRoutine] = []
+
     var body: some View {
         Form {
+            Section {
+                if builtIn.isEmpty {
+                    LabeledContent("X unfollows (automatic)") { Text("Not set up").foregroundStyle(.secondary) }
+                    Text("Off until you add it: Automations → + → X unfollows (automatic). It unfollows a few accounts that don't follow you back each day through your Safari login.")
+                        .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(builtIn, id: \.id) { r in
+                    Toggle(isOn: Binding(get: { r.off != true }, set: { setOn(r, $0) })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.title)
+                            Text(XUnfollower.shared.status(r)).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .accessibilityIdentifier("switch.routine.\(r.id)")
+                }
+            } header: { Text("Run by Hmunmawi") } footer: {
+                Text("The X switch below (or X unfollows (automatic) in your switch file) also stops it.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
             if let loaded {
                 ForEach(SwitchFile.groupOrder, id: \.self) { group in
                     let rows = loaded.switches.filter { $0.group == group }
@@ -80,7 +103,19 @@ struct JobSwitchesForm: View {
         .accessibilityLabel(s.label)
     }
 
+    private func setOn(_ r: MyRoutine, _ on: Bool) {
+        var list = MyRoutines.read()
+        guard let i = list.firstIndex(where: { $0.id == r.id }) else { return }
+        list[i].off = on ? nil : true   // `off` isn't signed: the routine stays approved
+        MyRoutines.write(list)
+        note = "\(r.title) is now \(on ? "on" : "off")."
+        reload()
+        Task { await model.recordJobAction("routine: \(r.id) \(on ? "on" : "off")", label: r.title) }
+    }
+
     private func reload() {
+        let mine = MyRoutines.read().filter { $0.does == RoutineKind.xUnfollows.rawValue }
+        if mine != builtIn { builtIn = mine }
         let u = SwitchFile.locate(chosen: chosen)
         url = u
         guard let u else { loaded = nil; problem = nil; return }

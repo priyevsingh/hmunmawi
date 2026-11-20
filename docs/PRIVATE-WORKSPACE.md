@@ -488,11 +488,12 @@ flowchart LR
 
 - **Built in:** **Post drafts from my bank** sends a few ready drafts a day at your best hours, ranked by X's
   published algorithm; **X reply ideas** sends one ready reply at each of your times; **X unfollow list** sends a
-  short list to unfollow by hand. See [Set up X](X-SETUP.md).
+  short list to unfollow by hand, and **X unfollows (automatic)** (opt-in) unfollows a few a day for you through
+  your Safari login from a frozen list (your workspace's `x` or `x_unfollows` switch turns it off). See [Set up X](X-SETUP.md).
 - **Your workspace:** fill the bank with `hm bank-add` (from your own drafts or an AI job), or have a bot write its
   daily reply-targets file. A check that each draft's facts are still true (app versions, prices) belongs in the
   script that adds it.
-- **Your OK:** you post, reply and unfollow yourself.
+- **Your OK:** you post and reply yourself; unfollows are yours by hand unless you add the automatic routine yourself in the app (agents can't).
 
 ### Review reply drafts and store keyword ideas
 

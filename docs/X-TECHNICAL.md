@@ -3,9 +3,11 @@
 How every X feature works, what it reads, what it decides and where its limits are. The people-facing setup is
 [X-SETUP.md](X-SETUP.md); this page is for the curious, for contributors and for agents.
 
-**Ground rules, everywhere:** Hmunmawi never posts, replies, likes, follows or unfollows. It never calls X's paid API
-and never calls X's private API from your session. It reads files Grok Bot saves, or pages X already loaded in your
-own signed-in Safari, and hands you checked suggestions.
+**Ground rules, everywhere:** Hmunmawi never posts, replies, likes or follows. It unfollows only if you add the opt-in
+**X unfollows (automatic)** routine yourself, and then only by clicking the profile's own button in your signed-in
+Safari ([below](#automatic-unfollows-does-x-unfollows)). It never calls X's paid API and never calls X's private API
+from your session. It reads files Grok Bot saves, or pages X already loaded in your own signed-in Safari, and hands
+you checked suggestions.
 
 ## Data flow
 
@@ -15,6 +17,7 @@ In words:
 - The Safari reads write the **same file shapes** Grok Bot does: `x-file.json` (numbers and glance), `x-reply-finds/day.json` and `unfollow-queue.json`.
 - The sandboxed X connection (add-on) turns the X file into `growth.x`, `growth.x_pulse` and `growth.x_glance`, shown in Today → Reach → X, Apps and the portal.
 - The X reply ideas routine and the X unfollow list routine read the finds, the unfollow queue and Grok Bot's files, then send results to you by iMessage, ntfy or Calendar.
+- The opt-in X unfollows (automatic) routine makes a frozen list once (your Following page, scrolled, or Grok Bot's file) in `x-unfollows/<routine>.json`, then unfollows a few a day in Safari and tells you only when it stops and once a day.
 
 The same flow as a diagram (plain text in some viewers; the list above says the same):
 
@@ -38,6 +41,10 @@ flowchart TB
     GB --> UL
     RI --> YOU["iMessage / ntfy / Calendar → you"]
     UL --> YOU
+    SS -. "once, or Rebuild list" .-> XL["x-unfollows/routine.json · frozen list + progress"]
+    GB -. "once, or Rebuild list" .-> XL
+    XL --> XU["X unfollows (automatic) · opt-in · one Safari tab per account"]
+    XU --> YOU
 ```
 
 The Safari route writes **the same file shapes** Grok Bot does, so both routes go through one set of checks.
@@ -120,6 +127,31 @@ limited. In practice the list refreshes itself: as you unfollow, the next accoun
 **Both routes:** `per_day` (default 10, at most 25) handles a day, never your `keep` list, never a handle already
 sent (the last 3,000 are remembered), once a day.
 
+## Automatic unfollows (`does=x-unfollows`)
+
+Opt-in and owner-only: added in the app (Automations → + → X unfollows (automatic)); agents get an error from
+`routine-add`/`routine-set`/`routine-run` and may only `routine-pause`/`routine-resume` it. Off also through
+Settings → Jobs (the routine's switch, or `x` / `x_unfollows` set to false in your switch file).
+
+- **List:** made once, the first time it runs or when you press **Rebuild list**, from your Following page (scrolled
+  until no more accounts load; `followed_by` false, with user ids) or from Grok Bot's file (`suggestion` keep,
+  `mutuals` and 50,000+ followers left out). It is never refreshed by itself, so accounts you follow later are never
+  added. Done and skipped accounts are kept by user id (or handle), so it is idempotent and resumable, also across rebuilds.
+- **Pace:** a run every 5 minutes; at most `per_day` (default 25, at most 40) inside `window` (default `10:00-20:00`,
+  your Mac's time); the first one 0-20 minutes after the window opens; then gaps of (time left ÷ number left),
+  jittered ×0.6-1.3, never under 10 minutes. At most 4 profiles are opened per run (skips move straight on) and
+  2 × `per_day` a day.
+- **Per account:** one new background tab in Safari's front window, tagged with `window.name` once it loads; only tabs
+  showing that profile and carrying the tag are used, and it is closed at the end whatever happened. Checks: the
+  page's `@handle` matches exactly, the user id matches, the signed-in account is your handle, no *Follows you*, the
+  button says exactly *Following* (or, on subscription profiles, an icon labelled exactly *Unfollow @handle*). Then
+  Following → Unfollow (confirm sheet only if its button says Unfollow) and a check that it now says *Follow*.
+- **Stops:** login page, challenge or captcha, rate limit, "Something went wrong", another signed-in account or a
+  lost tab stop it for the day (one message). A failed account is retried once in a later run, then skipped with its
+  reason; 3 different accounts failing in a row (same day) also stop the day. A login, challenge or rate-limit stop
+  two days running holds it until **Resume**. One summary after the window: *N done, M skipped, R left*.
+- **Try 3 (no unfollow):** opens and checks the next three profiles exactly as above, without clicking; nothing is saved.
+
 ## Post drafts and X's algorithm
 
 Best posting hours, draft ranking and the daily check of X's published ranking code
@@ -156,6 +188,7 @@ Routine parameters (`hm routine-add`, need the *routines* permission):
 | `file` | unfollow-list, `source=bot` | Grok Bot's unfollow list (must exist) |
 | `keep` | unfollow-list | up to 500 handles never to list |
 | `per_day` | both | replies a day (1–12) / accounts a day (1–25) |
+| `per_day`, `window`, `keep`, `source`, `file` | x-unfollows (set in the app only) | unfollows a day (1–40, default 25), `HH:MM-HH:MM` (default 10:00-20:00), handles never to unfollow, where the list comes from |
 | `best_hours`, `follow_x` | post-drafts | `1` / `0`, both on by default |
 
 `hm routine-list` shows each routine's `needs`: exactly what's still missing (for example *Read via your Safari login,

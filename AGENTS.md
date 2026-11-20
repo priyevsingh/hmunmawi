@@ -51,7 +51,9 @@ and asks before it acts. Users' guide: [README.md](README.md).
 
 - **Set up a user's X:** ask whether they use Grok Bot, then follow the agent section of [docs/X-SETUP.md](docs/X-SETUP.md)
   (every parameter: [docs/X-TECHNICAL.md](docs/X-TECHNICAL.md#agent-reference)). Never post, reply, like,
-  follow or unfollow on X for the user.
+  follow or unfollow on X for the user. **X unfollows (automatic)** (`Sources/HmunmawiApp/XUnfollower.swift`, rules in
+  `Sources/HmunmawiCore/XUnfollow.swift`) is the owner's own opt-in routine: agents can't add, change or start it,
+  only pause or resume it; keep its safety stops, pacing and frozen list when changing it.
 
 - **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, job lists and hand-off files, workflow recipes such as search health, publishing on a schedule, social planning and AI jobs with the pause and one-at-a-time lock, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
 - **Job switches (Settings → Jobs):** `Sources/HmunmawiCore/SwitchFile.swift` reads and edits the workspace's JSON

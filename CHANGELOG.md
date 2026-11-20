@@ -2,6 +2,18 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.3.0 (build 130), 20 Nov 2026
+
+**New**
+- **X unfollows (automatic), opt-in.** A new routine (Automations → + → X unfollows (automatic)) that unfollows accounts that don't follow you back for you, through your own signed-in Safari: up to 25 a day by default (at most 40), only inside your window (10:00-20:00 by default), at least 10 minutes apart and spread through the day. The list is made once, from your Following page or Grok Bot's file, and never grows by itself (Rebuild list makes a new one); mutuals, your keeps, accounts with 50,000+ followers and anyone whose page shows "Follows you" are never touched. Each account gets one background tab that is checked (handle and user id, signed in as you, says Following), clicked (Following → Unfollow), checked again (now says Follow) and closed; your other tabs are never touched. A login page, challenge, rate limit, "Something went wrong", the wrong account, a lost tab or 3 accounts failing in a row stop it for the day with one message; two hard stops in a row hold it until you press Resume. One summary a day. **Try 3 (no unfollow)** checks the next profiles without clicking. Off by default; owner-only (agents may only pause or resume it).
+- **Settings → Jobs** shows the new routine's on/off switch, and your switch file's `x` (now also covering automatic unfollows) and new `x_unfollows` keys turn it off too.
+- The manual X unfollow list is unchanged and now points to the automatic one.
+
+**Fixes**
+- Profile checks match the exact `@handle` (a page for `@name2` is never taken for `@name`).
+
+Hmunmawi still does everything it did in 1.2.0: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you), job switches, publishing, crashes and self-healing, money and offer codes, alerts, AI limits and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.2.0 (build 120), 20 Nov 2026
 
 **New**

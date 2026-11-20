@@ -39,9 +39,10 @@ public enum SwitchFile {
 
     public static let channelsGroup = "Channels"
     public static let detailsGroup = "Instagram details"
+    public static let xGroup = "X details"
     public static let warmupGroup = "Account warm-up"
     public static let otherGroup = "Other switches"
-    public static let groupOrder = [channelsGroup, detailsGroup, warmupGroup, otherGroup]
+    public static let groupOrder = [channelsGroup, detailsGroup, xGroup, warmupGroup, otherGroup]
 
     /// Well-known keys for social jobs. Channels default to on, as the scripts treat a missing key as on.
     public static let catalog: [Known] = [
@@ -49,7 +50,8 @@ public enum SwitchFile {
         Known(path: ["discord"], label: "Discord", help: "Discord post ideas for the servers you've joined.", group: channelsGroup, defaultValue: true, core: true),
         Known(path: ["instagram"], label: "Instagram", help: "All Instagram work: Reels, carousels and posting reminders.", group: channelsGroup, defaultValue: true, core: true),
         Known(path: ["youtube_shorts"], label: "YouTube Shorts", help: "Shorts plans and uploads (an upload still waits for your yes).", group: channelsGroup, defaultValue: true, core: true),
-        Known(path: ["x"], label: "X", help: "X post drafts and reply reminders (you still post by hand).", group: channelsGroup, defaultValue: true, core: true),
+        Known(path: ["x"], label: "X", help: "X post drafts, reply reminders and automatic unfollows (off stops them all; you still post by hand).", group: channelsGroup, defaultValue: true, core: true),
+        Known(path: ["x_unfollows"], label: "X unfollows (automatic)", help: "Hmunmawi's automatic X unfollows, when you've added that routine. Off pauses them; your list and progress are kept.", group: xGroup, defaultValue: true, core: true),
         Known(path: ["instagram_drafts"], label: "Instagram post suggestions", help: "Instagram posts from your post bank go into the day's plan.", group: detailsGroup, defaultValue: true, core: false),
         Known(path: ["new_instagram_carousels"], label: "New Instagram carousels", help: "AI jobs write new carousels; ones already made are still suggested.", group: detailsGroup, defaultValue: true, core: false),
         Known(path: ["instagram_warmup"], label: "Instagram warm-up sessions", help: "Daily warm-up sessions for a new Instagram account.", group: detailsGroup, defaultValue: true, core: false),

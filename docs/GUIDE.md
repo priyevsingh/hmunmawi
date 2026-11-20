@@ -432,7 +432,7 @@ The weekly routines, day by day. **+** adds a routine. Kinds include reminders, 
 
 <details><summary>How it works</summary>
 
-*X reply ideas* and *X unfollow list* ask **who reads X**: Grok Bot (it reads and searches X for free), or Hmunmawi itself through your signed-in Safari, read-only. Without Grok Bot or an AI key, replies are drafted **free by Apple's on-device AI**: nothing leaves your Mac. You always post, reply and unfollow yourself. Set it up: [Set up X](X-SETUP.md).
+*X reply ideas* and *X unfollow list* ask **who reads X**: Grok Bot (it reads and searches X for free), or Hmunmawi itself through your signed-in Safari, read-only. Without Grok Bot or an AI key, replies are drafted **free by Apple's on-device AI**: nothing leaves your Mac. You always post and reply yourself; unfollows are by hand from the list, or, if you add **X unfollows (automatic)**, a few a day done for you in your Safari (off by default, capped, stops at any sign of trouble). Set it up: [Set up X](X-SETUP.md).
 
 <table><tr>
 <td width="50%" align="center"><b>🤖 With Grok Bot</b><br><img src="images/guide/x-reply-ideas-grok.png" alt="X reply ideas with Grok Bot"></td>
@@ -771,7 +771,7 @@ that can `notify` can add any of them ([Writing a connection](ADD-ONS.md)).
 | Google Search Console | Google searches, clicks and pages | A service-account key |
 | Bing Webmaster Tools | Bing searches, clicks and pages | An API key |
 | YouTube | Views, subscribers and newest videos | An API key, or the Google sign-in file your own upload scripts already use (client id, client secret and refresh token) |
-| X | Your X numbers, read through your Safari login or from a file Grok Bot writes (no paid X API). Full setup with drafts, reply ideas and an unfollow list: [Set up X](X-SETUP.md) | Nothing |
+| X | Your X numbers, read through your Safari login or from a file Grok Bot writes (no paid X API). Full setup with drafts, reply ideas and unfollows (by hand or automatic): [Set up X](X-SETUP.md) | Nothing |
 | Cloudflare | Website visitors and AI-bot reads | An API token |
 | Mac jobs | Your Mac's scheduled jobs: runs, failures, Run now and Pause | Nothing |
 | Script feed | Any numbers your own scripts print: [Your own numbers](SCRIPT-FEED.md) | Nothing |

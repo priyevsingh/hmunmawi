@@ -49,7 +49,7 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 - **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit (and fixes it, then submits, only after you confirm), TestFlight tidy-up, offer codes, featuring nominations, product page tests, and review replies posted only when you press Post.
 - **Live sales:** the next morning, within minutes, or within seconds through a free relay in your own Cloudflare account.
 - **Websites and search:** visitors and AI-bot reads from Cloudflare, Google Search Console and Bing clicks, top searches and pages, a "website down" watch, next steps like searches that have no page yet, and a Search health card with Fix buttons fed by your own monitor script.
-- **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas and an unfollow list; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts; and one-tap switches (Settings → Jobs) that turn each channel, and each account's warm-up suggestions, on or off for your scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
+- **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas, and unfollows by hand from a daily list or (opt-in) automatic, a few a day through your Safari login; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts; and one-tap switches (Settings → Jobs) that turn each channel, and each account's warm-up suggestions, on or off for your scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
 - **Content publishing:** articles and posts you produce show up as to-dos and as jobs on the Automations map, so you can see what is due, what ran and what failed.
 - **Outreach and mail:** an outreach list with follow-up reminders, and replies matched from your mail for you to confirm.
 - **Crashes and health:** crash-free sessions and freezes from Sentry, failed Mac jobs retried, keys, certificates and domains watched for expiry, and your own fix scripts run when a problem appears.
@@ -120,7 +120,7 @@ everything else is exactly what the app shows.
 <tr><td width="30%">🩹 <b>Heals itself</b></td><td>Failed Mac jobs retried, stuck connections restarted, missed runs caught up, daily backups restored automatically.</td></tr>
 <tr><td width="30%">🌐 <b>Your numbers anywhere</b></td><td>Hmunmawi publishes your numbers as one web page you can open on your iPhone, iPad or any browser, share with your team behind a login, or turn into a public "open startup" page. You host it (Cloudflare Pages, Netlify or your own server); nothing goes through us. <a href="docs/GUIDE.md#your-own-portal-">See the portal</a>.</td></tr>
 <tr><td width="30%">🧠 <b>Free AI, on your Mac</b></td><td>Apple's on-device AI drafts your X replies for free: no key, nothing leaves your Mac. Bring any AI key for more, or use none at all. <a href="docs/AI-AND-COSTS.md#apples-on-device-ai">When and how</a>.</td></tr>
-<tr><td width="30%">𝕏 <b>Grow on X, safely</b></td><td>Your X numbers, best posting hours, ready replies and an unfollow list, from Grok Bot or your own Safari login. You always post yourself, so nothing can get your account limited. <a href="docs/X-SETUP.md">Set up X</a>.</td></tr>
+<tr><td width="30%">𝕏 <b>Grow on X, safely</b></td><td>Your X numbers, best posting hours, ready replies, and unfollows by hand or (opt-in) automatic, slow and capped, through your own Safari login. You always post yourself. <a href="docs/X-SETUP.md">Set up X</a>.</td></tr>
 <tr><td width="30%">🤖 <b>Agent-ready</b></td><td>Claude Code, Cursor and others read what you see through <code>hm</code> or MCP, under the same approval rules.</td></tr>
 </table>
 
@@ -153,7 +153,7 @@ Hmunmawi updates itself: Hmunmawi → Check for Updates…
 | Guide | What it's for |
 |---|---|
 | [**The full guide**](docs/GUIDE.md) | Every page, card, setting and connection, with pictures from a real Mac |
-| [Set up X](docs/X-SETUP.md) | Your X numbers and glance, drafts at your best hours, reply ideas and an unfollow list, with or without Grok Bot (also for your agent) |
+| [Set up X](docs/X-SETUP.md) | Your X numbers and glance, drafts at your best hours, reply ideas, and unfollows by hand or automatic, with or without Grok Bot (also for your agent) |
 | [hm commands](docs/HM-COMMANDS.md) | Every command an agent (or you) can run, and what needs approval |
 | [Routines](docs/ROUTINES.md) | Everything Hmunmawi can run on its own clock, and how to set each one up |
 | [AI credits, costs and profit](docs/AI-AND-COSTS.md) | Payday, what tools and AI cost you, free startup credits, plan limits and the AI job pause |

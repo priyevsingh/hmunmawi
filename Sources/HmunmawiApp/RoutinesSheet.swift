@@ -428,6 +428,13 @@ private struct RoutineForm: View {
         .onAppear { if routine.params?["source"] == nil { var p = routine.params ?? [:]; p["source"] = source; routine.params = p } }
     }
 
+    @State private var xBusy = false
+    @State private var xNote: String?
+    private func xRun(_ work: @escaping @MainActor () async -> String) {
+        xBusy = true; xNote = nil
+        Task { @MainActor in xNote = await work(); xBusy = false }
+    }
+
     private func param(_ key: String) -> Binding<String> {
         Binding(get: { routine.params?[key] ?? "" }, set: { var p = routine.params ?? [:]; p[key] = $0; routine.params = p })
     }
@@ -453,6 +460,7 @@ private struct RoutineForm: View {
                 routine.does = v.isEmpty ? nil : v
                 if !v.isEmpty { routine.who = "mac"; if v == RoutineKind.siteWatch.rawValue, routine.every == nil { routine.every = "30 min" } }
                 if v == RoutineKind.postDrafts.rawValue || v == RoutineKind.keyWatch.rawValue { routine.every = "60 min"; routine.catchUp = 60 }
+                else if v == RoutineKind.xUnfollows.rawValue { routine.every = "5 min"; routine.catchUp = 5 }
                 else if v != RoutineKind.siteWatch.rawValue { routine.every = nil }
             })) {
                 Text("Just list it (a bot's, cloud or manual routine)").tag("")
@@ -528,9 +536,32 @@ private struct RoutineForm: View {
                 TextField("Accounts a day", text: param("per_day"), prompt: Text("10")).input(.number, param("per_day"))
                 TextField("Always keep", text: param("keep"), prompt: Text("handles, comma separated")).input(.list, param("keep"))
                 Text(source == "safari"
-                     ? "Once a day Hmunmawi reads your Following page through your Safari login (read-only) and sends you a short list of accounts that don't follow back, to unfollow by hand. Accounts with 50,000+ followers are kept. Hmunmawi never unfollows anyone, because automated actions on X can get an account limited."
-                     : "Once a day you get a short list of accounts that don't follow you back, to unfollow by hand. Grok Bot makes the list; Hmunmawi never unfollows anyone, because automated actions on X can get an account limited.")
+                     ? "Once a day Hmunmawi reads your Following page through your Safari login (read-only) and sends you a short list of accounts that don't follow back, to unfollow by hand. Accounts with 50,000+ followers are kept. This list never unfollows anyone; for that, add X unfollows (automatic) instead."
+                     : "Once a day you get a short list of accounts that don't follow you back, to unfollow by hand. Grok Bot makes the list; this routine never unfollows anyone. For automatic unfollows, add X unfollows (automatic) instead.")
                     .font(.callout).foregroundStyle(.secondary)
+            case .xUnfollows?:
+                sourcePicker
+                if source != "safari" {
+                    PathField(label: "Grok Bot's list", prompt: "Optional (Hmunmawi's unfollow-queue.json)", text: param("file"), folders: false)
+                }
+                TextField("Unfollows a day (at most \(XUnfollow.maxPerDay))", text: param("per_day"), prompt: Text("\(XUnfollow.defaultPerDay)")).input(.number, param("per_day"))
+                TextField("Only between", text: param("window"), prompt: Text(XUnfollow.defaultWindow)).input(.text(20), param("window"))
+                TextField("Always keep", text: param("keep"), prompt: Text("handles, comma separated")).input(.list, param("keep"))
+                Text("Unfollows accounts that don't follow you back, for you, through your own Safari login: one tab per account, checked (right person, signed in as you, says Following, no \"Follows you\"), Following → Unfollow, checked again, tab closed. At least 10 minutes apart, spread through the window. The list is made once (from \(source == "safari" ? "your Following page" : "Grok Bot's file")) and never grows by itself; mutuals, your keeps and accounts with 50,000+ followers are never on it. Anything odd on X (login page, challenge, rate limit, an error, the wrong account) stops it for the day and tells you once. Automated actions can get an X account limited; keep the number low.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                let saved = MyRoutines.read().contains { $0.id == routine.id }
+                if saved { Text(XUnfollower.shared.status(routine)).font(.callout.monospacedDigit()).foregroundStyle(.secondary).textSelection(.enabled) }
+                HStack {
+                    Button("Try 3 (no unfollow)") { xRun { await XUnfollower.shared.tryOut(routine, count: 3) } }
+                        .accessibilityIdentifier("xunfollow.try")
+                    if saved {
+                        Button("Rebuild list") { xRun { await XUnfollower.shared.rebuild(routine) } }
+                        Button("Resume") { XUnfollower.shared.resume(routine); xNote = "Resumed: it carries on at its next time." }
+                    }
+                    if xBusy { ProgressView().controlSize(.small) }
+                }
+                .disabled(xBusy)
+                if let xNote { Text(xNote).font(.callout).textSelection(.enabled).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("xunfollow.note") }
             case .followUps?:
                 Text("Reads your outreach list (agents add to it with hm outreach-add). One follow-up per outlet.")
                     .font(.callout).foregroundStyle(.secondary)

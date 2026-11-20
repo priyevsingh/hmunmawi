@@ -21,6 +21,7 @@ enum RoutineKind: String, CaseIterable, Identifiable {
     case macJob = "mac-job"               // starts one of your own Mac jobs (LaunchAgents) on this schedule
     case replyIdeas = "reply-ideas"       // one ready X reply per run, from Grok Bot's targets or a Safari search
     case unfollowList = "unfollow-list"   // a short daily list of accounts that don't follow back, to unfollow by hand
+    case xUnfollows = "x-unfollows"       // opt-in: unfollows a few non-followbacks a day through your Safari login
     var id: String { rawValue }
 
     var title: String {
@@ -40,6 +41,7 @@ enum RoutineKind: String, CaseIterable, Identifiable {
         case .macJob: "Run one of my Mac jobs"
         case .replyIdeas: "X reply ideas"
         case .unfollowList: "X unfollow list"
+        case .xUnfollows: "X unfollows (automatic)"
         }
     }
 
@@ -201,6 +203,12 @@ final class Routines {
                     : "Read via your Safari login, with your X handle (Settings → General → X numbers)")
                 : FileManager.default.fileExists(atPath: UnfollowList.file(r).path) ? nil
                     : "the list Grok Bot saves of accounts that don't follow back (\(UnfollowList.file(r).path))"
+        case .xUnfollows:
+            !(XSafariReader.shared.enabled && XNative.validHandle(XSafariReader.shared.handle) != nil)
+                ? "Read via your Safari login, with your X handle (Settings → General → X numbers)"
+                : XUnfollow.window(r.params?["window"]) == nil ? "a window like 10:00-20:00"
+                : XUnfollower.fromSafari(r) || FileManager.default.fileExists(atPath: XUnfollower.file(r).path) ? nil
+                    : "the list Grok Bot saves of accounts that don't follow back (\(XUnfollower.file(r).path))"
         }
     }
 
@@ -428,6 +436,7 @@ final class Routines {
         }
         if kind.builtIn { return "“\(r.title)” runs on its own schedule." }
         if running.contains(id) { return "“\(r.title)” is running now; its result shows when it ends." }
+        if by == .agent, kind == .xUnfollows { return "Only the owner starts X unfollows by hand (in the app); agents may pause or resume it." }
         if by == .agent, let last = lastStart[id], Date.now.timeIntervalSince(last) < 600 {
             return "“\(r.title)” ran less than 10 minutes ago; try again later."
         }
@@ -484,6 +493,7 @@ final class Routines {
         case .macJob: outcome = await MacJobRoutine.start(r.params?["label"] ?? "")
         case .replyIdeas: outcome = await replyIdeas(r, key: key)
         case .unfollowList: outcome = await unfollowList(r, key: key)
+        case .xUnfollows: outcome = await xUnfollows(r, key: key)
         case .morningStory, .weeklyDigest: outcome = (true, "")
         }
         record(r.id, ok: outcome.ok)
@@ -665,6 +675,9 @@ final class Routines {
             if let t = args["title"] { r.title = InputRule.name.clean(t) }
             if r.does == RoutineKind.script.rawValue || args["does"] == RoutineKind.script.rawValue {
                 return fail("Only the owner can add or change a script routine, in the app (agents may run or pause it).")
+            }
+            if r.does == RoutineKind.xUnfollows.rawValue || args["does"] == RoutineKind.xUnfollows.rawValue {
+                return fail("Only the owner can add or change X unfollows (automatic), in the app (agents may pause or resume it).")
             }
             if let d = args["does"] {
                 guard let k = RoutineKind(rawValue: d), !k.builtIn else {
@@ -1103,6 +1116,17 @@ final class Routines {
         guard out.ok else { return out }
         UserDefaults.standard.set(["date": today, "sent": Array((Array(done) + batch.map { $0.lowercased() }).suffix(3000))], forKey: stateKey)
         return out
+    }
+
+    /// X unfollows (automatic): one step every 5 minutes; most runs only see it isn't time yet. Its messages (a
+    /// safety stop, the day's summary) go out like any routine's.
+    private func xUnfollows(_ r: MyRoutine, key: String) async -> (ok: Bool, note: String) {
+        let out = await XUnfollower.shared.tick(r)
+        if let m = out.message {
+            let sent = await tell(r, text: m, key: key + "-x-unfollows", urgent: false)
+            if !sent.ok { return (out.ok, out.note + " (message not sent: \(sent.note))") }
+        }
+        return (out.ok, out.note)
     }
 
     /// Your best posting hours (local time) from the X file's own original posts, or nil when there's no file or too

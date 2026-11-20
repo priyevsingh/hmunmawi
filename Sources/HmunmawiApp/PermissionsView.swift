@@ -57,6 +57,9 @@ final class Permissions {
             needs.append(.files)
             if routine.params?["source"] == "safari" { needs.append(.safari) }   // reads X through your Safari login
             if imessage { needs.append(.messages) }
+        case .xUnfollows:
+            needs.append(.files); needs.append(.safari)   // always through your Safari login
+            if imessage { needs.append(.messages) }
         case .siteWatch, .offerExpiry, .aiBrief, .postDrafts, .followUps, .judge, .macJob:
             break
         }
