@@ -13,11 +13,18 @@
 > **Do you use Grok Bot?** It reads and searches X for free, so it can do the X reading for you. No Grok Bot? Hmunmawi
 > reads X itself, through the Safari window you're already signed in to. You can also use both.
 
+In short:
+
+1. 🤖 **Grok Bot** reads X for free and hands Hmunmawi small files, and/or
+2. 🧭 **Your Safari login** lets Hmunmawi read your own pages in a read-only tab.
+3. ✨ **Hmunmawi** checks everything and follows X's own algorithm.
+4. 📱 **You** post, reply and unfollow by hand.
+
 ```mermaid
 flowchart LR
-    G["🤖 Grok Bot<br/>reads X for free"] -->|small files| H
-    S["🧭 Your Safari login<br/>read-only tab"] -->|reads your pages| H
-    H["✨ Hmunmawi<br/>checks everything,<br/>follows X's algorithm"] --> Y["📱 You<br/>post, reply and<br/>unfollow by hand"]
+    G["🤖 Grok Bot: reads X for free"] -->|small files| H
+    S["🧭 Your Safari login: read-only tab"] -->|reads your pages| H
+    H["✨ Hmunmawi: checks everything, follows X's algorithm"] --> Y["📱 You: post, reply and unfollow by hand"]
 ```
 
 <table>

@@ -2,6 +2,11 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+**Docs**
+- The README's Win / Worry / Next table now shows what Hmunmawi looks after for your Apple apps and for everything else you run through add-ons. The three flow diagrams in the docs have a plain-text list before them and no `<br/>` in their labels, so they read cleanly in the GitHub iOS app and other viewers.
+
 ## 1.1.4 (build 114), 20 Nov 2026
 
 **Fixes**

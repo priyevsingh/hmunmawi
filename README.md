@@ -32,28 +32,18 @@
 
 <br>
 
-<table>
-<tr>
-<td width="33%" valign="top">
+## One Mac menu bar app. Your apps and everything else you run.
 
-### 🌱 Win
-Sales, subscribers, downloads and ratings in one sentence, from your own numbers. No dashboards to open.
+Hmunmawi watches your Apple apps **and** the other things you run, then turns it all into one calm answer each morning.
+It runs on its own from your Mac's menu bar, and nothing is changed without your OK.
 
-</td>
-<td width="33%" valign="top">
+| | 🍎 Your Apple apps | 🌐 Everything else you run (via add-ons) |
+|---|---|---|
+| **🌱 Win** | Downloads, proceeds, active subscribers, ratings and new reviews, in one sentence from your own numbers. | Website visits, Google and Bing search clicks, daily active users, subscriptions, YouTube and X growth, in the same sentence. |
+| **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, trouble that one of your own scripts reports, a connection that stopped answering. Same calm alert on iMessage, your phone or Calendar. |
+| **➡️ Next** | What to do about it, and chores that run for you (review replies and X reply ideas drafted for you to edit). | Routines and your own scripts keep going on autopilot. Anything that changes something waits for your OK. |
 
-### 👀 Worry
-Refunds, crashes, rejected builds, a job that failed. Told once, quietly, only if it's still true 7 minutes later.
-
-</td>
-<td width="33%" valign="top">
-
-### ➡️ Next
-What to do about it. Routines and your Mac's own jobs run by themselves, and anything that changes something waits for your OK.
-
-</td>
-</tr>
-</table>
+No dashboards to open. Free, open source, and your data stays on your Mac. [See every add-on](docs/ADD-ONS.md).
 
 ## Every app, side by side
 

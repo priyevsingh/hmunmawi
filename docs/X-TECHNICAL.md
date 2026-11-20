@@ -9,18 +9,27 @@ own signed-in Safari, and hands you checked suggestions.
 
 ## Data flow
 
+In words:
+
+- **Sources:** Grok Bot's files (X file, glance file, reply targets, unfollow list), a Safari read every 6 hours of your own X pages (`with_replies` and your profile), and a daily Safari read per routine (topic searches and who you follow).
+- The Safari reads write the **same file shapes** Grok Bot does: `x-file.json` (numbers and glance), `x-reply-finds/day.json` and `unfollow-queue.json`.
+- The sandboxed X connection (add-on) turns the X file into `growth.x`, `growth.x_pulse` and `growth.x_glance`, shown in Today → Reach → X, Apps and the portal.
+- The X reply ideas routine and the X unfollow list routine read the finds, the unfollow queue and Grok Bot's files, then send results to you by iMessage, ntfy or Calendar.
+
+The same flow as a diagram (plain text in some viewers; the list above says the same):
+
 ```mermaid
 flowchart TB
     subgraph Sources
-        GB["Grok Bot<br/>X file · glance file · reply targets · unfollow list"]
-        SR["Safari read (every 6 h)<br/>x.com/you/with_replies + x.com/you"]
-        SS["Safari, daily, per routine<br/>x.com/search (topics) · x.com/you/following"]
+        GB["Grok Bot · X file · glance file · reply targets · unfollow list"]
+        SR["Safari read (every 6 h) · x.com/you/with_replies + x.com/you"]
+        SS["Safari, daily, per routine · x.com/search (topics) · x.com/you/following"]
     end
-    SR --> XF["x-file.json<br/>(numbers + glance)"]
+    SR --> XF["x-file.json · (numbers + glance)"]
     SS --> RF["x-reply-finds/day.json"]
     SS --> UF["unfollow-queue.json"]
     GB --> XF2["Grok Bot's X file / glance file"]
-    XF --> AD["X connection (sandboxed add-on)<br/>growth.x · growth.x_pulse · growth.x_glance"]
+    XF --> AD["X connection (sandboxed add-on) · growth.x · growth.x_pulse · growth.x_glance"]
     XF2 --> AD
     AD --> UI["Today → Reach → X · Apps · portal"]
     RF --> RI["X reply ideas routine"]

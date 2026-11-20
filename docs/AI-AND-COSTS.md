@@ -112,13 +112,21 @@ Your scripts ask `hm ai-pause-check` before starting (it answers "available" or 
 
 **Who drafts X replies (Drafts by)**
 
+With *Auto* (the default), Hmunmawi tries these in order and uses the first that works:
+
+1. 🧠 **Apple's on-device AI**, if Apple Intelligence is on for this Mac. Free, and nothing leaves your Mac.
+2. 🔑 **Your AI key**, if you added one and its budget isn't used up.
+3. ✍️ **No draft:** you get the post to reply to and write it yourself.
+
+The same flow as a diagram (shown as plain text in some viewers; the list above says the same):
+
 ```mermaid
 flowchart LR
-    A["Auto (default)"] --> B{"Apple Intelligence<br/>on this Mac?"}
-    B -->|yes| C["🧠 Apple's on-device AI<br/>free · stays on your Mac"]
-    B -->|no| D{"AI key with<br/>budget left?"}
+    A["Auto (default)"] --> B{"Apple Intelligence on this Mac?"}
+    B -->|yes| C["🧠 Apple's on-device AI (free, stays on your Mac)"]
+    B -->|no| D{"AI key with budget left?"}
     D -->|yes| E["🔑 Your AI key"]
-    D -->|no| F["✍️ No draft:<br/>you get the post to reply to"]
+    D -->|no| F["✍️ No draft: you get the post to reply to"]
 ```
 
 Pick *Apple's on-device AI*, *My AI key* or *No drafts* to use only that; a fixed choice never falls back to another.
