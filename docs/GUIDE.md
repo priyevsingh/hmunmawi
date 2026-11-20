@@ -17,6 +17,9 @@
 > **Show me how** (Hands-on: the steps, and you do it). Anything that changes App Store Connect or sends a message
 > always waits for your OK.
 
+> [!TIP]
+> The short list of everything Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md).
+
 ---
 
 <br>

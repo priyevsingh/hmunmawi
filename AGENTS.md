@@ -65,6 +65,10 @@ and asks before it acts. Users' guide: [README.md](README.md).
 
 ## Ground rules
 
+### Docs rule: keep the capability list in sync
+
+Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it.
+
 - **No secrets, real data or personal details** in code, tests, fixtures, comments or commit messages. Use
   `example.com`-style names and invented numbers. Keys live only in the macOS Keychain.
 - **Nothing writes to someone's accounts without their approval.** App Store Connect changes and anything that

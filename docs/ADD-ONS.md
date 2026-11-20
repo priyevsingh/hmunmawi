@@ -6,7 +6,7 @@ Add-ons never see your keys and can't reach the internet on their own: they ask 
 
 ## What the built-in add-ons cover
 
-Hmunmawi ships with these add-ons (every folder in `AddOns/`). Together they cover your Apple apps, your websites and search, YouTube and X, crashes, subscriptions, alerts and your own scripts and Mac jobs.
+The full list of what Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md). Hmunmawi ships with these add-ons (every folder in `AddOns/`). Together they cover your Apple apps, your websites and search, YouTube and X, crashes, subscriptions, alerts and your own scripts and Mac jobs.
 
 | Add-on | What it does for you |
 |---|---|

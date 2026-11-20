@@ -38,6 +38,10 @@ Replies come when there is time. If something is urgent (a security problem), us
 5. Check the app in both light and dark appearance (Settings → General → Appearance) and at a small and a large window size.
 6. Open the pull request and describe what changed and how you checked it.
 
+### Docs
+
+Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it.
+
 ### Style
 
 - Swift 6, strict concurrency. Slow work (files, network, databases) stays off the main thread.
