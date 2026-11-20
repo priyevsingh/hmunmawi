@@ -52,6 +52,11 @@ import Testing
         // Never someone who follows you, never a different person, never a missing signed-in account.
         #expect(XUnfollow.classify(page(["follows_you": true]), account: quiet, me: "me_dev") == .skip("now follows you (mutual), kept"))
         #expect(XUnfollow.classify(page(["username": "Q\n@quiet2"]), account: quiet, me: "me_dev") == .skip("page is a different user (handle changed?)"))
+        // X's real name line has no space before the handle.
+        #expect(XUnfollow.classify(page(["username": "Josh “Pizza” Holtz 💪🍕@quiet\nFollows you", "follows_you": true]), account: quiet, me: "me_dev") == .skip("now follows you (mutual), kept"))
+        #expect(XUnfollow.classify(page(["username": "Josh “Pizza” Holtz 💪🍕@quiet"]), account: quiet, me: "me_dev") == .following(.following))
+        #expect(XUnfollow.classify(page(["username": "Q🍕@quiet_x"]), account: quiet, me: "me_dev") == .skip("page is a different user (handle changed?)"))
+        #expect(XUnfollow.classify(page(["me": "Me Dev@me_dev"]), account: quiet, me: "me_dev") == .following(.following))
         #expect(XUnfollow.classify(page(["page_id": "99"]), account: quiet, me: "me_dev") == .skip("page is a different user (id changed)"))
         #expect(XUnfollow.classify(page(["me": ""]), account: quiet, me: "me_dev") == .fail("could not confirm the signed-in account"))
         #expect(XUnfollow.classify(page(["btn": "follow", "btn_text": "Follow"]), account: quiet, me: "me_dev") == .skip("already not following"))

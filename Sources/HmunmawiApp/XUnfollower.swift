@@ -207,13 +207,14 @@ final class XUnfollower {
         guard let me else { return "Enter your X handle (Settings → General → X numbers)." }
         if let wait = Permissions.shared.deferIfNeeded([.safari]) { return wait }
         var s = Self.load(r.id)
+        var about = "saved list of \(s.snapshot.count) accounts"
         if s.snapshotAt == nil {
             busy = true
             let made = await makeList(r)
             busy = false
             switch made {
             case .failure(let why): return why.text
-            case .success(let (list, _)): s.snapshot = list
+            case .success(let (list, source)): s.snapshot = list; about = "list read from \(source) just now (not saved): \(list.count) accounts"
             }
         }
         busy = true; defer { busy = false }
@@ -227,7 +228,7 @@ final class XUnfollower {
             lines.append("\(mark) @\(a.handle): \(why)")
             if result == .safety { break }
         }
-        return "Try-out (nothing clicked, nothing saved):\n" + lines.joined(separator: "\n")
+        return "Try-out (nothing clicked, nothing saved), \(about):\n" + lines.joined(separator: "\n")
     }
 
     // MARK: One account

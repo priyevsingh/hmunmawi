@@ -242,8 +242,14 @@ public enum XUnfollow {
 
     /// The text shows exactly this @handle as a word ("@quiet2" is not "@quiet").
     public static func hasHandle(_ text: String, _ handle: String) -> Bool {
-        let want = "@" + handle.lowercased()
-        return text.lowercased().split(whereSeparator: { $0.isWhitespace || $0 == "·" }).contains { $0 == want }
+        // X writes the name and handle together ("Josh 🍕@joshdholtz"), so only what follows the handle is checked.
+        let t = text.lowercased(), want = "@" + handle.lowercased()
+        var from = t.startIndex
+        while let r = t.range(of: want, range: from..<t.endIndex) {
+            guard let next = t[r.upperBound...].first, next.isASCII, next.isLetter || next.isNumber || next == "_" else { return true }
+            from = r.upperBound
+        }
+        return false
     }
 
     /// After the click: the button now says Follow (or no Following control is left).

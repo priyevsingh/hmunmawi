@@ -130,6 +130,33 @@ case "press":
     }
     print(pressed ? "pressed \(title)" : "no enabled button titled \(title)")
     exit(pressed ? 0 : 1)
+case "choose":
+    // ax choose "<picker label>" "<item>"  — opens the pop-up menu with that label and picks the item with that title.
+    let rest = Array(args.dropFirst())
+    guard rest.count == 2 else { print("usage: ax choose <picker label> <item>"); exit(2) }
+    var popup: AXUIElement?
+    for window in windows where popup == nil {
+        _ = walk(window) { element, role, _ in
+            guard role == "AXPopUpButton", label(element).localizedCaseInsensitiveContains(rest[0]) else { return false }
+            popup = element; return true
+        }
+    }
+    guard let popup else { print("no picker labelled \(rest[0])"); exit(1) }
+    AXUIElementPerformAction(popup, kAXPressAction as CFString)
+    usleep(800_000)
+    var picked = false
+    // The open menu hangs off the pop-up or, on newer macOS, off the app itself.
+    _ = walk(popup) { element, role, _ in
+        guard role == "AXMenuItem", (attribute(element, kAXTitleAttribute) as String?) == rest[1] else { return false }
+        picked = AXUIElementPerformAction(element, kAXPressAction as CFString) == .success; return true
+    }
+    if !picked { _ = walk(root) { element, role, _ in
+        guard role == "AXMenuItem", (attribute(element, kAXTitleAttribute) as String?) == rest[1] else { return false }
+        picked = AXUIElementPerformAction(element, kAXPressAction as CFString) == .success; return true
+    } }
+    if !picked { CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true)?.post(tap: .cghidEventTap); CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false)?.post(tap: .cghidEventTap) }
+    print(picked ? "chose \(rest[1])" : "no item \(rest[1])")
+    exit(picked ? 0 : 1)
 case "fill":
     // ax fill "<field label>" < file   — focuses the text field with that label and types the file's text
     // (keystrokes, so the app's own field and Save path are used; the text is never printed).
