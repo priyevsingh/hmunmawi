@@ -85,3 +85,31 @@ private final class Box: @unchecked Sendable { var request: URLRequest? }
         }
     }
 }
+
+import Testing
+@testable import HmunmawiCore
+
+@Suite("SecretVerification")
+struct SecretVerificationTests {
+    let pairs = [("posthog", "apiKey"), ("youtube", "apiKey"), ("youtube", "signIn")]
+
+    @Test func alternativeCredentialSatisfiesConnection() {
+        let lines = SecretVerification.evaluate(pairs: pairs) { p, n in !(p == "youtube" && n == "apiKey") }
+        #expect(lines.map(\.key) == ["posthog/apiKey", "youtube/apiKey", "youtube/signIn"])
+        #expect(lines.allSatisfy { !$0.failed })
+        #expect(lines[1].status == "ok (via youtube/signIn)")
+    }
+
+    @Test func missingWithoutAlternativeStillFails() {
+        let lines = SecretVerification.evaluate(pairs: pairs) { p, n in p == "posthog" }
+        #expect(lines.first { $0.key == "youtube/apiKey" }?.failed == true)
+        #expect(lines.first { $0.key == "posthog/apiKey" }?.failed == false)
+        // the absent optional alternative alone is not listed as a failure
+        #expect(lines.contains { $0.key == "youtube/signIn" } == false)
+    }
+
+    @Test func readableApiKeyIsPlainOk() {
+        let lines = SecretVerification.evaluate(pairs: pairs) { _, _ in true }
+        #expect(lines.allSatisfy { $0.status == "ok" })
+    }
+}

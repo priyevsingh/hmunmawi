@@ -124,12 +124,11 @@ struct HmunmawiApp: App {
             ("cloudflare", "apiToken"), ("searchconsole", "serviceAccount"), ("youtube", "apiKey"),
             ("live", "hookRelayKey"), ("live", "hookCloudflareToken"),
         ]
-        var failed = false
-        for (p, n) in pairs {
-            let ok = (try? store.peekSecret(plugin: p, name: n))?.isEmpty == false
-            print("\(p)/\(n) \(ok ? "ok" : "fail")")
-            if !ok { failed = true }
+        let lines = SecretVerification.evaluate(pairs: pairs + SecretVerification.extraPairs) { p, n in
+            (try? store.peekSecret(plugin: p, name: n))?.isEmpty == false
         }
+        for l in lines { print("\(l.key) \(l.status)") }
+        let failed = lines.contains(where: \.failed)
         exit(failed ? 1 : 0)
     }
 

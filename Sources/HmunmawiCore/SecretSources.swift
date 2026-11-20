@@ -348,3 +348,37 @@ public enum SecretRebinder {
         return nil
     }
 }
+
+/// What `--verify-secrets` reports: one line per connection secret. A secret that is unreadable but whose connection
+/// is satisfied by an alternative credential (YouTube: the Google sign-in instead of the old API key) is "ok (alt)",
+/// not a failure. Names only, never values.
+public enum SecretVerification {
+    /// `alternatives["youtube/apiKey"] = ["youtube/signIn"]`: the connection works if any of these is readable.
+    public static let alternatives: [String: [String]] = ["youtube/apiKey": ["youtube/signIn"]]
+
+    /// Credentials checked besides the primary ones (an alternative must itself be checked so it can count).
+    public static let extraPairs: [(String, String)] = [("youtube", "signIn")]
+
+    public struct Line: Equatable {
+        public let key: String
+        public let status: String   // "ok", "ok (via <alt>)", "fail"
+        public let failed: Bool
+    }
+
+    public static func evaluate(pairs: [(String, String)], alternatives: [String: [String]] = alternatives,
+                                isReadable: (String, String) -> Bool) -> [Line] {
+        pairs.compactMap { p, n in
+            let key = "\(p)/\(n)"
+            if isReadable(p, n) { return Line(key: key, status: "ok", failed: false) }
+            // An optional alternative (e.g. youtube/signIn) that is simply absent is not a failure on its own.
+            if alternatives.values.contains(where: { $0.contains(key) }) { return nil }
+            for alt in alternatives[key] ?? [] {
+                let parts = alt.split(separator: "/").map(String.init)
+                if parts.count == 2, isReadable(parts[0], parts[1]) {
+                    return Line(key: key, status: "ok (via \(alt))", failed: false)
+                }
+            }
+            return Line(key: key, status: "fail", failed: true)
+        }
+    }
+}
