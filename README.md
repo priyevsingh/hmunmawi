@@ -41,7 +41,7 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 |---|---|---|
 | **🌱 Win** | Downloads, proceeds, active subscribers, ratings and new reviews, in one sentence from your own numbers. | Website visits, Google and Bing search clicks, daily active users, subscriptions, YouTube and X growth, in the same sentence. |
 | **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, trouble that one of your own scripts reports, a connection that stopped answering. Same calm alert on iMessage, your phone or Calendar. |
-| **➡️ Next** | What to do about it, and chores that run for you (review replies and X reply ideas drafted for you to edit). | Routines and your own scripts keep going on autopilot. Anything that changes something waits for your OK. |
+| **➡️ Next** | What to do about it, plus chores that run for you: review replies and X reply ideas drafted for you to edit, and share cards sized for posts and stories. | Your own scripts can feed in the creative work you run: a Shorts or Reels plan, a carousel, a Reddit or Discord post idea, an X post, an article. Each shows up as a to-do under Next, and nothing goes out until you say so. |
 
 No dashboards to open. Free, open source, and your data stays on your Mac. [See every add-on](docs/ADD-ONS.md).
 

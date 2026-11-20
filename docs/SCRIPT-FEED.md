@@ -73,6 +73,14 @@ Leave out what you don't need; a card with only `title`, `page` and `figures` is
 - For something that should *run* on a schedule (send a message, tidy files), use a routine instead:
   **Automations → Your routines → Run my script** (see [ROUTINES.md](ROUTINES.md)).
 
+## Post ideas and to-dos
+
+Any script you run can send drafts in, for example a Shorts or Reels plan, a carousel, a Reddit or Discord post idea,
+an X post or an article outline. Hmunmawi has no built-in Instagram, Reddit, Discord or Shorts add-on; the script
+does the thinking and prints a card whose `items` carry an `action` (a plain sentence saying what to do). Those items
+appear under **Next** on Today as to-dos. Hmunmawi never posts for you. If you run these as Mac jobs, the
+Automations map groups jobs whose names mention a post, caption, Instagram or short under **Social posts**.
+
 ## Startup programs card
 
 A script can also fill the **Startup programs** card on the Money page (credits from accelerator and cloud
