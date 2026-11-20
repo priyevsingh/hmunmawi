@@ -4,6 +4,26 @@ An add-on connects Hmunmawi to one service. It is a small program, in any langua
 
 Add-ons never see your keys and can't reach the internet on their own: they ask the app to make each web request, and the app only sends it to the hosts the add-on declared.
 
+## What the built-in add-ons cover
+
+Hmunmawi ships with these add-ons (every folder in `AddOns/`). Together they cover your Apple apps, your websites and search, YouTube and X, crashes, subscriptions, alerts and your own scripts and Mac jobs.
+
+| Add-on | What it does for you |
+|---|---|
+| App Store Connect | Reviews, icons, version status, daily downloads and proceeds, hourly |
+| RevenueCat | Active subscriptions, trials, MRR and 28-day revenue |
+| PostHog | Daily active users |
+| Sentry | Sessions and crashes each day (crash-free rate) |
+| Cloudflare | Website visitors each day |
+| Google Search Console, Bing Webmaster Tools | Search clicks, impressions, top searches and pages |
+| YouTube | Subscribers, views and newest videos |
+| X | Followers, views and engagement from your daily X file; no key needed |
+| Script feed | Anything your own scripts print: numbers, plans and to-dos for Shorts, Reels, carousels, Reddit, Discord, X posts and articles ([how](SCRIPT-FEED.md#post-ideas-and-to-dos)) |
+| Mac jobs | Your scheduled Mac jobs: runs, failures, Run now and Pause |
+| iMessage, ntfy | Alerts to your phone |
+
+Hmunmawi tracks, plans, queues and reminds. It never posts to YouTube, Instagram, Reddit, Discord or X for you, and anything that changes something waits for your OK.
+
 ## The folder
 
 An add-on is a folder named `<id>.hmplugin` with two files:

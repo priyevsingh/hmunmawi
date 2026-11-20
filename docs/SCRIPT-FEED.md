@@ -75,11 +75,14 @@ Leave out what you don't need; a card with only `title`, `page` and `figures` is
 
 ## Post ideas and to-dos
 
-Any script you run can send drafts in, for example a Shorts or Reels plan, a carousel, a Reddit or Discord post idea,
-an X post or an article outline. Hmunmawi has no built-in Instagram, Reddit, Discord or Shorts add-on; the script
-does the thinking and prints a card whose `items` carry an `action` (a plain sentence saying what to do). Those items
-appear under **Next** on Today as to-dos. Hmunmawi never posts for you. If you run these as Mac jobs, the
-Automations map groups jobs whose names mention a post, caption, Instagram or short under **Social posts**.
+Any script you run can send drafts and plans in, so your creative work is tracked in one place: a YouTube Shorts
+plan or stats, an Instagram Reel or carousel, a Reddit or Discord post idea, an X post, an article outline. Hmunmawi
+has no built-in Instagram, Reddit, Discord or Shorts connection: your script (or an AI job you run) does the
+thinking and prints a card whose `items` carry an `action` (a plain sentence saying what to do), so each idea
+shows as a to-do line on its card. Hmunmawi tracks, queues and reminds; it never posts to any platform for you.
+If you run these as Mac jobs, the Automations map groups jobs whose names mention a post, caption, Instagram or
+short under **Social posts**, with a dot for what happened today. Remind-me routines and the Hmunmawi calendar put the
+due ones on your phone.
 
 ## Startup programs card
 

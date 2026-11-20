@@ -39,9 +39,20 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 
 | | 🍎 Your Apple apps | 🌐 Everything else you run (via add-ons) |
 |---|---|---|
-| **🌱 Win** | Downloads, proceeds, active subscribers, ratings and new reviews, in one sentence from your own numbers. | Website visits, Google and Bing search clicks, daily active users, subscriptions, YouTube and X growth, in the same sentence. |
-| **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, trouble that one of your own scripts reports, a connection that stopped answering. Same calm alert on iMessage, your phone or Calendar. |
-| **➡️ Next** | What to do about it, plus chores that run for you: review replies and X reply ideas drafted for you to edit, and share cards sized for posts and stories. | Your own scripts can feed in the creative work you run: a Shorts or Reels plan, a carousel, a Reddit or Discord post idea, an X post, an article. Each shows up as a to-do under Next, and nothing goes out until you say so. |
+| **🌱 Win** | Downloads, proceeds, active subscribers, ratings and new reviews, in one sentence from your own numbers. Every sale shows up as it happens. | Website visits, Google and Bing search clicks, daily active users, subscriptions, YouTube and X growth, in the same sentence. |
+| **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review, offer codes about to expire. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, a website that stopped answering, a crash spike, trouble that one of your own scripts reports, a connection or key that stopped working. Same calm alert on iMessage, your phone or Calendar. |
+| **➡️ Next** | What to do about it, plus chores that run for you: review replies and X reply ideas drafted for you to edit, offer codes handed out one by one, and share cards sized for posts and stories. | The creative work you run, tracked and queued: YouTube channel stats and Shorts plans, Instagram Reels and carousels, Reddit and Discord post ideas, X posts and reply ideas, articles. Your own scripts or AI jobs write the drafts; each shows up as a to-do and nothing goes out until you say so. |
+
+### What it can run for you
+
+- **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit, offer codes, featuring nominations and product page tests.
+- **Websites and search:** visitors and AI-bot reads from Cloudflare, Google Search Console and Bing clicks, top searches and pages, a "website down" watch, and next steps like searches that have no page yet.
+- **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas and an unfollow list; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
+- **Content publishing:** articles and posts you produce show up as to-dos and as jobs on the Automations map, so you can see what is due, what ran and what failed.
+- **Crashes and health:** crash-free sessions from Sentry, failed Mac jobs retried, keys and certificates watched for expiry.
+- **Money:** payday date, monthly forecast, profit after your costs, AI credits and plan limits, and an export for your accountant.
+- **Alerts:** iMessage, ntfy push and an iPhone and Watch calendar, with quiet hours.
+- **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs, and agents like Claude Code through `hm`. Anything that changes something waits for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
 
 No dashboards to open. Free, open source, and your data stays on your Mac. [See every add-on](docs/ADD-ONS.md).
 

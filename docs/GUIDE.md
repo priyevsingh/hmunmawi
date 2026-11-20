@@ -756,6 +756,8 @@ that can `notify` can add any of them ([Writing a connection](ADD-ONS.md)).
 | Script feed | Any numbers your own scripts print: [Your own numbers](SCRIPT-FEED.md) | Nothing |
 | iMessage, ntfy | Alerts to your phone | Your number, or an ntfy topic |
 
+Beyond these, the **Script feed** and **Mac jobs** connections are how everything else you run reaches Hmunmawi: a YouTube Shorts plan, Instagram Reels and carousels, Reddit and Discord post ideas, X posts, articles or a research job each appear as a card or a job on the Automations map, with a to-do when something needs you. Hmunmawi tracks, queues and reminds; anything that posts or changes something waits for your OK. See [Your own numbers](SCRIPT-FEED.md#post-ideas-and-to-dos).
+
 Each runs as a separate sandboxed add-on that never sees your keys. Write your own: [Writing a connection](ADD-ONS.md). They check in on their own clock: Mac jobs every 5 minutes, the script feed every 10, X every 30, App Store Connect every hour, Cloudflare, PostHog, RevenueCat and Sentry every 3 hours, Search Console, Bing and YouTube every 6 hours, and ntfy every 6 hours (only to see it answers).
 
 <br>
