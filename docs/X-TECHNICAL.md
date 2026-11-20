@@ -133,8 +133,9 @@ Opt-in and owner-only: added in the app (Automations → + → X unfollows (auto
 `routine-add`/`routine-set`/`routine-run` and may only `routine-pause`/`routine-resume` it. Off also through
 Settings → Jobs (the routine's switch, or `x` / `x_unfollows` set to false in your switch file).
 
-- **List:** made once, the first time it runs or when you press **Rebuild list**, from your Following page (scrolled
-  until no more accounts load; `followed_by` false, with user ids) or from Grok Bot's file (`suggestion` keep,
+- **List:** made once, the first time it runs or when you press **Rebuild list**, from your Following page
+  (`followed_by` false, with user ids; X loads only its first page in a background tab, about your 50 most recent
+  follows, so a Safari list is short: press Rebuild list when it's done, or use Grok Bot's file for a longer list) or from Grok Bot's file (`suggestion` keep,
   `mutuals` and 50,000+ followers left out). It is never refreshed by itself, so accounts you follow later are never
   added. Done and skipped accounts are kept by user id (or handle), so it is idempotent and resumable, also across rebuilds.
 - **Pace:** a run every 5 minutes; at most `per_day` (default 25, at most 40) inside `window` (default `10:00-20:00`,

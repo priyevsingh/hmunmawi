@@ -136,7 +136,7 @@ Pick one:
 |---|---|---|
 | Who clicks | You | Hmunmawi, in your own signed-in Safari |
 | How many | A short list a day (10 by default) | Up to 25 a day by default (at most 40), at least 10 minutes apart, spread through your window (10:00-20:00 by default) |
-| The list | Re-read every day | **Made once** and frozen; accounts you follow later are never added. **Rebuild list** to make a new one |
+| The list | Re-read every day | **Made once** and frozen; accounts you follow later are never added. **Rebuild list** to make a new one. From Safari it holds what X loads at first (about your 50 most recent follows); Grok Bot's file can be longer |
 | Never touched | Big accounts (50,000+ followers), your keeps | The same, plus mutuals and anyone whose page shows *Follows you* |
 
 How the automatic one works, per account: one new background tab, checked (the right person by handle and user id,
