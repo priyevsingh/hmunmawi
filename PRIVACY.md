@@ -5,7 +5,7 @@ Hmunmawi runs on your Mac and works for you alone. It has **no telemetry, no ana
 ## What stays on your Mac
 
 - **Your data:** a SQLite database in `~/Library/Application Support/Hmunmawi/`, with the numbers your connections fetch, your rules, and the activity log.
-- **Your keys:** in the macOS Keychain only.
+- **Your keys:** in the macOS Keychain only. (Only with owner extras on: a key you type in Settings is also kept in a private `0600` file in `~/.config/hmunmawi/keys/` so it can be re-imported after the app's signature changes.)
 - **Settings:** the app's preferences and settings file in the same folder.
 - **Backups:** once a day in `~/Library/Application Support/Hmunmawi/Backups/`: a full copy of the database (the last 7 kept, 2 if it grows past 300 MB), the settings file whenever it changed, and small snapshots (the last 30 days plus the first of each month for a year). If iCloud Drive is on, an **encrypted** copy also goes to *iCloud Drive › Hmunmawi Backups*. The key stays in your Keychain, and a recovery code is shown in Settings → Backups.
 - **Your published portal (only if you press Publish):** one `index.html` with your numbers, written to `~/Library/Application Support/Hmunmawi/Portal/` or the folder you choose in Settings → Publish. Hmunmawi doesn't upload it; if you set and approve your own upload command, that command (your tool, your login) sends it where you chose. With "Safe to show anyone" on, no money amounts, sales list or problem list are in it. Dated copies of the last 8 days stay in the `earlier` folder next to it. Sample numbers are never published.

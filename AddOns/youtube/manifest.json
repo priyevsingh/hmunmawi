@@ -9,10 +9,11 @@
   "poll": { "everySeconds": 21600 },
   "permissions": {
     "hosts": ["www.googleapis.com"],
-    "secrets": ["apiKey"]
+    "secrets": ["apiKey", "signIn"]
   },
   "settings": [
     { "key": "channelID", "label": "Channel ID (starts with UC) from youtube.com/account_advanced", "type": "text", "required": true },
-    { "key": "apiKey", "label": "API key from Google Cloud Console → APIs & Services → Credentials → Create credentials → API key (turn on \"YouTube Data API v3\" in the Library first)", "type": "secret", "required": true }
+    { "key": "apiKey", "label": "API key from Google Cloud Console → APIs & Services → Credentials → Create credentials → API key (turn on \"YouTube Data API v3\" in the Library first)", "type": "secret", "required": false },
+    { "key": "signIn", "label": "Or a Google sign-in file (JSON with client_id, client_secret and refresh_token) instead of an API key", "type": "secret-file", "required": false }
   ]
 }

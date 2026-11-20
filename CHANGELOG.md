@@ -4,6 +4,9 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 
 ## Unreleased
 
+**Fixes**
+- **YouTube recovers by itself:** the YouTube connection can now use a Google sign-in file (client id, client secret and refresh token, the kind your own upload scripts already use) instead of an API key, and re-imports it from its saved file at launch with no typing. Any connection with a known key file is re-imported the same way, and a key typed in Settings is also kept in a private file (mode 0600) in `~/.config/hmunmawi/keys/` (owner extras only; a normal install keeps keys in the Keychain alone), so a later signature change can't leave a connection needing a re-entry.
+
 **Release process**
 - A release is refused unless its code-signing designated requirement is identical to the previous release's (`scripts/check-designated-requirement.sh`, run by `release.sh` and again by `publish-release.sh`), so an update can never re-ask macOS permissions or Keychain keys.
 

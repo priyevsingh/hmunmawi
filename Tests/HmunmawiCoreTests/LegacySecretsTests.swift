@@ -73,6 +73,7 @@ private final class FakeTarget: SecretMigrationTarget {
 
     @Test func youtubeIsAConnectionSecret() {
         #expect(SecretRebinder.connectionSecretNames.contains("youtube/apiKey"))
+        #expect(SecretRebinder.connectionSecretNames.contains("youtube/signIn"))
         #expect(LegacySecretMigrator.legacyServices.allSatisfy { $0 != KeychainSecretStore.service })
     }
 }

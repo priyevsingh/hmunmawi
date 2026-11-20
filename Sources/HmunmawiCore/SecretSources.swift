@@ -200,9 +200,58 @@ public enum SecretSourceDefaults {
         // Same file as the hooks key: the Pages purchase outbox uses this name.
         "live/relayKey": ("asn_relay.env", .envLine, "RELAY_KEY"),
         "live/hookCloudflareToken": ("cloudflare_analytics.env", .envLine, "CF_ANALYTICS_TOKEN"),
+        // The YouTube sign-in the hub's upload and stats scripts already use (client id/secret + refresh token).
+        "youtube/signIn": ("youtube_token.json", .wholeFile, ""),
     ]
 
-    public static func ref(plugin: String, name: String) -> SecretSourceRef? {
+    /// Where a key typed in Settings is also kept, so a changed app signature (an old Keychain item no longer
+    /// readable) recovers without typing it again. Owner extras only: a normal install keeps keys in the Keychain
+    /// alone. One file per key, `<add-on>.<key>`, mode 0600, folder 0700. `HMUNMAWI_TYPED_KEYS` overrides (tests).
+    public static func typedKeyFolder() -> URL? {
+        if let p = ProcessInfo.processInfo.environment["HMUNMAWI_TYPED_KEYS"], !p.isEmpty {
+            return URL(fileURLWithPath: (p as NSString).expandingTildeInPath, isDirectory: true)
+        }
+        guard OwnerConfig.current.enabled else { return nil }
+        return home().appending(path: ".config/hmunmawi/keys", directoryHint: .isDirectory)
+    }
+
+    static func typedKeyURL(plugin: String, name: String, in folder: URL? = typedKeyFolder()) -> URL? {
+        let safe = CharacterSet.alphanumerics
+        guard !plugin.isEmpty, !name.isEmpty, plugin.unicodeScalars.allSatisfy(safe.contains), name.unicodeScalars.allSatisfy(safe.contains) else { return nil }
+        return folder?.appending(path: "\(plugin).\(name)")
+    }
+
+    /// Writes a key typed in Settings to its 0600 file (see `typedKeyFolder`). No-op on a normal install.
+    @discardableResult
+    public static func mirrorTypedKey(_ value: String, plugin: String, name: String, in folder: URL? = typedKeyFolder()) -> Bool {
+        guard !value.isEmpty, let url = typedKeyURL(plugin: plugin, name: name, in: folder) else { return false }
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                   attributes: [.posixPermissions: 0o700])
+            // Create empty at 0600 first so the value is never readable by others, then replace atomically.
+            let tmp = url.deletingLastPathComponent().appending(path: ".\(url.lastPathComponent).tmp")
+            fm.createFile(atPath: tmp.path, contents: nil, attributes: [.posixPermissions: 0o600])
+            try Data(value.utf8).write(to: tmp)
+            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tmp.path)
+            _ = try fm.replaceItemAt(url, withItemAt: tmp)
+            return true
+        } catch { return false }
+    }
+
+    /// Every `<add-on>.<key>` pair that has a typed-key file.
+    public static func typedKeyPairs() -> [(String, String)] {
+        guard let dir = typedKeyFolder(),
+              let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return [] }
+        return names.compactMap { n in
+            guard !n.hasPrefix("."), let dot = n.firstIndex(of: ".") else { return nil }
+            let plugin = String(n[..<dot]), name = String(n[n.index(after: dot)...])
+            return plugin.isEmpty || name.isEmpty ? nil : (plugin, name)
+        }
+    }
+
+    public static func ref(plugin: String, name: String, keyFolder keys: URL? = keyFolder(),
+                           typedFolder: URL? = typedKeyFolder()) -> SecretSourceRef? {
         func existing(_ url: URL?, _ kind: SecretSourceRef.Kind, _ field: String) -> SecretSourceRef? {
             guard let p = url?.path, FileManager.default.fileExists(atPath: p) else { return nil }
             return SecretSourceRef(path: p, kind: kind, field: field)
@@ -212,11 +261,13 @@ public enum SecretSourceDefaults {
         case ("appstoreconnect", "keyID"): return existing(ascConfig(), .tomlKey, "key_id")
         case ("appstoreconnect", "privateKey"): return existing(ascConfig(), .tomlPathFile, "private_key_path")
         case ("sentry", "authToken"):
-            return existing(keyFolder()?.appending(path: "sentry.env"), .envLine, "SENTRY_AUTH_TOKEN")
+            return existing(keys?.appending(path: "sentry.env"), .envLine, "SENTRY_AUTH_TOKEN")
                 ?? existing(ascConfig(), .tomlKey, "auth_token")
         default:
-            guard let f = keyFolderFields["\(plugin)/\(name)"] else { return nil }
-            return existing(keyFolder()?.appending(path: f.file), f.kind, f.field)
+            if let f = keyFolderFields["\(plugin)/\(name)"],
+               let r = existing(keys?.appending(path: f.file), f.kind, f.field) { return r }
+            // A key typed in Settings and mirrored to its own file.
+            return existing(typedKeyURL(plugin: plugin, name: name, in: typedFolder), .wholeFile, "")
         }
     }
 }
@@ -279,7 +330,7 @@ public enum SecretRebinder {
     }
 
     /// Every built-in connection key as `"<add-on>/<field>"` (used by the legacy migration too).
-    public static var connectionSecretNames: [String] { builtInConnectionSecrets().map { "\($0.0)/\($0.1)" } + ["youtube/apiKey"] }
+    public static var connectionSecretNames: [String] { builtInConnectionSecrets().map { "\($0.0)/\($0.1)" }  }
 
     private static func builtInConnectionSecrets() -> [(String, String)] {
         [
@@ -287,7 +338,8 @@ public enum SecretRebinder {
             ("posthog", "apiKey"), ("sentry", "authToken"), ("bing", "apiKey"),
             ("cloudflare", "apiToken"), ("searchconsole", "serviceAccount"),
             ("live", "hookRelayKey"), ("live", "hookCloudflareToken"),
-        ]
+            ("youtube", "apiKey"), ("youtube", "signIn"),
+        ] + SecretSourceDefaults.typedKeyPairs()
     }
 
     private static func readValue(catalog: SecretSourceCatalog, plugin: String, name: String, pass: SecretReadPass?) -> String? {

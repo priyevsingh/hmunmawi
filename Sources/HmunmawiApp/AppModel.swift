@@ -1188,7 +1188,10 @@ final class AppModel {
             for setting in row.manifest.settings where values[setting.key] != nil {
                 let value = (values[setting.key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if setting.type.hasPrefix("secret") {
-                    if !value.isEmpty { try secrets.replaceSecret(value, plugin: row.id, name: setting.key) }
+                    if !value.isEmpty {
+                        try secrets.replaceSecret(value, plugin: row.id, name: setting.key)
+                        SecretSourceDefaults.mirrorTypedKey(value, plugin: row.id, name: setting.key)
+                    }
                 } else {
                     plain[setting.key] = value
                 }

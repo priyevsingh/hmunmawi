@@ -64,7 +64,14 @@ struct YouTube: HmunmawiPlugin {
     }
 
     private func get(_ core: Core, _ path: String) async throws -> JSONValue {
-        let response = try await core.http(HTTPRequestSpec(url: Self.api + path, headers: ["X-goog-api-key": "{{secret:apiKey}}"]))
+        // A Google sign-in (the `signIn` secret) is used when there is one; otherwise the plain API key.
+        let response: HTTPResponseSpec
+        do {
+            response = try await core.http(HTTPRequestSpec(url: Self.api + path, headers: ["Authorization": "Bearer {{google-user-token}}"]))
+        } catch {
+            guard String(describing: error).contains("missing_secret") else { throw error }
+            response = try await core.http(HTTPRequestSpec(url: Self.api + path, headers: ["X-goog-api-key": "{{secret:apiKey}}"]))
+        }
         let json = (try? JSONValue.parse(response.body ?? "")) ?? .null
         guard response.status == 200 else {
             let detail = json[path: "error.message"]?.string ?? "status \(response.status)"

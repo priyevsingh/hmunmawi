@@ -469,6 +469,7 @@ extension NetworkGate {
     /// only ever sees the hour-long access token in its own request, never the key.
     func withGoogleTokens(_ spec: HTTPRequestSpec, for manifest: PluginManifest) async throws -> HTTPRequestSpec {
         // Headers only: a body can hold text written by you or an AI, which must never carry a live token out.
+        let spec = try await withGoogleUserToken(spec, for: manifest)
         let texts = Array(spec.headers.values)
         let scopes = Set(texts.flatMap { $0.matches(of: /\{\{google-token:([^}]+)\}\}/).map { String($0.1) } })
         guard !scopes.isEmpty else { return spec }
@@ -487,6 +488,57 @@ extension NetworkGate {
             out.headers = out.headers.mapValues { $0.replacingOccurrences(of: tag, with: token) }
         }
         return out
+    }
+}
+
+extension NetworkGate {
+    /// Fills `{{google-user-token}}` with a short-lived access token made from the add-on's `signIn` secret (a
+    /// Google OAuth sign-in file: client_id, client_secret, refresh_token). Headers only, like the service-account
+    /// token; the add-on never sees the sign-in itself.
+    func withGoogleUserToken(_ spec: HTTPRequestSpec, for manifest: PluginManifest) async throws -> HTTPRequestSpec {
+        let tag = "{{google-user-token}}"
+        guard spec.headers.values.contains(where: { $0.contains(tag) }) else { return spec }
+        guard manifest.permissions.secrets.contains("signIn") else {
+            throw WireError("blocked_secret", "Google sign-in tokens need the secret “signIn” declared")
+        }
+        guard let json = try secrets.secret(plugin: manifest.id, name: "signIn"), !json.isEmpty else {
+            throw WireError("missing_secret", "Secret “signIn” has not been set yet")
+        }
+        let token = try await GoogleTokenCache.shared.token(plugin: manifest.id, scope: "user-sign-in") {
+            try await GoogleUserToken.fetch(signInJSON: json, transport: transport)
+        }
+        var out = spec
+        out.headers = out.headers.mapValues { $0.replacingOccurrences(of: tag, with: token) }
+        return out
+    }
+}
+
+enum GoogleUserToken {
+    /// Exchanges the refresh token for an access token. The sign-in goes only to Google's own token endpoint,
+    /// whatever the file says.
+    static func fetch(signInJSON: String, transport: any HTTPTransport) async throws -> String {
+        guard let info = try? JSONSerialization.jsonObject(with: Data(signInJSON.utf8)) as? [String: Any],
+              let id = info["client_id"] as? String, let secret = info["client_secret"] as? String,
+              let refresh = info["refresh_token"] as? String, !id.isEmpty, !secret.isEmpty, !refresh.isEmpty
+        else { throw WireError("bad_key", "That isn't a Google sign-in file (it needs client_id, client_secret and refresh_token)") }
+        let tokenURI = (info["token_uri"] as? String) ?? "https://oauth2.googleapis.com/token"
+        guard let url = URL(string: tokenURI), url.scheme == "https", let host = url.host, host == "googleapis.com" || host.hasSuffix(".googleapis.com")
+        else { throw WireError("bad_key", "Bad token address in the sign-in file") }
+        var request = URLRequest(url: url, timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+        func enc(_ t: String) -> String { t.addingPercentEncoding(withAllowedCharacters: allowed) ?? t }
+        request.httpBody = Data("grant_type=refresh_token&client_id=\(enc(id))&client_secret=\(enc(secret))&refresh_token=\(enc(refresh))".utf8)
+        let (data, response) = try await transport.send(request)
+        guard response.statusCode == 200,
+              let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let token = body["access_token"] as? String
+        else {
+            let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_description"] as? String
+            throw WireError("google_auth", "Google refused the sign-in: \(detail ?? "status \(response.statusCode)")")
+        }
+        return token
     }
 }
 
