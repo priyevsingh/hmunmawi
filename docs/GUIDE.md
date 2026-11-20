@@ -692,7 +692,7 @@ On the maintainer's Mac the same sources also feed a larger private portal, buil
 Hmunmawi's data (it isn't part of the app; it shows how far the idea goes). Numbers and private names are blurred.
 
 **The menu opens every section in one tap:** Today, Lifetime free, Apps, Subscribers, Users, X, YouTube, Outreach,
-Earnings, This week, Money, Store, Retention, Trends, Website & search, Social warm-up, Attention, Startup programs,
+Earnings, This week, Money, Store, Retention, Trends, Website & search, Social warm-up (optional, for new accounts only; hidden once an account is warmed up), Attention, Startup programs,
 Account and the Automation map.
 
 <p align="center"><img src="images/guide/hub/menu.png" width="820" alt="The portal's menu, open, with every section"></p>
