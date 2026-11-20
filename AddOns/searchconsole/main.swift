@@ -37,7 +37,7 @@ struct SearchConsole: HmunmawiPlugin {
                 let queries = try await query(core, site, ["startDate": .string(start28), "endDate": .string(endText),
                                                            "dimensions": .array([.string("query")]), "rowLimit": .number(10)])
                 let pages = try await query(core, site, ["startDate": .string(start28), "endDate": .string(endText),
-                                                         "dimensions": .array([.string("page")]), "rowLimit": .number(10)])
+                                                         "dimensions": .array([.string("page")]), "rowLimit": .number(50)])
                 let t28 = totals28.first ?? .object([:])
                 let t7 = totals7.first ?? .object([:])
                 let position = ((t28[path: "position"]?.number ?? 0) * 10).rounded() / 10
@@ -56,7 +56,8 @@ struct SearchConsole: HmunmawiPlugin {
                     "top_pages_28d": .array(pages.compactMap { row in
                         guard let key = row[path: "keys"]?.array?.first?.string else { return nil }
                         return .object(["page": .string(Self.pathOnly(key)), "clicks": .number(row[path: "clicks"]?.number ?? 0),
-                                        "impressions": .number(row[path: "impressions"]?.number ?? 0)])
+                                        "impressions": .number(row[path: "impressions"]?.number ?? 0),
+                                        "position": .number(((row[path: "position"]?.number ?? 0) * 10).rounded() / 10)])
                     }),
                 ])
                 let name = Self.displayName(site)

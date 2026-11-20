@@ -66,7 +66,42 @@ struct Sentry: HmunmawiPlugin {
                     dedupeKey: "crash-\(project.slug)-\(day)" + (endOfDay > nowMs - 2 * 86_400_000 ? "-v\(Self.dayFormat.string(from: .now))" : "")))
             }
         }
+        // Open problems (crashes, Sentry Uptime and Crons issues), for "Watch my services". Needs the token's
+        // event:read scope; without it this part is skipped and the crash numbers above still arrive.
+        if let issues = await Self.openIssues(core: core, base: base, headers: headers, projects: projects, mapping: mapping) {
+            events.append(issues)
+        }
         return events
+    }
+
+    /// Unresolved issues seen in the last 14 days, newest first (at most 50). nil when the token can't read them.
+    static func openIssues(core: Core, base: String, headers: [String: String], projects: [String: (slug: String, name: String)],
+                           mapping: [String: String]) async -> PluginEvent? {
+        let url = "\(base)/issues/?query=is%3Aunresolved&statsPeriod=14d&sort=date&limit=50&project=-1"
+        guard let r = try? await core.http(HTTPRequestSpec(url: url, headers: headers)) else { return nil }
+        guard r.status == 200, let list = (try? JSONValue.parse(r.body ?? ""))?.array else {
+            core.log(r.status == 403 ? "open issues skipped: the token needs the event:read scope" : "open issues skipped: status \(r.status)")
+            return nil
+        }
+        let issues: [JSONValue] = list.compactMap { i in
+            guard let id = i[path: "id"]?.string, let title = i[path: "title"]?.string else { return nil }
+            let slug = i[path: "project.slug"]?.string ?? ""
+            let name = mapping[slug] ?? i[path: "project.name"]?.string ?? slug
+            var o: [String: JSONValue] = ["id": .string(id), "title": .string(String(title.prefix(200))), "project": .string(name),
+                                          "category": .string(i[path: "issueCategory"]?.string ?? ""), "type": .string(i[path: "issueType"]?.string ?? ""),
+                                          "level": .string(i[path: "level"]?.string ?? "error"),
+                                          "count": .number(Double(i[path: "count"]?.string ?? "") ?? i[path: "count"]?.number ?? 0)]
+            if let p = i[path: "permalink"]?.string, p.hasPrefix("https://") { o["permalink"] = .string(p) }
+            if let s = i[path: "shortId"]?.string { o["short_id"] = .string(s) }
+            if let f = i[path: "firstSeen"]?.string { o["first_seen"] = .string(f) }
+            return .object(o)
+        }
+        _ = projects
+        let ids = issues.compactMap { $0[path: "id"]?.string }.sorted().joined(separator: ",")
+        let hash = String(ids.utf8.reduce(UInt64(5381)) { ($0 &* 33) &+ UInt64($1) }, radix: 36)
+        let now = Date()
+        return PluginEvent(kind: "issues.snapshot", app: "Sentry", payload: .object(["issues": .array(issues), "read_at": .number(now.timeIntervalSince1970 * 1000)]),
+                           occurredAt: Int64(now.timeIntervalSince1970 * 1000), dedupeKey: "sentry-issues-\(hash)-\(Int(now.timeIntervalSince1970 / 3600))")
     }
 
     nonisolated(unsafe) static let dayFormat: DateFormatter = {

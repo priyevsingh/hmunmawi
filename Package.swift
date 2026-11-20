@@ -15,6 +15,7 @@ let addOns = [
     ("x-addon", "AddOns/x"),
     ("cloudflare-addon", "AddOns/cloudflare"),
     ("revenuecat-addon", "AddOns/revenuecat"),
+    ("vercel-addon", "AddOns/vercel"),
 ]
 
 let package = Package(

@@ -1,12 +1,12 @@
 {
   "id": "sentry",
   "name": "Sentry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "protocol": 1,
   "executable": "sentry-addon",
-  "emits": ["crash.daily"],
-  "summary": "Reads how many app sessions ran each day and how many of them crashed, from your Sentry account every 3 hours.",
-  "poll": { "everySeconds": 10800 },
+  "emits": ["crash.daily", "issues.snapshot"],
+  "summary": "Reads how many app sessions ran each day and how many of them crashed, and (with the event:read scope) your open Sentry issues, from your Sentry account every 30 minutes.",
+  "poll": { "everySeconds": 1800 },
   "permissions": {
     "hosts": ["sentry.io", "us.sentry.io", "de.sentry.io"],
     "secrets": ["authToken"]
@@ -15,6 +15,6 @@
     { "key": "org", "label": "Organization slug (the part after /organizations/ in your Sentry web address, e.g. my-team)", "type": "text", "required": true },
     { "key": "region", "label": "Data region: leave empty for sentry.io, or type de.sentry.io if your Sentry account is hosted in the EU", "type": "text" },
     { "key": "apps", "label": "App names (optional): project-slug=App Name, separated by commas, e.g. my-app=My App. Empty uses the Sentry project names", "type": "text" },
-    { "key": "authToken", "label": "Auth token (Sentry → Settings → Auth Tokens → Create New Token, scopes: org:read, project:read)", "type": "secret", "required": true }
+    { "key": "authToken", "label": "Auth token (Sentry → Settings → Auth Tokens → Create New Token, scopes: org:read, project:read; add event:read to get open issues, website-down and job alerts)", "type": "secret", "required": true }
   ]
 }

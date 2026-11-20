@@ -1,0 +1,25 @@
+{
+  "id": "vercel",
+  "name": "Vercel",
+  "version": "0.1.0",
+  "protocol": 1,
+  "executable": "vercel-addon",
+  "emits": ["section.snapshot", "deploy.snapshot"],
+  "actions": ["vercel.redeploy"],
+  "summary": "Reads your website's visitors and page views from Vercel Web Analytics every 3 hours, and every 15 minutes whether production is running your branch's newest commit. Redeploy only runs after you approve it.",
+  "poll": { "everySeconds": 900 },
+  "permissions": {
+    "hosts": ["api.vercel.com", "api.github.com"],
+    "secrets": ["apiToken", "githubToken"],
+    "secretHosts": { "apiToken": ["api.vercel.com"], "githubToken": ["api.github.com"] }
+  },
+  "settings": [
+    { "key": "project", "label": "Project name or ID (Vercel → your project → Settings → General → Project Name or Project ID)", "type": "text", "required": true },
+    { "key": "teamID", "label": "Team ID (optional; Vercel → Team Settings → General → Team ID, starts with team_). Empty for a personal account", "type": "text" },
+    { "key": "siteName", "label": "Website name to show (e.g. mysite.com)", "type": "text" },
+    { "key": "repo", "label": "GitHub repository (optional, owner/name) to warn when production is behind your branch", "type": "text" },
+    { "key": "branch", "label": "Production branch (optional; empty = the one Vercel has set, usually main)", "type": "text" },
+    { "key": "apiToken", "label": "Access token (Vercel → Account Settings → Tokens → Create, scoped to the team that owns the project)", "type": "secret", "required": true },
+    { "key": "githubToken", "label": "GitHub token (optional; only for a private repository: fine-grained, read-only Contents on that repository)", "type": "secret", "required": false }
+  ]
+}
