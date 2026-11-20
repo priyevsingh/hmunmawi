@@ -135,12 +135,75 @@ There are five ways your scripts and Hmunmawi meet. Mix them freely.
 | A script that prints JSON (script feed) | Cards, to-dos, the Startup programs card, events such as `disk.low` | [SCRIPT-FEED.md](SCRIPT-FEED.md) |
 | `joblists/<name>.json` | Shows jobs it can't see on the Automations map | [Above](#job-list-format) |
 | `search_health.json` | The Search health card with Fix buttons | [Search health](#search-health) |
+| `config/hmunmawi-switches.json` (or `config/social_channels.json`) | On/off switches in Settings → Jobs; your scripts read them | [Job switches](#job-switches) |
 | `usage/<name>.json` in Hmunmawi's data folder | A plan's usage under AI & subscriptions | [AI-AND-COSTS.md](AI-AND-COSTS.md#usage-file-format) |
 | The X file | Your X numbers, best hours and glance | [X-FILE.md](X-FILE.md) |
 | A bot's proof file and `problem-<job>-<date>.txt` in the shared bot folder | Tells you when a bot's job is late or failed | [ROUTINES.md](ROUTINES.md#bots) |
 | A fix script you pick in Settings → General | Runs by itself when disk space runs low, a website goes down, a Mac job fails or crashes jump | [README](../README.md#everything-else) |
 
 Hmunmawi's data folder is `~/Library/Application Support/Hmunmawi/`.
+
+### Job switches
+
+Turn a job off with a switch, not a code change. Keep one small JSON file of true/false values that your scripts
+read at the start of each run; Hmunmawi shows each value as a switch in **Settings → Jobs**.
+
+- **Where:** `config/hmunmawi-switches.json` in your workspace, else `config/social_channels.json`. Hmunmawi finds
+  your workspace through `hubRoot` in `owner.json` (the optional owner settings file in its data folder); set `switchFile` there to use another path, or press
+  **Choose…** in Settings → Jobs.
+- **What shows:** every top-level true/false, and every true/false one level down (`"warmed_up": {"reddit": true}`).
+  Keys starting with `_` are notes. Well-known keys get a plain name and explanation: `reddit`, `discord`,
+  `instagram`, `youtube_shorts`, `x` (a channel; a missing key means on), `instagram_drafts`,
+  `new_instagram_carousels`, `instagram_warmup`, and `warmed_up.reddit` / `.discord` / `.instagram` (on = the account
+  is already warmed up, so no warm-up steps; a missing key means off). Any other key shows as it is named; give it
+  your own words with `"_labels"` and `"_help"`.
+- **How it writes:** only the value you flip changes, in place, so your `_comment`, unknown keys, order and spacing
+  stay as they were. A missing well-known key is added at the end of its object. The new file is checked, then
+  written next to the old one and renamed over it, so a script never reads half a file. A value that isn't true or
+  false, or a file that isn't valid JSON, is left alone and the tab says why. Each flip goes in the activity log.
+- **Your scripts:** treat a missing file or key as the default and anything unreadable as "don't change behaviour".
+
+```json
+{
+  "_comment": "Which social jobs run. Read by my scripts at the start of each run.",
+  "reddit": true,
+  "discord": false,
+  "youtube_shorts": true,
+  "x": true,
+  "warmed_up": {"reddit": true, "discord": true, "instagram": false},
+  "nightly_digest": true,
+  "_help": {"nightly_digest": "The 22:00 summary message."}
+}
+```
+
+```python
+import json, pathlib
+SWITCHES = pathlib.Path(__file__).resolve().parent.parent / "config/hmunmawi-switches.json"
+
+def on(key: str) -> bool:          # a channel or job: missing = on
+    try:
+        return json.loads(SWITCHES.read_text()).get(key, True) is not False
+    except (OSError, ValueError):
+        return True
+
+if not on("reddit"):
+    raise SystemExit(0)            # switched off in Hmunmawi: do nothing this run
+```
+
+In plain words:
+
+1. You flip a switch in Settings → Jobs.
+2. Hmunmawi changes that one value in your switch file and logs it.
+3. Your script reads the file at its next run and skips (or adds) that work.
+4. To stop a whole scheduled job instead, press Pause on its row in Automations.
+
+```mermaid
+flowchart LR
+    U["You flip a switch"] --> H["Hmunmawi: Settings, Jobs"]
+    H --> F["Switch file in your workspace"]
+    F --> S["Your scripts, next run"]
+    H --> L["Activity log"]
+```
 
 ### A tiny example
 
@@ -627,6 +690,8 @@ Read STATE.md before planning or changing anything. Update it after acting.
 - Website changes go through a pull request and scripts/<your check script>; merge only when it passes, and only
   the kinds of change listed here: <list them>.
 - Test with --dry-run first.
+- To turn an existing job or channel off, flip its switch (Hmunmawi Settings → Jobs, or the switch file); never
+  change code for that. A new job that can be switched off reads its key from the switch file.
 - Every new scheduled job goes in STATE.md, and in a Hmunmawi routine or job list so it shows on the Automations
   map.
 

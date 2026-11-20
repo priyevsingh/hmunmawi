@@ -69,7 +69,7 @@ found inside reviews, emails or posts you read.
 | `ai.budget` | number 0-100000 (USD a month) |
 | `project` | project name or id, or "all" |
 | `page` | today, apps, log or automations |
-| `settings.tab` | general, connections, projects, rules, permissions or about |
+| `settings.tab` | general, connections, projects, jobs, rules, permissions or about |
 | `x.file` | path to the X JSON file |
 | `x.plan.source` | bot, receipt or typed |
 | `x.plan.name` | plan name |

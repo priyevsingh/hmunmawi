@@ -25,6 +25,9 @@ struct SettingsView: View {
             Tab("Projects", systemImage: "square.stack.3d.up", value: "projects") {
                 ProjectsForm().frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
             }
+            Tab("Jobs", systemImage: "switch.2", value: "jobs") {
+                JobSwitchesForm(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 300, idealHeight: 620, maxHeight: .infinity)
+            }
             Tab("Rules", systemImage: "bolt.badge.automatic", value: "rules") {
                 RulesEditor(model: model).frame(minWidth: 1000, idealWidth: 1000, maxWidth: .infinity, minHeight: 420, idealHeight: 620, maxHeight: .infinity)
             }

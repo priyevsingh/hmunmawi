@@ -42,6 +42,9 @@ public struct OwnerConfig: Codable, Sendable, Equatable {
     public var jobsData: String?
     /// The project's maintainer: draft a welcome post into the post bank when a new app joins the Wall of Apps.
     public var wallShoutouts: Bool?
+    /// The JSON switch file your scripts read (Settings → Jobs), inside `hubRoot` (relative) or anywhere (absolute).
+    /// Unset: Hmunmawi looks for `config/hmunmawi-switches.json`, then `config/social_channels.json`, in `hubRoot`.
+    public var switchFile: String?
 
     public init(enabled: Bool = false) { self.enabled = enabled }
 
@@ -108,6 +111,11 @@ public struct OwnerConfig: Codable, Sendable, Equatable {
     public var safariDriverURL: URL? { enabled ? Self.expand(safariDriver) : nil }
     public var claudeGateURL: URL? { enabled ? Self.expand(claudeGateApp) : nil }
     public var jobsDataURL: URL? { enabled ? Self.expand(jobsData) : nil }
+    public var switchFileURL: URL? {
+        guard enabled, let f = switchFile, !f.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        if f.hasPrefix("/") || f.hasPrefix("~") { return Self.expand(f) }
+        return hubURL?.appending(path: f)
+    }
     public var ascConfigURL: URL? {
         guard enabled, let a = ascConfig, !a.isEmpty else { return nil }
         if a.hasPrefix("/") || a.hasPrefix("~") { return Self.expand(a) }

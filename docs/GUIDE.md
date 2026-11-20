@@ -544,6 +544,15 @@ Group apps into a project or add a website (visitors, enquiries, search); the to
 
 </details>
 
+#### 🎚️ Jobs
+**Turn a job or a channel on or off with one tap, no code.**
+
+<details><summary>How it works</summary>
+
+The on/off switches your own scripts read, from a small JSON file in your workspace: each channel (Reddit, Discord, Instagram, YouTube Shorts, X), Instagram details (post suggestions, new carousels, warm-up sessions), "account warmed up" per platform (on = no warm-up steps, only real post ideas), and any other true/false your file has. Each switch has a one-line explanation. Hmunmawi changes only the value you flip, writes the file atomically and keeps every other key and note as it was; your scripts see the change on their next run. Every flip is written to the activity log. No file yet? The tab says how to add one, or press **Choose…**. To stop a whole scheduled Mac job instead, use **Pause** on its row in Automations. File format: [Job switches](PRIVATE-WORKSPACE.md#job-switches).
+
+</details>
+
 #### ⚡ Rules
 **It reacts to events the way you would.**
 

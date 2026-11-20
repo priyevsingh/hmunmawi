@@ -2,7 +2,13 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
-## Unreleased
+## 1.2.0 (build 120), 20 Nov 2026
+
+**New**
+- **Settings → Jobs: one-tap on/off switches for the jobs your scripts run.** Hmunmawi reads a small JSON switch file in your workspace (`config/hmunmawi-switches.json`, else `config/social_channels.json`, found through your workspace folder; or any file you choose) and shows each true/false as a switch with a one-line explanation: each channel (Reddit, Discord, Instagram, YouTube Shorts, X), Instagram details (post suggestions, new carousels, warm-up sessions), "account warmed up" per platform (Reddit, Discord, Instagram), and any other switch your file has (name them with `_labels` and `_help`). Flipping one changes only that value, in place: your `_comment`, unknown keys, order and spacing stay exactly as they were. The file is checked, then written atomically, and each flip is noted in the activity log. A file that isn't valid JSON, or a value that isn't true or false, is left alone and the tab says why; with no file, the tab explains how to add one. Your scripts see the change on their next run, so turning a job off never needs a code change. Pausing a whole scheduled Mac job stays on its row in Automations (… → Pause / Resume). Format and an example reader: [Job switches](docs/PRIVATE-WORKSPACE.md#job-switches).
+- Agents can open the new tab with `hm set key=settings.tab value=jobs`.
+
+Hmunmawi still does everything it did in 1.1.4: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you), publishing, crashes and self-healing, money and offer codes, alerts, AI limits and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 
 **Docs**
 - Gap check of the docs against the code: the capability list now also covers the daily answer, live sales, outreach and mail, the Search health card, share cards, the portal, the Wall of Apps, and install, updates, keys and backups, and says which parts are built in and which come from your own scripts. The private workspace guide adds job lists, a table of hand-off files, the Search health report format and script contract, fifteen workflow recipes (publishing on a schedule, social planning, search health, AI jobs and more) and an optional second AI while the first is paused. New diagrams, each with a plain-text list first: how it fits together, alerts, the morning answer, a workspace feeding the app, AI jobs, social planning, publishing, search health fixes, key recovery after an update, the Wall of Apps, the release gate and live sales. The script feed guide documents card `items`, figure formats and the events that start a fix script. Docs only.

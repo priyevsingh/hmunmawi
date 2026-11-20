@@ -182,7 +182,7 @@ enum AgentSetting: String, CaseIterable {
         case .aiBudget: "number 0-100000 (USD a month)"
         case .project: "project name or id, or \"all\""
         case .page: "today, apps, log or automations"
-        case .settingsTab: "general, connections, projects, rules, permissions or about"
+        case .settingsTab: "general, connections, projects, jobs, rules, permissions or about"
         case .xFile: "path to the X JSON file"
         case .xSafariRead: "true or false (read your own X page through your Safari login every 6 hours)"
         case .xHandle: "your X handle, e.g. yourname"
@@ -207,7 +207,7 @@ enum AgentSetting: String, CaseIterable {
         case .aiBudget: return number(0...100_000)
         case .aiEnabled: return oneOf(["true", "false"])
         case .page: return oneOf(["today", "apps", "log", "automations"])
-        case .settingsTab: return oneOf(["general", "connections", "projects", "rules", "permissions", "about"])
+        case .settingsTab: return oneOf(["general", "connections", "projects", "jobs", "rules", "permissions", "about"])
         case .xPlanSource: return oneOf(["bot", "receipt", "typed"])
         case .liveMode: return oneOf(["daily", "history", "cloudflare"])
         case .webDashboard: return InputCheck.httpsURL(v)?.absoluteString

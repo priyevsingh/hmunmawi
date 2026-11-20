@@ -49,13 +49,13 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 - **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit (and fixes it, then submits, only after you confirm), TestFlight tidy-up, offer codes, featuring nominations, product page tests, and review replies posted only when you press Post.
 - **Live sales:** the next morning, within minutes, or within seconds through a free relay in your own Cloudflare account.
 - **Websites and search:** visitors and AI-bot reads from Cloudflare, Google Search Console and Bing clicks, top searches and pages, a "website down" watch, next steps like searches that have no page yet, and a Search health card with Fix buttons fed by your own monitor script.
-- **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas and an unfollow list; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
+- **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas and an unfollow list; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts; and one-tap switches (Settings → Jobs) that turn each channel, and each account's warm-up suggestions, on or off for your scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
 - **Content publishing:** articles and posts you produce show up as to-dos and as jobs on the Automations map, so you can see what is due, what ran and what failed.
 - **Outreach and mail:** an outreach list with follow-up reminders, and replies matched from your mail for you to confirm.
 - **Crashes and health:** crash-free sessions and freezes from Sentry, failed Mac jobs retried, keys, certificates and domains watched for expiry, and your own fix scripts run when a problem appears.
 - **Money:** payday date, monthly forecast, profit after your costs, AI credits and plan limits, and an export for your accountant.
 - **Alerts:** iMessage, ntfy push and an iPhone and Watch calendar, with quiet hours.
-- **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs, and agents like Claude Code through `hm`. Anything that changes something waits for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
+- **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs (pause or resume any of them), on/off switches for the jobs your scripts run, and agents like Claude Code through `hm`. Anything that changes something waits for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
 - **Share and show:** share cards for posts and stories, your numbers as a web page you host yourself, and the Wall of Apps.
 
 No dashboards to open. Free, open source, and your data stays on your Mac. [Full capability list](docs/CAPABILITIES.md) · [Build your private workspace](docs/PRIVATE-WORKSPACE.md) · [See every add-on](docs/ADD-ONS.md).
@@ -241,6 +241,11 @@ after by it. All of it stays on your Mac.
   its file says.
 - **Take over its own timer** makes Hmunmawi the only clock for that job, so it never runs twice. Hmunmawi keeps
   a copy of the job's file, and switching the routine off (or deleting it) puts the original back.
+- **Settings → Jobs** shows the on/off switches your own scripts read from a small JSON file in your workspace
+  (for example Reddit, Discord, Instagram, YouTube Shorts, X, and "account warmed up" per platform). One tap
+  changes just that value; the rest of the file stays exactly as it was, and your scripts pick it up on their next
+  run. To stop a whole scheduled Mac job, use **Pause** on its row in Automations. [How a workspace exposes its
+  switches](docs/PRIVATE-WORKSPACE.md#job-switches).
 - Hmunmawi starts when you log in and comes back if it crashes. Closing the window keeps routines running;
   quitting asks first.
 
