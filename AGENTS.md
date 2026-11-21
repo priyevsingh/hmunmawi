@@ -138,6 +138,9 @@ Every docs, README, release-note or GitHub description update must check and kee
 
 - [ ] `swift test` passes.
 - [ ] Docs updated if behaviour changed (README, PRIVACY, SECURITY, CHANGELOG, docs/).
+- [ ] Doc pictures: don't retake them for small UI changes (wording, colours, a new button). Retake only a picture
+      that would mislead (its screen is gone or looks completely different); all pictures are refreshed together at
+      milestones (a public launch, 2.0, a big redesign).
 - [ ] No real data, keys or personal paths anywhere in the change.
 - [ ] UI changes checked in light and dark mode, small and full-screen window.
 - [ ] Small commit, short imperative subject (about 70 characters), a body that says why, signed off with
