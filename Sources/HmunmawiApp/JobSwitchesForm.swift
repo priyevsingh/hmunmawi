@@ -18,14 +18,23 @@ struct JobSwitchesForm: View {
 
     /// Jobs Hmunmawi itself runs that act for you or watch your services, switched on and off here as in Automations.
     @State private var builtIn: [MyRoutine] = []
+    /// The kind whose routine form is open (Set up…).
+    @State private var settingUp: RoutineKind?
     static let ownJobKinds: [RoutineKind] = [.xUnfollows, .serviceWatch, .heartbeat, .linkCheck, .pythonCheck]
 
     var body: some View {
         Form {
             Section {
                 ForEach(Self.ownJobKinds.filter { k in !builtIn.contains { $0.does == k.rawValue } }, id: \.self) { k in
-                    LabeledContent(k.title) { Text("Not set up").foregroundStyle(.secondary) }
-                        .help("Off until you add it: Automations → + → \(k.title).")
+                    LabeledContent {
+                        Button("Set up…") { settingUp = k }
+                            .accessibilityIdentifier("jobs.setup.\(k.rawValue)")
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(k.title)
+                            Text("Not set up").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 ForEach(builtIn, id: \.id) { r in
                     Toggle(isOn: Binding(get: { r.off != true }, set: { setOn(r, $0) })) {
@@ -38,7 +47,7 @@ struct JobSwitchesForm: View {
                     .accessibilityIdentifier("switch.routine.\(r.id)")
                 }
             } header: { Text("Run by Hmunmawi") } footer: {
-                Text("Each is off until you add it in Automations → +. X unfollows also stop with the X switch below (or X unfollows (automatic) in your switch file). Nothing here deploys, repairs or posts without your OK.")
+                Text("Each is off until you set it up (here, or in Automations → +). X unfollows also stop with the X switch below (or X unfollows (automatic) in your switch file). Nothing here deploys, repairs or posts without your OK.")
                     .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if let loaded {
@@ -85,6 +94,11 @@ struct JobSwitchesForm: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: Binding(get: { settingUp != nil }, set: { if !$0 { settingUp = nil } })) {
+            if let k = settingUp {
+                NewRoutineForm(kind: k) { reload(); note = "\(k.title) is set up; switch it on or off here." }
+            }
+        }
         .onAppear { reload() }
         .onChange(of: chosen) { reload() }
         .onReceive(tick) { _ in reload() }

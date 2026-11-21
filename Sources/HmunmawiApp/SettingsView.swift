@@ -23,6 +23,9 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .permissions: "lock.shield"; case .publish: "globe"; case .backups: "clock.arrow.circlepath"; case .about: "info.circle"
         }
     }
+    /// The sidebar's groups, in order, the way System Settings separates them (no headings, just a gap):
+    /// the app itself, where numbers come from, what agents and routines may do, sharing and keeping, About.
+    static let groups: [[SettingsPane]] = [[.general, .menubar], [.connections, .projects, .jobs], [.rules, .permissions], [.publish, .backups], [.about]]
     /// Unknown or old values (a remembered tab from another version) open General.
     static func from(_ raw: String) -> SettingsPane { SettingsPane(rawValue: raw) ?? .general }
 }
@@ -41,10 +44,16 @@ struct SettingsView: View {
     var body: some View {
         let pane = SettingsPane.from(tab)
         NavigationSplitView {
-            List(SettingsPane.allCases, selection: Binding(get: { pane }, set: { if let p = $0 { tab = p.rawValue } })) { p in
-                Label(p.title, systemImage: p.symbol)
-                    .tag(p)
-                    .accessibilityIdentifier("settings.tab.\(p.rawValue)")
+            List(selection: Binding(get: { pane }, set: { if let p = $0 { tab = p.rawValue } })) {
+                ForEach(SettingsPane.groups.indices, id: \.self) { g in
+                    Section {
+                        ForEach(SettingsPane.groups[g]) { p in
+                            Label(p.title, systemImage: p.symbol)
+                                .tag(p)
+                                .accessibilityIdentifier("settings.tab.\(p.rawValue)")
+                        }
+                    }
+                }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: Self.sidebarWidth, ideal: Self.sidebarWidth, max: Self.sidebarWidth + 40)

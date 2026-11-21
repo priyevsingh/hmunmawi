@@ -393,6 +393,23 @@ struct RoutinesSheet: View {
     }
 }
 
+/// The routine form for a new routine of one kind, opened from elsewhere (Settings → Jobs → Set up…): the same form
+/// and checks as Automations → +, saved to the same list.
+struct NewRoutineForm: View {
+    let kind: RoutineKind
+    var onSave: () -> Void = {}
+    var body: some View {
+        var r = MyRoutine()
+        r.does = kind.rawValue; r.who = "mac"; r.title = kind.title
+        return RoutineForm(draft: RoutineDraft(r)) { saved in
+            var list = MyRoutines.read()
+            if let i = list.firstIndex(where: { $0.id == saved.id }) { list[i] = saved } else { list.append(saved) }
+            MyRoutines.write(list)
+            onSave()
+        }.buttonStyle(.pill)
+    }
+}
+
 /// What the routine form held when it stepped aside for another sheet, so it comes back as it was left.
 final class RoutineDraft {
     var routine: MyRoutine; var time: Date?; var proof: String?

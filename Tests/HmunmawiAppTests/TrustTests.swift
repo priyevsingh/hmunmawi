@@ -195,12 +195,15 @@ import Testing
         #expect(p.allows(.messages, agent: "Claude Code"))
     }
 
-    @Test func askStillWinsInSteroidModeAndUnknownNamesGetOnlyTheGeneralRules() {
+    @Test func askStillWinsInSteroidModeAndUnverifiedCallersAlwaysAsk() {
         let (p, _, _) = policy()
         p.setFullTrust(for: 3600)
         p.setRule(agent: "Claude Code", .spending, "ask")
         #expect(p.allows(.spending) && p.allows(.spending, agent: "Someone Else") && !p.allows(.spending, agent: "Claude Code"))
-        #expect(!p.allows(.spending, agent: "Claude Code (unverified)") == false)    // an unverified name has no rules of its own
+        // Dropping the badge doesn't dodge the ask: once badges exist, an unbadged caller always waits.
+        #expect(!p.allows(.spending, agent: "Claude Code" + AgentPolicy.unverifiedSuffix))
+        p.set(.messages, true)
+        #expect(!p.allows(.messages, agent: "My Bot" + AgentPolicy.unverifiedSuffix))
     }
 
     @Test func rulesAreSignedSoOutsideEditsAreNotTrusted() {

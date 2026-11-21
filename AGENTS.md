@@ -91,7 +91,7 @@ and asks before it acts. Users' guide: [README.md](README.md).
   `ExtrasSection.swift` and a test in `ExtrasTests`. Order: owner settings file > Settings > workspace file.
 - **A setting only one person can have** (it runs a program they name, needs a build made on their Mac, or keeps
   keys outside the Keychain): put it behind an `OwnerConfig` field (`owner.json` in the app's data folder, off unless
-  it says `"enabled": true`), list it in `Extras.ownerOnly` with why, and never make it agent-settable. Never put
+  it says `"enabled": true`), set `ownerOnly: true` on its `ExtraItem` in `Extras.items()` and say why in its `note`, and never make it agent-settable. Never put
   personal paths or names in code.
 
 ## Ground rules

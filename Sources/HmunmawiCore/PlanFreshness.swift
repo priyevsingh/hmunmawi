@@ -46,7 +46,7 @@ public enum PlanFreshness {
         return out
     }
 
-    /// The live version for a plan step's app ("Body Vitals" also matches "Body Vitals: Health Widgets").
+    /// The live version for a plan step's app ("Pocket Garden" also matches "Pocket Garden: Plant Diary").
     public static func live(for app: String?, in versions: [String: String]) -> String? {
         guard let app, !app.isEmpty else { return nil }
         return versions[app] ?? versions.first { $0.key.hasPrefix(app + ":") || app.hasPrefix($0.key + ":") }?.value

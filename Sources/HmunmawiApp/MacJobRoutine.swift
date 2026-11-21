@@ -16,6 +16,14 @@ enum MacJobRoutine {
         return FileManager.default.fileExists(atPath: u.path) ? u : nil
     }
 
+    /// One of your own jobs: its name starts with one of the Mac jobs prefixes (3+ characters each), and it is
+    /// never one of Apple's (com.apple.*), whatever the prefixes say.
+    static func isOwnJob(_ label: String, prefixes: String) -> Bool {
+        guard !label.lowercased().hasPrefix("com.apple.") else { return false }
+        let list = prefixes.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count >= 3 }
+        return list.contains { label.hasPrefix($0) }
+    }
+
     /// "com.example.mail-watch" -> "mail-watch": the part a person recognises.
     static func shortName(_ label: String) -> String {
         let parts = label.split(separator: ".")

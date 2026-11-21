@@ -51,8 +51,9 @@ public struct OwnerConfig: Codable, Sendable, Equatable {
     // MARK: Reading
 
     /// Where `owner.json` lives: the app's data folder (a test profile has its own, so it never sees the owner's).
+    /// `HMUNMAWI_OWNER_CONFIG` points elsewhere only in a test profile; the real app always reads its own folder.
     public static var fileURL: URL {
-        if let p = ProcessInfo.processInfo.environment["HMUNMAWI_OWNER_CONFIG"], !p.isEmpty {
+        if let p = TestProfile.testOnlyEnv("HMUNMAWI_OWNER_CONFIG") {
             return URL(fileURLWithPath: (p as NSString).expandingTildeInPath)
         }
         return URL.applicationSupportDirectory.appending(path: TestProfile.supportFolderName, directoryHint: .isDirectory)

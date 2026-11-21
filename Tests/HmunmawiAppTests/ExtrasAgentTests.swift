@@ -23,7 +23,7 @@ import Testing
             #expect(AgentSetting(rawValue: k)?.action == .connections, "\(k)")
         }
         #expect(AgentSetting(rawValue: "extras.ai_pause_card")?.action == nil)
-        #expect(AgentSetting(rawValue: "extras.time_zone")?.action == nil)
+        #expect(AgentSetting(rawValue: "extras.time_zone")?.action == .routines)   // moves every routine's time
     }
 
     @Test func everyExtraKeyHasItsOwnDefault() {

@@ -66,11 +66,61 @@ import Testing
     }
 }
 
+@Suite struct PythonRepairGuardTests {
+    @Test func agentEditDropsAutomaticRepair() {
+        #expect(Routines.agentEdited(["repair": "auto", "folders": "/w/.venv"])["repair"] == "ask")
+        #expect(Routines.agentEdited(["repair": "ask"])["repair"] == "ask")
+        #expect(Routines.agentEdited(["url": "https://example.com"])["repair"] == nil)
+    }
+
+    @MainActor @Test func foldersMustBeVenvs() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hm-venv-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let r = Routines.shared
+        let args = ["title": "Py", "does": "python-check", "folders": dir.path]
+        #expect(r.agentChange("routine-add", args, dryRun: true)["ok"] as? Bool == false)   // bin/ only: not a venv
+        FileManager.default.createFile(atPath: dir.appendingPathComponent("pyvenv.cfg").path, contents: Data("home = /x\n".utf8))
+        #expect(r.agentChange("routine-add", args, dryRun: true)["ok"] as? Bool == true)
+    }
+}
+
 @Suite struct PythonVenvScanTests {
     @Test func runToolReportsExitAndTimeout() async {
         let ok = await Routines.runTool(["/bin/echo", "hi"], timeout: 5)
         #expect(ok.code == 0 && ok.output.contains("hi"))
         let slow = await Routines.runTool(["/bin/sleep", "5"], timeout: 0.5)
         #expect(slow.code == -2)
+    }
+}
+
+@Suite struct WebGuardTests {
+    @Test func onlyPublicWebAddresses() {
+        #expect(WebGuard.allowed(URL(string: "https://example.com/a")!))
+        #expect(WebGuard.allowed(URL(string: "http://example.com/a")!))
+        #expect(!WebGuard.allowed(URL(string: "http://127.0.0.1:8080/")!))
+        #expect(!WebGuard.allowed(URL(string: "http://192.168.1.10/admin")!))
+        #expect(!WebGuard.allowed(URL(string: "https://printer.local/")!))
+        #expect(!WebGuard.allowed(URL(string: "file:///etc/hosts")!))
+        #expect(!WebGuard.allowed(URL(string: "https://user@example.com/")!))
+    }
+
+    @Test func internalAddressesAreNeverFetched() async {
+        let r = await Routines.fetch(URL(string: "http://127.0.0.1:9/")!)
+        #expect(r.status == nil && r.body == nil && !r.noSuchHost)
+    }
+
+    @Test func aRedirectToThisMacIsNotFollowed() async {
+        var req = URLRequest(url: URL(string: "https://example.com/")!)
+        req.url = URL(string: "http://10.0.0.1/")
+        let next = await WebGuard.shared.urlSession(WebGuard.session, task: WebGuard.session.dataTask(with: URL(string: "https://example.com/")!),
+                                                    willPerformHTTPRedirection: HTTPURLResponse(url: URL(string: "https://example.com/")!, statusCode: 302, httpVersion: nil, headerFields: nil)!,
+                                                    newRequest: req)
+        #expect(next == nil)
+        req.url = URL(string: "https://www.example.com/")
+        let ok = await WebGuard.shared.urlSession(WebGuard.session, task: WebGuard.session.dataTask(with: URL(string: "https://example.com/")!),
+                                                  willPerformHTTPRedirection: HTTPURLResponse(url: URL(string: "https://example.com/")!, statusCode: 302, httpVersion: nil, headerFields: nil)!,
+                                                  newRequest: req)
+        #expect(ok?.url?.host == "www.example.com")
     }
 }

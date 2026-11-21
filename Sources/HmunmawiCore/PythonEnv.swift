@@ -22,6 +22,13 @@ public enum PythonEnv {
         return exists(root + "/pyvenv.cfg") || [".venv", "venv", "env", ".env"].contains(name) ? root : nil
     }
 
+    /// Whether a folder you name is a venv: it has the pyvenv.cfg every venv gets. A folder that only has a
+    /// `bin/` (~/go, ~/.cargo, ~/.local) is not one, so it is never shown as broken or repaired.
+    public static func isVenv(_ root: String, exists: (String) -> Bool) -> Bool {
+        let p = (root as NSString).standardizingPath
+        return p.hasPrefix("/") && p != "/" && exists(p + "/pyvenv.cfg")
+    }
+
     /// Interpreter paths named in a command: the program itself and any argument that is one.
     public static func interpreters(program: String, args: [String]) -> [String] {
         ([program] + args).filter { ($0 as NSString).lastPathComponent.wholeMatch(of: /python[0-9.]*/) != nil && $0.hasPrefix("/") }

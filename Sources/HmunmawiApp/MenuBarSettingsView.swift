@@ -107,15 +107,17 @@ struct OwnerExtrasSection: View {
         let o = OwnerConfig.current
         if o.isOn {
             Section {
-                let on: [(String, Bool)] = [("Your key folder and hub in Find my key", o.keyFolderURL != nil || o.hubURL != nil),
-                                            ("AI job pause card", o.showsAIPause), ("Zoho Mail reader", o.offersZoho),
-                                            ("X numbers from your bot's file", o.usesXFileFeed),
-                                            ("Keychain-prompt watcher in your builds", o.wantsKeychainWatcher),
-                                            ("Fixed time zone \(o.timeZone ?? "")", o.timeZone != nil)]
+                // Only what a normal install can't have; the folders, AI pause card, Zoho reader, X file and time zone
+                // it sets show under Your extras below (marked "from your owner settings file").
+                let on: [(String, Bool)] = [("Keychain-prompt watcher in your builds", o.wantsKeychainWatcher),
+                                            ("Keys also kept in files (~/.config/hmunmawi/keys)", true),
+                                            ("Safari steps through your own program", o.safariDriverURL != nil),
+                                            ("AI job policy from your own job data", o.jobsDataURL != nil),
+                                            ("Wall of Apps shout-outs", o.wantsWallShoutouts)]
                 ForEach(on.filter(\.1), id: \.0) { Label($0.0, systemImage: "checkmark") }
             } header: { Text("Owner extras") } footer: {
-                Text("From your owner settings file. New installs don't have this file, so none of these show for anyone else.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Text("From your owner settings file; only one person can have these. New installs don't have this file. What it sets among Your extras is marked there.")
+                    .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

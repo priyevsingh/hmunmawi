@@ -102,16 +102,26 @@ extension Routines {
 
     static func linkStateURL(_ id: String) -> URL { URL.hmSupport.appending(path: "link-check-\(id).json") }
 
+    /// One web read for link checks and outreach checks. Never calls this Mac or its own network (also not through a
+    /// redirect), stops reading at `maxBytes` (a bigger page gives no body) and gives up after 30 seconds in all.
     nonisolated static func fetch(_ url: URL, method: String = "GET", timeout: TimeInterval = 15, maxBytes: Int = 2_000_000) async -> (status: Int?, body: String?, final: URL?, noSuchHost: Bool) {
+        guard WebGuard.allowed(url) else { return (nil, nil, nil, false) }
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = method
         req.setValue("Mozilla/5.0 (Macintosh) Hmunmawi link check", forHTTPHeaderField: "User-Agent")
         if method == "GET", maxBytes == 0 { req.setValue("bytes=0-1023", forHTTPHeaderField: "Range") }   // only the answer matters, not a big file
         do {
-            let (data, resp) = try await URLSession(configuration: .ephemeral).data(for: req)
+            let (bytes, resp) = try await WebGuard.session.bytes(for: req, delegate: WebGuard.shared)
             let http = resp as? HTTPURLResponse
-            let body = method == "GET" && data.count <= maxBytes ? String(decoding: data, as: UTF8.self) : nil
-            return (http?.statusCode, body, http?.url, false)
+            guard method == "GET", maxBytes > 0 else { bytes.task.cancel(); return (http?.statusCode, nil, http?.url, false) }
+            if let length = http?.expectedContentLength, length > Int64(maxBytes) { bytes.task.cancel(); return (http?.statusCode, nil, http?.url, false) }
+            var data = Data()
+            data.reserveCapacity(min(maxBytes, 256_000))
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > maxBytes { bytes.task.cancel(); return (http?.statusCode, nil, http?.url, false) }
+            }
+            return (http?.statusCode, String(decoding: data, as: UTF8.self), http?.url, false)
         } catch let e as URLError {
             return (nil, nil, nil, e.code == .cannotFindHost || e.code == .dnsLookupFailed)
         } catch {
@@ -128,7 +138,7 @@ extension Routines {
         if let body = first.body, first.status == 200 {
             if LinkCheck.isSitemapIndex(body) {
                 for child in LinkCheck.sitemapLocations(body).prefix(5) {
-                    guard let u = URL(string: child), let b = await fetch(u).body else { continue }
+                    guard let u = URL(string: child), WebGuard.allowed(u), let b = await fetch(u).body else { continue }
                     locs += LinkCheck.sitemapLocations(b)
                     if locs.count >= max { break }
                 }
@@ -137,7 +147,7 @@ extension Routines {
             }
         }
         let own = LinkCheck.site(start.host)
-        let pages = locs.compactMap(URL.init(string:)).filter { LinkCheck.site($0.host) == own }
+        let pages = locs.compactMap(URL.init(string:)).filter { LinkCheck.site($0.host) == own && WebGuard.allowed($0) }
         return pages.isEmpty ? [start] : Array(pages.prefix(max))
     }
 
@@ -170,7 +180,7 @@ extension Routines {
             }
             for (page, body) in bodies {
                 guard let body else { continue }
-                for l in LinkCheck.outside(LinkCheck.links(in: body, base: page), ownHosts: own) where found[l.absoluteString] == nil {
+                for l in LinkCheck.outside(LinkCheck.links(in: body, base: page), ownHosts: own) where found[l.absoluteString] == nil && WebGuard.allowed(l) {
                     found[l.absoluteString] = page.absoluteString; order.append(l)
                 }
             }
@@ -242,7 +252,7 @@ extension Routines {
             for a in argv where a.hasSuffix(".py") || a == program { if let s = shebang(a) { add(s, job.label) } }
         }
         for f in (extra ?? "").split(separator: ",").map({ ($0.trimmingCharacters(in: .whitespaces) as NSString).expandingTildeInPath }) where !f.isEmpty {
-            if exists(f + "/pyvenv.cfg") || exists(f + "/bin") { used[f, default: []].append("you") }
+            if PythonEnv.isVenv(f, exists: exists) { used[f, default: []].append("you") }
         }
         return used.keys.sorted().map { root in
             VenvRow(root: root, usedBy: Array(Set(used[root] ?? [])).sorted(),
@@ -300,7 +310,7 @@ extension Routines {
                 guard !told.contains(row.root) else { continue }
                 let lock = FileManager.default.fileExists(atPath: Self.lockURL(row.root).path) ? Self.lockURL(row.root).path : nil
                 if r.params?["repair"] == "auto" {
-                    let fixed = await repairPython(row.root)
+                    let fixed = await repairPython(row.root, actor: "routine")
                     lines.append(fixed.ok ? "🔧 Repaired \(row.root) (\(why)); used by \(row.usedBy.joined(separator: ", ")). \(fixed.message)"
                                           : "⚠️ \(row.root) is broken (\(why)) and the repair failed: \(fixed.message)")
                     if !fixed.ok { told.insert(row.root) }
@@ -319,8 +329,9 @@ extension Routines {
 
     /// Rebuilds a broken venv: the old folder is kept beside it (<venv>.broken-<day>), a fresh one is made with the
     /// current python3 and the saved package list is installed. Only from your tap or an approved request.
-    func repairPython(_ root: String) async -> (ok: Bool, message: String) {
+    func repairPython(_ root: String, actor: String = "you") async -> (ok: Bool, message: String) {
         guard let python3 = Self.python3 else { return (false, "No python3 found on this Mac (install it with Homebrew first).") }
+        guard PythonEnv.isVenv(root, exists: { FileManager.default.fileExists(atPath: $0) }) else { return (false, "\(root) is not a Python environment (no pyvenv.cfg); nothing was changed.") }
         guard case .broken = PythonEnv.health(root: root, exists: { FileManager.default.fileExists(atPath: $0) },
                                               read: { try? String(contentsOfFile: $0, encoding: .utf8) }) else { return (false, "\(root) works; nothing to repair.") }
         let lockPath = Self.lockURL(root).path
@@ -331,7 +342,7 @@ extension Routines {
             let r = await Self.runTool(step, timeout: step.contains("pip") ? 900 : 120)
             guard r.code == 0 else { return (false, "\((step[0] as NSString).lastPathComponent) failed: \(r.output.suffix(300))") }
         }
-        try? await model?.liveStore?.appendAudit(actor: "you", action: "python.repaired", subject: root)
+        try? await model?.liveStore?.appendAudit(actor: actor, action: "python.repaired", subject: root)
         return (true, lock == nil ? "Made a fresh one; no saved package list, so install its packages again." : "Packages put back from the saved list.")
     }
 }

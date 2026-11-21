@@ -505,7 +505,7 @@ For 1 hour, until tomorrow, or until you switch them on. *Send a test notificati
 > [!TIP]
 > **What you get:** it works your way: your currency, your quiet hours, your AI (or none), your backups.
 
-Settings (⌘,) lists its panes in a sidebar on the left, like System Settings: General, Menu bar, Connections, Projects, Jobs, Rules, Permissions, Publish, Backups and About. Every pane is always in view, at any window size.
+Settings (⌘,) lists its panes in a sidebar on the left, grouped like System Settings: General and Menu bar; Connections, Projects and Jobs; Rules and Permissions; Publish and Backups; About. Every pane is always in view, at any window size.
 
 #### 🧩 General
 **Make it behave exactly the way you like.**
@@ -557,7 +557,7 @@ Group apps into a project or add a website (visitors, enquiries, search); the to
 
 The on/off switches your own scripts read, from a small JSON file in your workspace: each channel (Reddit, Discord, Instagram, YouTube Shorts, X), Instagram details (post suggestions, new carousels, warm-up sessions), "account warmed up" per platform (on = no warm-up steps, only real post ideas), and any other true/false your file has. Each switch has a one-line explanation. Hmunmawi changes only the value you flip, writes the file atomically and keeps every other key and note as it was; your scripts see the change on their next run. Every flip is written to the activity log. No file yet? The tab says how to add one, or press **Choose…**. To stop a whole scheduled Mac job instead, use **Pause** on its row in Automations. File format: [Job switches](PRIVATE-WORKSPACE.md#job-switches).
 
-At the top, **Run by Hmunmawi** lists the jobs Hmunmawi itself runs for you: X unfollows (automatic), Watch my services, Mac-alive heartbeat (Sentry), Check links on my site and Check my workspace Python. Each shows "Not set up" until you add it in Automations → +, then an on/off switch with when it runs and its last result. Nothing there deploys, repairs or posts without your OK.
+At the top, **Run by Hmunmawi** lists the jobs Hmunmawi itself runs for you: X unfollows (automatic), Watch my services, Mac-alive heartbeat (Sentry), Check links on my site and Check my workspace Python. Each shows "Not set up" with a **Set up…** button (the same form as Automations → +) until you add it, then an on/off switch with when it runs and its last result. Nothing there deploys, repairs or posts without your OK.
 
 </details>
 
@@ -798,7 +798,7 @@ Each runs as a separate sandboxed add-on that never sees your keys. Write your o
 > **What you get:** your AI coding agent can check your numbers and do the busywork for you, but nothing changes without your OK.
 
 Claude Code, Cursor and other agents use Hmunmawi through the `hm` command or its MCP server, under the same
-approval rules as you. Settings → Rules → Agents chooses what an agent may do without asking, and gives it a badge.
+approval rules as you. Settings → Rules → Agents chooses what an agent may do without asking, and gives it a badge. Once any badge exists, an agent without one shows as unverified and always waits for your OK.
 Every command: [hm commands](HM-COMMANDS.md). Notes for coding agents: [AGENTS.md](../AGENTS.md).
 
 ![Rules: agents](images/guide/set-rules-00.png)

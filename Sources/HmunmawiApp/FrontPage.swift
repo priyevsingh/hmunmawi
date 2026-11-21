@@ -143,7 +143,8 @@ struct FrontPage: View {
             }
             Text(first).font(.largeTitle).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             if let second {
-                Kit.glow(second, tint: mood).font(.title2)
+                // A worry never glows in the day's happy colour.
+                Kit.glow(second, tint: todays?.lane == .worry ? Brand.caution : mood).font(.title2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -242,24 +243,45 @@ struct RollingNumber: View {
     @Environment(\.sceneActive) private var sceneActive
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// What the number is, said with its change ("14-day earnings, −₹520 since last look"), so the change can't be
+    /// read as contradicting a sentence about something else.
+    var deltaLabel: String? = nil
+
+    private func delta(_ d: Double) -> some View {
+        Text("\(deltaLabel.map { "\($0), " } ?? "")\(d > 0 ? "+" : "−")\(format(abs(d))) since last look")
+            .font(.callout.weight(.semibold)).foregroundStyle(d > 0 ? Brand.good : Brand.caution)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     var body: some View {
         let before = LastSeen.value(scoped)
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(format(shown ?? before ?? value))
-                .font(.system(size: 44, weight: .bold)).monospacedDigit()
-                .foregroundStyle(Kit.vibrant(tint))
-                .contentTransition(.numericText(value: shown ?? value))
-                .lineLimit(1).fixedSize()
-            if let before, before != value {
-                let d = value - before
-                Text("\(d > 0 ? "+" : "−")\(format(abs(d))) since last look")
-                    .font(.callout.weight(.semibold)).foregroundStyle(d > 0 ? Brand.good : Brand.caution)
-                    .fixedSize()
-            }
+        // Side by side when it fits, else the change goes under the number (never cut off).
+        ViewThatFits(in: .horizontal) {
+            line(before, stacked: false)
+            line(before, stacked: true)
         }
         .onAppear { roll() }
         .onChange(of: sceneActive) { _, on in if on { roll() } }
         .onChange(of: value) { _, _ in roll() }
+    }
+
+    @ViewBuilder private func line(_ before: Double?, stacked: Bool) -> some View {
+        let number = Text(format(shown ?? before ?? value))
+            .font(.system(size: 44, weight: .bold)).monospacedDigit()
+            .foregroundStyle(Kit.vibrant(tint))
+            .contentTransition(.numericText(value: shown ?? value))
+            .lineLimit(1).fixedSize()
+        if stacked {
+            VStack(alignment: .leading, spacing: 2) {
+                number
+                if let before, before != value { delta(value - before) }
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                number
+                if let before, before != value { delta(value - before).fixedSize() }
+            }
+        }
     }
 
     /// Each project remembers its own "last look", so switching projects never shows a false change.
@@ -361,7 +383,8 @@ private struct MoneyStory: View {
                     // Nothing earned and no report yet: no giant 0, the sentence says it.
                     number: proceeds > 0 || portal?[path: "proceeds_usd"] != nil
                         ? RollingNumber(key: "money.\(days)d.\(code)", value: proceeds.rounded(),
-                                        format: { Money.text($0, code, decimals: 0) }, tint: Brand.Category.money) : nil,
+                                        format: { Money.text($0, code, decimals: 0) }, tint: Brand.Category.money,
+                                        deltaLabel: "\(days)-day earnings") : nil,
                     trend: facts.subscribers, trendLabel: "Active subscribers, last 4 weeks",
                     footer: proceeds > 0 || portal?[path: "proceeds_usd"] != nil
                         ? "Earned in the last \(days) days, after Apple's cut." + MRRSummary.footer(model.mrr)
@@ -421,16 +444,31 @@ private struct HealthStory: View {
         let trend = model.crashTrend
         let releases = ComingSoon.releases(model).prefix(2)
         StoryColumn(symbol: "heart.text.square.fill", title: "Health", tint: Brand.Category.users,
-                    sentence: model.truth.dot == .good || (model.isDemo && problems.isEmpty) ? "Everything is running fine." : problems.isEmpty ? model.truth.sentence : problems.prefix(2).map { "\($0.title): \($0.value)" }.joined(separator: " · ") + (problems.count > 2 ? " · +\(problems.count - 2) more" : ""),
+                    // The sentence says what the big number is; anything that needs a look goes in the footnote.
+                    sentence: trend.last != nil ? (problems.isEmpty ? "Crash-free sessions; everything else runs fine." : "Crash-free sessions; \(problems.count == 1 ? "1 thing" : "\(problems.count) things") to look at, listed below.")
+                        : model.truth.dot == .good || (model.isDemo && problems.isEmpty) ? "Everything is running fine." : problems.isEmpty ? model.truth.sentence : problemLine(problems),
                     number: trend.last.map { RollingNumber(key: "health.crashfree", value: ($0.1 * 10).rounded() / 10,
                                                            format: { String(format: "%.1f%%", $0) }, tint: Brand.Category.users) },
                     trend: trend, trendLabel: "Crash-free sessions (Sentry), lowest app each day",
-                    footer: releases.isEmpty ? nil : releases.map { "\([$0.app, $0.version].compactMap { $0 }.joined(separator: " ")): \($0.status.prefix(1).lowercased() + $0.status.dropFirst())" }.joined(separator: " · ") + ".") {
+                    footer: footer(problems: trend.last != nil ? problems : [], releases: Array(releases))) {
             CardHeader(symbol: "heart.text.square.fill", title: "Health", tint: Brand.Category.users)
             HealthList(model: model).padding(20).contentCard(cornerRadius: 22)
             ComingSoon(model: model)
             CustomSections(model: model, page: "health")
         }
+    }
+
+    private func problemLine(_ problems: [HealthCheck.Check]) -> String {
+        problems.prefix(2).map { "\($0.title): \($0.value)" }.joined(separator: " · ") + (problems.count > 2 ? " · +\(problems.count - 2) more" : "")
+    }
+
+    private func footer(problems: [HealthCheck.Check], releases: [ComingSoon.Release]) -> String? {
+        var parts: [String] = []
+        if !problems.isEmpty { parts.append(problemLine(problems) + ".") }
+        if !releases.isEmpty {
+            parts.append(releases.map { "\([$0.app, $0.version].compactMap { $0 }.joined(separator: " ")): \($0.status.prefix(1).lowercased() + $0.status.dropFirst())" }.joined(separator: " · ") + ".")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 }
 

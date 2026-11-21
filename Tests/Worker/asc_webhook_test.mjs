@@ -30,4 +30,14 @@ r = await worker.fetch(new Request("https://x/outbox", { headers: { authorizatio
 check("purchase outbox untouched (no webhook items)", (await r.json()).items.length === 0);
 r = await worker.fetch(new Request("https://x/", {}), env);
 check("root still answers", r.status === 200);
+
+// Live sales (/apple): nothing is taken without the app list, and a body over 64 KB is refused before it's read as JSON.
+r = await worker.fetch(new Request("https://x/apple", { method: "POST", body: JSON.stringify({ signedPayload: "x" }) }), env);
+check("/apple without BUNDLE_IDS -> 503", r.status === 503);
+r = await worker.fetch(new Request("https://x/apple", { method: "POST", body: "x".repeat(65 * 1024) }), { ...env, BUNDLE_IDS: "com.example.app" });
+check("/apple over 64 KB -> 413", r.status === 413);
+r = await worker.fetch(new Request("https://x/apple", { method: "POST", body: "{not json" }), { ...env, BUNDLE_IDS: "com.example.app" });
+check("/apple bad JSON -> 400", r.status === 400);
+r = await worker.fetch(new Request("https://x/apple", { method: "POST", body: JSON.stringify({ signedPayload: "a.b.c" }) }), { ...env, BUNDLE_IDS: "com.example.app" });
+check("/apple unsigned payload refused", r.status >= 400 && r.status < 500);
 process.exit(ok ? 0 : 1);

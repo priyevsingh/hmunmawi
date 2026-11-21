@@ -5,7 +5,7 @@ How every X feature works, what it reads, what it decides and where its limits a
 
 **Ground rules, everywhere:** Hmunmawi never posts, replies, likes or follows. It unfollows only if you add the opt-in
 **X unfollows (automatic)** routine yourself, and then only by clicking the profile's own button in your signed-in
-Safari ([below](#automatic-unfollows-does-x-unfollows)). It never calls X's paid API and never calls X's private API
+Safari ([below](#automatic-unfollows-doesx-unfollows)). It never calls X's paid API and never calls X's private API
 from your session. It reads files Grok Bot saves, or pages X already loaded in your own signed-in Safari, and hands
 you checked suggestions.
 

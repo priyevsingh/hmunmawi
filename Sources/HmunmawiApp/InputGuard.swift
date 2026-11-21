@@ -120,6 +120,28 @@ enum InputCheck {
     }
 }
 
+/// Web reads the app makes for checks (links, outreach pages): http(s) to a public host only, checked again on every
+/// redirect, and a 30-second limit for the whole read.
+final class WebGuard: NSObject, URLSessionTaskDelegate, Sendable {
+    static let shared = WebGuard()
+    static let session: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.timeoutIntervalForResource = 30
+        return URLSession(configuration: c)
+    }()
+
+    static func allowed(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host, !host.isEmpty, url.user == nil else { return false }
+        return !InputCheck.isInternalHost(host)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        request.url.map(Self.allowed) == true ? request : nil
+    }
+}
+
 /// An error in words the owner can read: the add-on or database message when there is one, never a Swift dump.
 func plainError(_ error: any Error) -> String {
     if let w = error as? WireError { return w.message }

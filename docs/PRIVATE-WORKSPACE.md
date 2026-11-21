@@ -156,7 +156,7 @@ read at the start of each run; Hmunmawi shows each value as a switch in **Settin
   **Choose…** in Settings → Jobs.
 - **What shows:** every top-level true/false, and every true/false one level down (`"warmed_up": {"reddit": true}`).
   Keys starting with `_` are notes. Well-known keys get a plain name and explanation: `reddit`, `discord`,
-  `instagram`, `youtube_shorts`, `x` (a channel; a missing key means on), `instagram_drafts`,
+  `instagram`, `youtube_shorts`, `x` (a channel; a missing key means on), `x_unfollows` (Hmunmawi's automatic unfollows; a missing key means on), `instagram_drafts`,
   `new_instagram_carousels`, `instagram_warmup`, and `warmed_up.reddit` / `.discord` / `.instagram` (on = the account
   is already warmed up, so no warm-up steps; a missing key means off). Any other key shows as it is named; give it
   your own words with `"_labels"` and `"_help"`.

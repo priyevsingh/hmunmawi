@@ -353,14 +353,14 @@ import Testing
         return (p.terminationStatus, String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
     }
 
-    static let dr = #"designated => identifier "io.github.priyevsingh.Hmunmawi" and anchor apple generic and certificate leaf[subject.OU] = CYPYNR3525"#
+    static let dr = #"designated => identifier "io.github.priyevsingh.Hmunmawi" and anchor apple generic and certificate leaf[subject.OU] = ABCDE12345"#
 
     @Test func sameRequirementPasses() throws {
         #expect(try Self.run(Self.dr + "\n", Self.dr + "\n").code == 0)
     }
 
     @Test func differentTeamOrIdentifierFails() throws {
-        let otherTeam = Self.dr.replacingOccurrences(of: "CYPYNR3525", with: "YP7C482RSY")
+        let otherTeam = Self.dr.replacingOccurrences(of: "ABCDE12345", with: "ZYXWV98765")
         let r = try Self.run(otherTeam, Self.dr)
         #expect(r.code == 1 && r.err.contains("DIFFERENT"))
         let otherId = Self.dr.replacingOccurrences(of: "io.github.priyevsingh.Hmunmawi", with: "io.example.Other")

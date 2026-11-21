@@ -636,6 +636,13 @@ final class Routines {
 
     // MARK: Agents (hm routine-…): the same list and checks as the routine form; changes are signed by the app
 
+    /// Params after an agent's edit: an owner's automatic Python repair goes back to asking.
+    nonisolated static func agentEdited(_ p: [String: String]) -> [String: String] {
+        var p = p
+        if p["repair"] == "auto" { p["repair"] = "ask" }
+        return p
+    }
+
     func agentChange(_ command: String, _ args: [String: String], dryRun: Bool = false) -> [String: Any] {
         var list = MyRoutines.read()
         let id = InputRule.identifier.clean(args["id"] ?? "")
@@ -808,7 +815,7 @@ final class Routines {
             }
             if let v = args["folders"] {
                 let list = v.split(separator: ",").map { ($0.trimmingCharacters(in: .whitespaces) as NSString).expandingTildeInPath }
-                guard list.count <= 20, list.allSatisfy({ $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) }) else { return fail("folders is a comma-separated list of existing venv folders.") }
+                guard list.count <= 20, list.allSatisfy({ $0.hasPrefix("/") && PythonEnv.isVenv($0, exists: { FileManager.default.fileExists(atPath: $0) }) }) else { return fail("folders is a comma-separated list of existing venv folders (each with a pyvenv.cfg).") }
                 p["folders"] = list.joined(separator: ",")
             }
             if let src = args["source"] {
@@ -850,7 +857,9 @@ final class Routines {
                 p["cap"] = String(v)
             }
             if let l = args["label"] {
-                guard MacJobRoutine.plist(l) != nil else { return fail("label must be one of your Mac jobs; hm status lists them.") }
+                guard MacJobRoutine.plist(l) != nil, MacJobRoutine.isOwnJob(l, prefixes: model?.value("prefixes", for: "macjobs") ?? "") else {
+                    return fail("label must be one of your Mac jobs (its name starts with your Mac jobs prefixes); hm status lists them.")
+                }
                 p["label"] = l
             }
             if let v = args["takeover"] {
@@ -862,6 +871,9 @@ final class Routines {
                 guard !n.isEmpty, n.allSatisfy({ (0...365).contains($0) }) else { return fail("warn is days before expiry, like 30,7,1.") }
                 p["days"] = n.map(String.init).joined(separator: ",")
             }
+            // Automatic Python repair is the owner's choice for the folders they checked; any agent edit drops it
+            // back to asking, so an agent can't point an automatic repair at other folders.
+            p = Self.agentEdited(p)
             r.params = p.isEmpty ? nil : p
             if let v = args["done"] {
                 guard ["0", "1", "true", "false"].contains(v) else { return fail("done is 1 (tell me each time it runs) or 0.") }

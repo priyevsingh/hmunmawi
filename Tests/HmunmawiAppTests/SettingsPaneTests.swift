@@ -12,6 +12,12 @@ import Testing
         #expect(SettingsPane.allCases.allSatisfy { !$0.title.isEmpty && !$0.symbol.isEmpty })
     }
 
+    /// The sidebar's groups hold every pane exactly once, in the same order as the list.
+    @Test func groupsCoverEveryPaneOnceInOrder() {
+        #expect(SettingsPane.groups.flatMap { $0 } == SettingsPane.allCases)
+        #expect(SettingsPane.groups.allSatisfy { !$0.isEmpty })
+    }
+
     @Test func agentsCanOpenEveryPane() {
         for pane in SettingsPane.allCases {
             #expect(AgentSetting.settingsTab.validate(pane.rawValue) == pane.rawValue)

@@ -17,7 +17,7 @@ public struct UserExtras: Codable, Sendable, Equatable {
     public var reposFolder: String?
     /// Show the AI job pause card (Today and the menu bar) for your own AI runner.
     public var aiPauseCard: Bool?
-    /// Offer the Zoho Mail (Safari) reader in Settings → Connections → Mail.
+    /// Offer the Zoho Mail (Safari) reader in Settings → Connections → Outreach replies.
     public var zohoMail: Bool?
     /// Your X numbers file (workspace file only; Settings uses `x.file`). Relative paths are inside the workspace.
     public var xFile: String?
@@ -177,7 +177,7 @@ public struct Extras: Sendable {
             ExtraItem(id: "extras.ai_pause_card", title: "AI job pause card", on: ai.on, value: nil, source: ai.source,
                       ownerOnly: ai.source == .owner, note: "Shows when your own AI jobs are paused (Today and the menu bar). Your runner asks with hm ai-pause-check."),
             ExtraItem(id: "extras.zoho_mail", title: "Zoho Mail reader (Safari)", on: zo.on, value: nil, source: zo.source,
-                      ownerOnly: zo.source == .owner, note: "Offers Zoho Mail in Settings → Connections → Mail, read through your Safari login (for Zoho plans without IMAP)."),
+                      ownerOnly: zo.source == .owner, note: "Offers Zoho Mail in Settings → Connections → Outreach replies, read through your Safari login (for Zoho plans without IMAP)."),
             ExtraItem(id: "x.file", title: "X numbers from a file", on: x.0 != nil || x.1 == .owner, value: Self.short(x.0), source: x.1,
                       ownerOnly: false, note: "A file your bot or a Mac job writes with your X numbers; the X connection reads it for free."),
             ExtraItem(id: "extras.time_zone", title: "Fixed time zone", on: fz != nil, value: fz?.zone.identifier, source: fz?.source ?? .none,

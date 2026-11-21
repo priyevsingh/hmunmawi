@@ -141,12 +141,26 @@ final class LivePurchases {
         throw AscWebhookStream.StreamError.applyFailed
     }
 
+    /// "com.example.app=Name, com.example.two=Two" -> "com.example.app,com.example.two"; nil when none is given.
+    nonisolated static func bundleIDs(_ names: String) -> String? {
+        let ids = names.split(separator: ",").compactMap { pair -> String? in
+            let id = pair.split(separator: "=").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+            return id.isEmpty ? nil : id
+        }
+        return ids.isEmpty ? nil : ids.joined(separator: ",")
+    }
+
     // MARK: Set up and remove
 
     /// Deploys (or updates) the worker with a Cloudflare API token that can edit Workers and Workers KV.
     func deploy(token: String) async {
         let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else { return }
+        // The worker only takes your own apps' sales, so it needs their bundle ids first.
+        guard Self.bundleIDs(appNames) != nil else {
+            status = "Add your app names first (bundle.id=Name, comma separated), so the worker only takes your apps' sales."
+            return
+        }
         busy = true
         defer { busy = false }
         do {
@@ -308,10 +322,7 @@ final class LivePurchases {
         else { throw WireError("cf", "The worker files are missing from the app.") }
         let modules = ["worker.mjs", "workerCore.mjs", "ascKvImport.mjs", "verify.mjs", "x509.mjs", "root.mjs", "ascRelayDO.mjs"]
         // Your apps' bundle ids (from "App names" above), so the worker refuses notifications for anyone else's app.
-        let bundleIDs = appNames.split(separator: ",").compactMap { pair -> String? in
-            let id = pair.split(separator: "=").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
-            return id.isEmpty ? nil : id
-        }.joined(separator: ",")
+        let bundleIDs = Self.bundleIDs(appNames) ?? ""
         var bindings: [[String: Any]] = [
                 ["type": "kv_namespace", "name": "OUTBOX", "namespace_id": kv],
                 ["type": "secret_text", "name": "RELAY_KEY", "text": relayKey],

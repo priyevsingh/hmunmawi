@@ -34,6 +34,12 @@ public enum TestProfile {
         if n == "xctest" || n.contains("swiftpm-testing-helper") || n.hasSuffix("packagetests") { return true }
         return Bundle.allBundles.contains { $0.bundlePath.hasSuffix(".xctest") }
     }()
+    /// An environment override honoured only in a test profile (nil for the real app, whatever the environment says).
+    public static func testOnlyEnv(_ key: String, profile: String? = name,
+                                   env: [String: String] = ProcessInfo.processInfo.environment) -> String? {
+        guard profile != nil, let v = env[key], !v.isEmpty else { return nil }
+        return v
+    }
     /// ".fresh" for a profile called "fresh", empty for the real app.
     public static var suffix: String { name.map { "." + $0 } ?? "" }
     /// The app's data folder name: "Hmunmawi" for the real app, "Hmunmawi-Test-<profile>" for a test profile, so a test run can

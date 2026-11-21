@@ -25,6 +25,12 @@ import Testing
         #expect(MacJobRoutine.shortName("com.example.mail-watch") == "mail-watch")
         #expect(MacJobRoutine.shortName("watch") == "watch")
     }
+    @Test func onlyYourOwnJobsCount() {
+        #expect(MacJobRoutine.isOwnJob("com.example.mail-watch", prefixes: "com.example., org.me."))
+        #expect(!MacJobRoutine.isOwnJob("com.vendor.updater", prefixes: "com.example."))
+        #expect(!MacJobRoutine.isOwnJob("com.apple.Safari.History", prefixes: "com."))   // never Apple's, whatever the prefixes
+        #expect(!MacJobRoutine.isOwnJob("com.example.x", prefixes: "co, ,"))             // prefixes under 3 characters are ignored
+    }
     @Test func onlyRealLaunchAgentLabelsAreAccepted() {
         #expect(MacJobRoutine.plist("../../etc/passwd") == nil)
         #expect(MacJobRoutine.plist("a b") == nil)

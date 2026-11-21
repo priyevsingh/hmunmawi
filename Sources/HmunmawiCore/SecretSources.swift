@@ -206,9 +206,10 @@ public enum SecretSourceDefaults {
 
     /// Where a key typed in Settings is also kept, so a changed app signature (an old Keychain item no longer
     /// readable) recovers without typing it again. Owner extras only: a normal install keeps keys in the Keychain
-    /// alone. One file per key, `<add-on>.<key>`, mode 0600, folder 0700. `HMUNMAWI_TYPED_KEYS` overrides (tests).
+    /// alone. One file per key, `<add-on>.<key>`, mode 0600, folder 0700. `HMUNMAWI_TYPED_KEYS` overrides, but only
+    /// in a test profile (the real app ignores it, so a launch with a changed environment can't turn key files on).
     public static func typedKeyFolder() -> URL? {
-        if let p = ProcessInfo.processInfo.environment["HMUNMAWI_TYPED_KEYS"], !p.isEmpty {
+        if let p = TestProfile.testOnlyEnv("HMUNMAWI_TYPED_KEYS") {
             return URL(fileURLWithPath: (p as NSString).expandingTildeInPath, isDirectory: true)
         }
         guard OwnerConfig.current.enabled else { return nil }

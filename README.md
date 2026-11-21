@@ -362,6 +362,7 @@ Contributors' and coding agents' notes are in [AGENTS.md](AGENTS.md).
 - **I want to start over.** Follow *Remove Hmunmawi* below, then install again.
 
 </details>
+<a id="remove-hmunmawi"></a>
 <details>
 <summary><b>Remove Hmunmawi</b></summary>
 

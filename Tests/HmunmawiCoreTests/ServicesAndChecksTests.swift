@@ -168,6 +168,13 @@ import Testing
 }
 
 @Suite struct PythonEnvTests {
+    @Test func venvNeedsConfig() {
+        let files: Set<String> = ["/w/.venv/pyvenv.cfg", "/home/go/bin"]
+        #expect(PythonEnv.isVenv("/w/.venv", exists: files.contains))
+        #expect(!PythonEnv.isVenv("/home/go", exists: files.contains))
+        #expect(!PythonEnv.isVenv("relative/.venv", exists: { _ in true }) && !PythonEnv.isVenv("/", exists: { _ in true }))
+    }
+
     @Test func findsAndJudgesVenvs() {
         let files: Set<String> = ["/w/.venv/pyvenv.cfg", "/w/.venv/bin/python3", "/opt/py/bin", "/b/env/pyvenv.cfg"]
         let exists: (String) -> Bool = { files.contains($0) }

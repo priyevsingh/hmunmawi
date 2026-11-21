@@ -2,6 +2,31 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.1 (build 151), 21 Nov 2026
+
+**Safer**
+- **Python repair:** only folders with a `pyvenv.cfg` count as Python environments (a folder with just a `bin/`, such as `~/go` or `~/.cargo`, is never shown as broken or repaired), an agent's edit of a "Check my workspace Python" routine turns automatic repair back to asking, and an automatic repair is logged as the routine's, not yours.
+- **Agent badges:** once you have made a badge, an agent without one always waits for your OK, even in Full Autopilot, so it can't dodge an "ask" rule by leaving its badge out.
+- **Mac jobs:** agents can schedule only your own Mac jobs (the same prefix check as `job-run`, never `com.apple.*`); a routine that starts a Mac job needs "Run or pause Mac jobs"; only you can change the Mac jobs prefixes.
+- **Web checks** (link check, outreach check) read at most their size limit while downloading, give up after 30 seconds, and never follow a redirect to this Mac or your own network. Links to local addresses are skipped.
+- **Fixed time zone** set by an agent now needs "Run or change routines" (it moves every routine's time).
+- **Live sales:** the worker takes nothing until your app names are set (Hmunmawi asks for them before it deploys) and refuses bodies over 64 KB. Redeploy from Settings → Connections → Live sales to get it.
+- The owner settings and key-folder environment variables only work in test profiles.
+
+**Better**
+- **Settings sidebar** is grouped the way System Settings is: General and Menu bar; Connections, Projects and Jobs; Rules and Permissions; Publish and Backups; About.
+- **Settings → Jobs:** each "Run by Hmunmawi" job that isn't set up has a **Set up…** button that opens its routine form.
+- **Settings → General:** Owner extras lists only what one person can have; what an owner settings file sets among Your extras shows there once.
+- **Settings → Rules:** Full Autopilot's button says **Turn On…**.
+- **Today:** a worry is never coloured green; the Money card's change says what it measures ("14-day earnings, −₹520 since last look"); the Health card's sentence is about its big number (crash-free sessions) and what needs a look moves to the line under it. A long change line goes under the number instead of being cut off.
+
+**Fixed**
+- `plan-remove` is offered by the MCP `hm_change` tool (it was refused); the MCP tool lists are now built from the same command lists, and `mail-status` and `wall-plan` are read-only tools. A test keeps every guide command reachable over MCP.
+- Agent guide: `ai-pause-set` / `ai-pause-clear` need "routines" (as the app checks), `lint-text` points to Settings → General, the Zoho reader to Settings → Connections → Outreach replies, `mail-status` names Zoho too, routines are added under Automations → +, and the settings table shows each setting's permission.
+- Docs: PRIVACY.md describes the Zoho reader as one of Your extras and lists only the true owner extras; two broken links fixed; the `x_unfollows` switch key is documented.
+
+Hmunmawi still does everything it did in 1.5.0: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you, with post drafts, reply ideas and opt-in automatic X unfollows), job switches, service watch, link and Python checks, publishing, outreach and mail, crashes and self-healing, money and offer codes, alerts, AI limits, share and show, Your extras, and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.0 (build 150), 21 Nov 2026
 
 **New**

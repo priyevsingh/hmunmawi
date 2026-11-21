@@ -6,6 +6,14 @@ import Testing
 /// `swift test` must never see the real Keychain: every run is a test profile with in-memory keys, its own data
 /// folder name and suffixed Keychain names, even when HMUNMAWI_PROFILE isn't set.
 @Suite struct KeychainIsolationTests {
+    @Test func ownerOverridesOnlyInATestProfile() {
+        let env = ["HMUNMAWI_OWNER_CONFIG": "/tmp/x.json", "HMUNMAWI_TYPED_KEYS": "/tmp/keys"]
+        #expect(TestProfile.testOnlyEnv("HMUNMAWI_OWNER_CONFIG", profile: nil, env: env) == nil)   // the real app ignores it
+        #expect(TestProfile.testOnlyEnv("HMUNMAWI_TYPED_KEYS", profile: nil, env: env) == nil)
+        #expect(TestProfile.testOnlyEnv("HMUNMAWI_OWNER_CONFIG", profile: "fresh", env: env) == "/tmp/x.json")
+        #expect(TestProfile.testOnlyEnv("HMUNMAWI_TYPED_KEYS", profile: "fresh", env: ["HMUNMAWI_TYPED_KEYS": ""]) == nil)
+    }
+
     @Test func testRunsAreAlwaysATestProfile() {
         #expect(TestProfile.runningUnitTests)
         #expect(TestProfile.name != nil)

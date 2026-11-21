@@ -32,19 +32,23 @@ function mirrorKv(env) {
 }
 
 async function receive(request, env) {
+  // Only your own apps' notifications: without a list of bundle ids nothing is taken (Hmunmawi sets it on deploy).
+  const allowed = (env.BUNDLE_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!allowed.length) return json({ error: "no app list: add your app names in Hmunmawi and deploy again" }, 503);
+  const raw = new Uint8Array(await request.arrayBuffer());
+  if (raw.length > 64 * 1024) return json({ error: "too large" }, 413);
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(new TextDecoder().decode(raw));
   } catch {
     return json({ error: "not JSON" }, 400);
   }
   try {
     const n = await verifyJws(body?.signedPayload);
     const data = n.data || {};
-    const allowed = (env.BUNDLE_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
-    if (allowed.length && !allowed.includes(data.bundleId)) return json({ error: "unknown app" }, 403);
+    if (!allowed.includes(data.bundleId)) return json({ error: "unknown app" }, 403);
     const tx = data.signedTransactionInfo ? await verifyJws(data.signedTransactionInfo) : {};
-    if (allowed.length && tx.bundleId && !allowed.includes(tx.bundleId)) return json({ error: "unknown app" }, 403);
+    if (tx.bundleId && !allowed.includes(tx.bundleId)) return json({ error: "unknown app" }, 403);
     const rn = data.signedRenewalInfo ? await verifyJws(data.signedRenewalInfo) : {};
     const at = Number(n.signedDate) || Date.now();
     const item = {
