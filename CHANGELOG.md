@@ -2,6 +2,25 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.0 (build 150), 21 Nov 2026
+
+**New**
+- **Your extras** (Settings → General). Things that used to need a hand-made owner settings file are now there for everyone, set in the app, by an agent or by your private workspace: a **workspace folder** (Find my key looks in it and Settings → Jobs finds its switch file), a **key folder** and a **repositories folder** for Find my key, the **AI job pause card** for your own AI runner, the **Zoho Mail reader** (through your Safari login, for Zoho plans without IMAP), **X numbers from a file** and a **fixed time zone** for every date in the app. Each row says whether it is on and where that comes from.
+- **Workspace extras file.** Put `config/hmunmawi-extras.json` in your workspace folder (`key_folder`, `repos_folder`, `ai_pause_card`, `zoho_mail`, `x_file`, `time_zone`; relative paths are inside the workspace) and the extras switch on by themselves. A choice made in Settings wins over the file; a broken file is named and switches nothing on. Recipe: [Your extras from your workspace](docs/PRIVATE-WORKSPACE.md#your-extras-from-your-workspace).
+- Agents: `hm extras` (read only; also `extras` in state.json) lists every extra with its state, value, source and whether an agent may set it; `hm set key=extras.workspace|extras.key_folder|extras.repos_folder|extras.ai_pause_card|extras.zoho_mail|extras.time_zone` changes one (`none` clears). Folders and the Zoho reader need the Connections permission. Extras an owner settings file sets, and owner-only ones, are refused.
+
+**Fixed**
+- A fixed time zone now applies to every time the app shows. Before, some labels (such as the quiet-hours pickers) still used the Mac's own zone while "today" used the fixed one. It changes nothing when the fixed zone is the Mac's own.
+- Settings guide pictures show the new Settings sidebar.
+
+**Stays owner-only (and why)**
+- The **Keychain-prompt watcher** is built into the app on the Mac that makes it, with a script that is not in the repo; the published, notarized app can't carry anyone's own script, so it is listed but never in a public build. Running Safari steps through another program, the owner's own AI-pause script, typed keys kept in recovery files and Wall of Apps welcome drafts also stay owner-only: each runs a program of the owner's, keeps keys outside the Keychain, or is the maintainer's job.
+
+**Unchanged**
+- An owner settings file (`owner.json`) still wins over everything, so a Mac that has one behaves exactly as before; its Owner extras list is unchanged. A key folder is only read when you press Find my key; it never becomes an automatic key source.
+
+Hmunmawi still does everything it did in 1.4.1: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you, with post drafts, reply ideas and opt-in automatic X unfollows), job switches, service watch, link and Python checks, publishing, outreach and mail, crashes and self-healing, money and offer codes, alerts, AI limits, share and show, and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.4.1 (build 141), 21 Nov 2026
 
 **Fixed**

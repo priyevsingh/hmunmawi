@@ -57,11 +57,12 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 - **Alerts:** iMessage, ntfy push and an iPhone and Watch calendar, with quiet hours.
 - **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs (pause or resume any of them), on/off switches for the jobs your scripts run and the ones Hmunmawi runs, an optional "keep this Mac awake" setting, and agents like Claude Code through `hm`. Anything that changes something waits for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
 - **Share and show:** share cards for posts and stories, your numbers as a web page you host yourself, and the Wall of Apps.
+- **Your extras:** Settings → General lists what your own setup switches on (a workspace folder and key folders for Find my key, the AI job pause card, the Zoho Mail reader, an X numbers file, a fixed time zone), set in the app, by agents or by a file in your private workspace.
 
 No dashboards to open. Free, open source, and your data stays on your Mac. [Full capability list](docs/CAPABILITIES.md) · [Build your private workspace](docs/PRIVATE-WORKSPACE.md) · [See every add-on](docs/ADD-ONS.md).
 
 How it fits together, in plain words: your sources are read by add-ons that never see your keys; your own private
-workspace (optional) adds scripts, Mac jobs and AI jobs; Hmunmawi turns it all into one answer, cards and to-dos;
+workspace (optional) adds scripts, Mac jobs, AI jobs and your extras; Hmunmawi turns it all into one answer, cards and to-dos;
 anything that changes something waits for your OK; alerts reach your phone and Watch.
 
 ```mermaid
@@ -69,6 +70,8 @@ flowchart LR
     S["Your sources"] --> A["Add-ons"]
     A --> H["Hmunmawi on your Mac"]
     W["Your private workspace"] --> H
+    W -->|"Your extras file"| X["Your extras"]
+    X --> H
     H --> D["Daily answer and to-dos"]
     H --> Q["Waits for your OK"]
     H --> P["Phone and Watch alerts"]
@@ -271,7 +274,7 @@ after by it. All of it stays on your Mac.
 - **Connections never see your keys.** A connection asks for `{{secret:NAME}}` and Hmunmawi fills the key in
   when it makes the request.
 - **Find my key** (next to every key field) looks, only when you press it, in your Keychain, in `.env` files in
-  folders you choose, and for App Store Connect key files (`AuthKey_<KEY ID>.p8`) in Downloads, Documents,
+  folders you choose (Settings → Connections → Also look in, or your workspace and key folder in Settings → General → Your extras), and for App Store Connect key files (`AuthKey_<KEY ID>.p8`) in Downloads, Documents,
   Desktop and iCloud Drive. You pick one; values are never shown, only where each came from.
 - **Keys survive an update.** A connection with a known key file (for example the Google sign-in file for
   YouTube) re-imports it at launch, in the background, so a permission prompt for a protected folder never

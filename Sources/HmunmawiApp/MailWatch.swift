@@ -9,9 +9,11 @@ enum MailSourceKind: String, CaseIterable, Identifiable {
     case off, appleMail, imap, zohoSafari
     var id: String { rawValue }
     var title: String { switch self { case .off: "Off"; case .appleMail: "Apple Mail"; case .imap: "Other mail (IMAP)"; case .zohoSafari: "Zoho Mail (your Safari login)" } }
-    /// The choices offered: the Zoho Safari reader only on an owner Mac that asks for it (or when already picked).
-    static func offered(current: MailSourceKind, owner: OwnerConfig = .current) -> [MailSourceKind] {
-        allCases.filter { $0 != .zohoSafari || owner.offersZoho || current == .zohoSafari }
+    /// The choices offered: the Zoho Safari reader only when Your extras (or an owner settings file) switch it on, or
+    /// when it is already picked.
+    static func offered(current: MailSourceKind, owner: OwnerConfig = .current, extras: Bool? = nil) -> [MailSourceKind] {
+        let zoho = extras ?? Extras.current.zohoMail.on
+        return allCases.filter { $0 != .zohoSafari || owner.offersZoho || zoho || current == .zohoSafari }
     }
 }
 

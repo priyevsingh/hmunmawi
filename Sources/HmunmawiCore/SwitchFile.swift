@@ -90,18 +90,19 @@ public enum SwitchFile {
 
     // MARK: Finding the file
 
-    /// Paths looked for inside your workspace folder (the owner settings' `hubRoot`), in this order.
+    /// Paths looked for inside your workspace folder (Your extras, or the owner settings' `hubRoot`), in this order.
     public static let conventionalNames = ["config/hmunmawi-switches.json", "config/social_channels.json"]
 
     /// Where the switch file is: the one you chose in Settings, else owner settings' `switchFile`, else the first
     /// conventional name that exists in your workspace. A chosen or configured file is returned even when missing,
     /// so the section can say so; nil means there's nothing to show.
-    public static func locate(chosen: String?, owner: OwnerConfig = .current, fileManager: FileManager = .default) -> URL? {
+    public static func locate(chosen: String?, owner: OwnerConfig = .current, workspace: URL? = Extras.current.workspace.url,
+                              fileManager: FileManager = .default) -> URL? {
         if let c = chosen?.trimmingCharacters(in: .whitespaces), !c.isEmpty {
             return URL(fileURLWithPath: (c as NSString).expandingTildeInPath)
         }
         if let configured = owner.switchFileURL { return configured }
-        guard let hub = owner.hubURL else { return nil }
+        guard let hub = owner.hubURL ?? workspace else { return nil }
         return conventionalNames.map { hub.appending(path: $0) }.first { fileManager.fileExists(atPath: $0.path) }
     }
 

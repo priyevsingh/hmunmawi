@@ -1205,7 +1205,7 @@ final class Routines {
     nonisolated static func cap(_ r: MyRoutine, _ fallback: Double) -> Double { min(max(finite(r.params?["cap"]) ?? fallback, 0), 1000) }
 
     static func bestHours(perDay: Int, gap: Int) -> [Int]? {
-        let path = XFileFeed.shared.path
+        let path = XFileFeed.shared.effectivePath
         guard !path.isEmpty, let d = try? Data(contentsOf: URL(fileURLWithPath: (path as NSString).expandingTildeInPath)),
               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let list = o["posts"] as? [[String: Any]] else { return nil }
         let iso = ISO8601DateFormatter(), frac = ISO8601DateFormatter()

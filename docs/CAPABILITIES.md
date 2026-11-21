@@ -27,6 +27,7 @@ scripts* means the app shows and tracks it, but a script or AI job of your own p
 | **AI limits** | Built in: plan limits shown, an alert at 80%, a monthly AI budget and a cap per AI routine; the AI job pause stops your own AI scripts when you need them to wait | [AI and costs](AI-AND-COSTS.md), [AI jobs](PRIVATE-WORKSPACE.md#running-ai-jobs-on-your-own-mac) |
 | **Autopilot with approval** | Built in: routines on a schedule, your own scripts and Mac jobs (Run now, Pause and Resume on each job's row), on/off switches for the jobs your scripts run and for the jobs Hmunmawi runs for you (Settings → Jobs → Run by Hmunmawi), an optional **Keep this Mac awake** setting (off, while plugged in, always) so routines run on time, bots and agents such as Claude Code through `hm` and MCP; anything that changes something waits in Log → Waiting | [Routines](ROUTINES.md), [hm commands](HM-COMMANDS.md), [For AI agents](../AGENTS.md) |
 | **Share and show** | Built in: share cards sized for posts and stories; your numbers as one web page (the portal) you host yourself, with a "safe to show anyone" copy; the Wall of Apps | [Portal](GUIDE.md#your-own-portal-), [Wall of Apps](WALL-OF-APPS.md) |
+| **Your extras** | Built in: Settings → General → Your extras, for everyone: a workspace folder (Find my key and the job switch file look there), key and repositories folders for Find my key, the AI job pause card for your own AI runner, the Zoho Mail reader through your Safari login, X numbers from a file and a fixed time zone for every date; set in the app, by agents (`hm extras`, `hm set extras.*`) or from your workspace's `config/hmunmawi-extras.json`. Each row shows where it comes from. The Keychain-prompt watcher stays in builds you make yourself | [Guide](GUIDE.md#-general), [Workspace recipe](PRIVATE-WORKSPACE.md#your-extras-from-your-workspace) |
 | **Install, updates, keys and backups** | Built in: a notarized app that updates itself after asking; keys only in your Keychain, and a key that came from a file (an App Store Connect `.p8`, a Google sign-in file) re-imported by itself after an update; daily backups, with an optional encrypted iCloud copy | [README: Your keys](../README.md#everything-else), [Releasing](RELEASING.md) |
 
 ## Built-in connections
@@ -40,7 +41,8 @@ In plain words:
 
 1. Your **sources** (App Store Connect, Sentry, Vercel, search, YouTube, X and the rest) are read by small add-ons
    that never see your keys.
-2. Your **private workspace** (optional) adds what no add-on knows: your own scripts, Mac jobs and AI jobs.
+2. Your **private workspace** (optional) adds what no add-on knows: your own scripts, Mac jobs and AI jobs, and its
+   extras file switches on **Your extras** (folders for Find my key, the AI pause card, the Zoho reader, a time zone).
 3. **Hmunmawi** on your Mac turns all of it into the daily answer, cards, to-dos and the Automations map.
 4. Routines Hmunmawi runs itself (Watch my services, the heartbeat, link and Python checks) read what the add-ons
    found and tell you in plain words.
@@ -51,6 +53,8 @@ In plain words:
 flowchart LR
     S["Your sources"] --> A["Add-ons"]
     W["Your private workspace"] --> H["Hmunmawi on your Mac"]
+    W --> X["Your extras"]
+    X --> H
     A --> H
     H --> R["Routines that watch for you"]
     R --> P

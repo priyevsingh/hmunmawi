@@ -69,7 +69,7 @@ flowchart TD
 
 Your own Mac's builds (`scripts/make-app.sh`) keep the Apple Development signature so saved Keychain keys keep working
 across rebuilds, and, with the git-ignored marker `scripts/.owner-build`, include the owner-only Keychain-prompt
-watcher. `HM_FLAVOR=public`, and `scripts/release.sh` always, leave that watcher out, so public releases never contain it. Owner extras in the app itself come from `owner.json` in the app's data folder (see `OwnerConfig`).
+watcher. `HM_FLAVOR=public`, and `scripts/release.sh` always, leave that watcher out, so public releases never contain it. Owner extras in the app itself come from `owner.json` in the app's data folder (see `OwnerConfig`); everyone else's extras come from Settings → General → Your extras or the workspace file `config/hmunmawi-extras.json` (see `Extras`), which need no special build. The watcher row in Your extras reads "Not in this build" in a public release.
 
 ## Keychain names after a bundle id change
 

@@ -37,7 +37,7 @@ For example:
 - If the Keychain does not answer, no approval counts until it does: add-ons stay off instead of being waved through.
 - Limits, said plainly: the add-on sandbox is a safety layer, not a guarantee (it blocks the network, the home folder and other side doors, but is not a full allow-list). A web address is checked for private and local names, but a public name that resolves to a private address is not caught, and the live-sales worker has no replay window (its writes are idempotent). Anything running as you on this Mac that can change Hmunmawi itself or read its Keychain item can get around these protections. Development builds (`scripts/make-app.sh` default) also accept `--approve-addon` and `--set-secret` on the command line for tests; release builds do not, so use a release build as your everyday app.
 
-- Release builds (`HM_FLAVOR=public`) contain no Keychain watcher LaunchAgent and no personal paths; owner extras need an `owner.json` the app never writes on its own. Tests run in a test profile with keys in memory only, so `swift test` can never read or write your real Keychain.
+- Release builds (`HM_FLAVOR=public`) contain no Keychain watcher LaunchAgent and no personal paths; owner extras need an `owner.json` the app never writes on its own. Your extras (1.5.0) only name folders, a file and a time zone: a key folder is read only when you press Find my key and never becomes an automatic key source; agents change folders and the Zoho reader only with the Connections permission and can't change anything an owner settings file sets. Tests run in a test profile with keys in memory only, so `swift test` can never read or write your real Keychain.
 
 ## How the project is protected
 

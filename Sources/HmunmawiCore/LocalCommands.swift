@@ -163,7 +163,9 @@ enum LocalCommands {
     /// digest beside it as a fallback. Free: no network, no key.
     static func readXFile(settings: JSONValue, defaults: UserDefaults = .standard, now: Date = .now) -> JSONValue {
         let set = (settings[path: "file"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let file = set.isEmpty ? (defaults.string(forKey: "HMXFile") ?? "") : (set as NSString).expandingTildeInPath
+        let chosen = defaults.string(forKey: "HMXFile") ?? ""
+        let file = !set.isEmpty ? (set as NSString).expandingTildeInPath
+            : !chosen.isEmpty ? chosen : (Extras.current.workspaceXFile?.path ?? "")
         let glance = (defaults.string(forKey: "HMXGlanceFile") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return XFileNumbers.load(file: file, digest: XFileNumbers.digestPath(nextTo: file),
                                  glanceFile: glance.isEmpty ? nil : (glance as NSString).expandingTildeInPath,

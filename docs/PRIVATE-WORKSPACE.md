@@ -26,8 +26,10 @@ flowchart LR
         J["Mac jobs"]
         F["Hand-off files"]
         AI["AI jobs"]
+        X["config/hmunmawi-extras.json"]
     end
     S -->|"script feed"| H["Hmunmawi"]
+    X -->|"Your extras"| H
     J -->|"routines and Mac jobs"| H
     F -->|"read every few minutes"| H
     AI -->|"hm, asks first"| H
@@ -57,6 +59,7 @@ Names are only a suggestion. Use whatever you like.
 my-workspace/
   STATE.md          what runs, what changed, what is planned (see the template below)
   AGENTS.md         rules for AI agents working in this repo (starter below)
+  config/           switch file and hmunmawi-extras.json (Your extras, see below)
   scripts/          your scripts: feeds, jobs, checks
   data/             small files your scripts read and write (queues, lists, caches)
   briefs/           written instructions you give an AI agent for one job
@@ -149,7 +152,7 @@ Turn a job off with a switch, not a code change. Keep one small JSON file of tru
 read at the start of each run; Hmunmawi shows each value as a switch in **Settings → Jobs**.
 
 - **Where:** `config/hmunmawi-switches.json` in your workspace, else `config/social_channels.json`. Hmunmawi finds
-  your workspace through `hubRoot` in `owner.json` (the optional owner settings file in its data folder); set `switchFile` there to use another path, or press
+  your workspace folder (Settings → General → Your extras → Workspace folder, or `hubRoot` in an owner settings file); set `switchFile` in an owner settings file to use another path, or press
   **Choose…** in Settings → Jobs.
 - **What shows:** every top-level true/false, and every true/false one level down (`"warmed_up": {"reddit": true}`).
   Keys starting with `_` are notes. Well-known keys get a plain name and explanation: `reddit`, `discord`,
@@ -594,6 +597,63 @@ flowchart LR
 - **Built in:** Settings → Publish writes your numbers as one web page you host yourself ([the portal](GUIDE.md#your-own-portal-)).
 - **Your workspace:** scripts that build a larger private site on top of the same data, kept behind a login. The
   guide shows [what that can look like](GUIDE.md#what-a-full-portal-can-look-like-the-maintainers-setup).
+
+## Your extras from your workspace
+
+Settings → General → **Your extras** lists what your own setup switches on. Choose your workspace folder there
+(or let an agent run `hm set key=extras.workspace value=~/my-workspace`, which waits for your OK unless you allowed
+Connections), then add `config/hmunmawi-extras.json` to the workspace:
+
+```json
+{
+  "key_folder": "secrets",
+  "repos_folder": "~/code",
+  "ai_pause_card": true,
+  "zoho_mail": false,
+  "x_file": "data/x_numbers.json",
+  "time_zone": "Europe/Berlin"
+}
+```
+
+| Key | What it switches on |
+|---|---|
+| `key_folder` | A folder of `.env` and key files that **Find my key** looks in first. Read only when you press Find my key; never sent anywhere. Keep it gitignored. |
+| `repos_folder` | A folder of projects Find my key also looks through (up to 40). |
+| `ai_pause_card` | The **AI job pause card** on Today and in the menu bar, for your own AI runner ([below](#queueing-limits-and-pause)). |
+| `zoho_mail` | Offers **Zoho Mail (your Safari login)** in Settings → Connections → Mail, for Zoho plans without IMAP. |
+| `x_file` | Your **X numbers file** ([format](X-FILE.md)), when none is set in Settings. |
+| `time_zone` | A **fixed time zone** for every date and "today" in the app (an IANA name such as `America/New_York`). |
+
+Every key is optional. Relative paths are inside the workspace; `~` and full paths work too. The workspace folder
+itself is set only in Settings (a file can't move the folder it lives in). Without this file, the workspace folder
+alone already makes Find my key look in it and lets Settings → Jobs find `config/hmunmawi-switches.json` or
+`config/social_channels.json`.
+
+```mermaid
+flowchart LR
+    O["Owner settings file (owner.json), if any"] --> E["Your extras in effect"]
+    S["Settings → General → Your extras, or hm set extras.*"] --> E
+    W["workspace config/hmunmawi-extras.json"] --> E
+    E --> K["Find my key folders"]
+    E --> J["Settings → Jobs switch file"]
+    E --> P["AI job pause card"]
+    E --> M["Zoho Mail reader"]
+    E --> XF["X numbers file"]
+    E --> T["Time zone for every date"]
+```
+
+Order, highest first: an owner settings file, then Settings, then the workspace file. A choice in Settings wins, so
+switching the Zoho reader off in the app keeps it off even if the file says `true`; `hm set key=extras.zoho_mail
+value=none` goes back to the file. A file that isn't valid JSON, or has a wrong type (say `"ai_pause_card": "yes"`),
+switches nothing on, and Settings names the problem. Agents see the same list with `hm extras` (each extra's
+state, value, where it comes from and whether an agent may set it).
+
+**What stays owner-only, and why.** The **Keychain-prompt watcher** is built into the app by `scripts/make-app.sh`
+on your own Mac (`HM_FLAVOR=owner`, with your watcher script in `HM_KEYCHAIN_WATCH`, which stays outside the repo);
+the published, notarized app can't carry anyone's own script, so it shows as "Not in this build" there. Safari steps
+through another program, the owner's own AI-pause script, typed keys kept in recovery files and Wall of Apps
+welcome drafts also stay in the owner settings file: each runs a program you name, keeps keys outside the
+Keychain, or is the project maintainer's job.
 
 ## Running AI jobs on your own Mac
 

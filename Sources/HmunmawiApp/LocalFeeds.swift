@@ -65,9 +65,12 @@ final class XFileFeed {
         path = UserDefaults.standard.string(forKey: "HMXFile") ?? ""   // set in Settings → General → X
     }
 
+    /// The file in use: the one set here, else `x_file` from your workspace's extras file.
+    var effectivePath: String { path.isEmpty ? (Extras.current.workspaceXFile?.path ?? "") : path }
+
     /// Reads the plan block when the file changed since the last look.
     func readPlan() async {
-        guard let answer = await Self.peek(path), let modified = answer, modified != lastModified else { return }
+        guard let answer = await Self.peek(effectivePath), let modified = answer, modified != lastModified else { return }
         lastModified = modified
         lastRead = modified
         XPlan.shared.readBotFile(path)

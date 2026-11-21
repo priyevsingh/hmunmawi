@@ -710,7 +710,7 @@ final class LivePurchases {
     private static func shortIST(_ ms: Double) -> String {
         let d = Date(timeIntervalSince1970: ms / 1000)
         let f = DateFormatter()
-        f.timeZone = OwnerConfig.current.zone   // the Mac's own time zone (an owner may fix one)
+        f.timeZone = Extras.current.zone   // the Mac's own time zone (or a fixed one from Your extras)
         f.dateStyle = .short
         f.timeStyle = .short
         return f.string(from: d)

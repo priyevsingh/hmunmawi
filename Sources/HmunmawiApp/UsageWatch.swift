@@ -175,8 +175,8 @@ struct UsageCard: View {
     var body: some View {
         VStack(spacing: 12) {
             content
-            // Only where an AI pause policy is used (an owner Mac, or once a pause file exists); hidden for everyone else.
-            if OwnerConfig.current.showsAIPause || FileManager.default.fileExists(atPath: AIPolicyPaths.policyFile.path) {
+            // Only where an AI pause policy is used (Your extras or an owner Mac, or once a pause file exists).
+            if Extras.current.aiPauseCard.on || FileManager.default.fileExists(atPath: AIPolicyPaths.policyFile.path) {
                 AIPolicyPauseCard()
             }
         }.frame(maxWidth: .infinity)

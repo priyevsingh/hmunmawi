@@ -290,7 +290,7 @@ struct MenuBarPanel: View {
 
     @ViewBuilder private var quickNumbers: some View {
         let ev = model.isDemo ? [] : model.events
-        let x = OwnerConfig.current.usesXFileFeed || !XFileFeed.shared.path.isEmpty ? MenuBarFacts.latest(ev, kind: "growth.x", field: "followers") : nil
+        let x = OwnerConfig.current.usesXFileFeed || !XFileFeed.shared.effectivePath.isEmpty ? MenuBarFacts.latest(ev, kind: "growth.x", field: "followers") : nil
         let yt = MenuBarFacts.latest(ev, kind: "growth.youtube", field: "subscribers")
         let visitors = MenuBarFacts.latest(ev, kind: "analytics.daily_users", field: "users")
         let subs = model.isDemo ? nil : model.mrr?.total.latest.map { Double($0.active) }
@@ -314,7 +314,7 @@ struct MenuBarPanel: View {
     }
 
     @ViewBuilder private var aiPause: some View {
-        if OwnerConfig.current.showsAIPause {
+        if Extras.current.aiPauseCard.on {
             let snap = AIPolicyDisplay.parse(policy.statusJSON, loadFailed: policy.lastError != nil && policy.statusJSON.isEmpty)
             section("AI routines") {
                 Text(AIPolicyDisplay.headline(snap)).font(.callout).fixedSize(horizontal: false, vertical: true)

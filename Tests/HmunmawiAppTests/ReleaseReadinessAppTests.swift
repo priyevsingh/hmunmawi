@@ -74,7 +74,7 @@ import HmunmawiCore
 /// Owner-only choices stay hidden for new users; Find my key reads short labels aloud.
 @Suite struct OwnerGatingAppTests {
     @Test func zohoOnlyForTheOwnerOrWhenAlreadyPicked() {
-        #expect(!MailSourceKind.offered(current: .off, owner: OwnerConfig()).contains(.zohoSafari))
+        #expect(!MailSourceKind.offered(current: .off, owner: OwnerConfig(), extras: false).contains(.zohoSafari))
         #expect(MailSourceKind.offered(current: .zohoSafari, owner: OwnerConfig()).contains(.zohoSafari))
         var owner = OwnerConfig(enabled: true); owner.zohoMail = true
         #expect(MailSourceKind.offered(current: .off, owner: owner).contains(.zohoSafari))

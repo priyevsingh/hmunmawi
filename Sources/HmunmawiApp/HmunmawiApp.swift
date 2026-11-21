@@ -312,9 +312,9 @@ struct OpenSettingsButton<Label: View>: View {
     /// shows. `open Hmunmawi.app --args -HMAppearance dark` does the same for one launch without saving it.
     func applicationWillFinishLaunching(_ notification: Notification) {
         umask(0o077)  // files the app creates are readable by this user only, even if moved out of the 0700 folder
-        // A fixed time zone in owner.json is the app's own: every "today", day group and date follows it, not the
-        // Mac's zone while travelling. Without it nothing changes.
-        if OwnerConfig.current.timeZone != nil { NSTimeZone.default = OwnerConfig.current.zone }
+        // A fixed time zone (owner.json, Your extras or the workspace extras file) is the app's own: every "today",
+        // day group and date follows it, not the Mac's zone while travelling. Without one nothing changes.
+        if Extras.current.fixedZone != nil { Extras.applyProcessZone() }
         Self.applyAppearance(UserDefaults.standard.string(forKey: Self.appearanceKey) ?? "system")
     }
 

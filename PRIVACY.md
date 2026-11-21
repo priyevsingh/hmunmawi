@@ -64,6 +64,7 @@ Only with your permission, which you give once during setup (or later in Setting
 - **Another tool's usage figure:** if you named your bot "Grok" (Automations → Your routines → Set up your bot), Grok Bot's local cache folder under `~/Library/Application Support/Grok Bot/` is read for its weekly usage figure, only to show it.
 - **Safari**, only for the two things you switch on: reading a tracker page you're signed in to (the one address you gave, once), and, as an owner extra, the Zoho Mail source (it opens Zoho's list page in a background tab, at most every 10 minutes, and reads sender, subject and folder; it never opens a message).
 
+- **Your extras** (Settings → General, or your workspace's `config/hmunmawi-extras.json`; all off by default): a workspace, key and projects folder that Find my key looks in only when you press it, the AI pause card, the Zoho Mail reader through your Safari login, an X numbers file and a fixed time zone. Nothing in them is a key, and nothing is sent anywhere.
 - **Owner extras** (off unless you create `owner.json` in the app's data folder): a hub folder, key folder and projects folder to search, an AI pause card, the Zoho Mail reader, a Keychain-prompt alert and a fixed time zone. A new install has none of these.
 - **Mac notifications** stay on your Mac (macOS Notification Center). Review text and buyer details are hidden unless you switch on "Show details" in Settings → Menu bar, and sample data never notifies.
 

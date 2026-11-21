@@ -83,6 +83,7 @@ private struct GeneralSettings: View {
     var body: some View {
         Form {
             OwnerExtrasSection()
+            ExtrasSection()
             Section {
                 Picker("Appearance", selection: $appearance) {
                     Text("Same as Mac").tag("system")
@@ -589,7 +590,7 @@ struct AddOnSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 if row.id == "x" {
                     // One description only (the add-on's summary below says what it reads).
-                    if XFileFeed.shared.path.isEmpty && model.value("file", for: "x").isEmpty {
+                    if XFileFeed.shared.effectivePath.isEmpty && model.value("file", for: "x").isEmpty {
                         Label("Needs an X file: a small JSON file your own bot or script writes (the format is in docs/X-FILE.md). Set it under General → X. Without one, X stays off.",
                               systemImage: "doc.badge.gearshape")
                             .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

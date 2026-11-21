@@ -156,6 +156,11 @@ enum AgentSetting: String, CaseIterable {
     case botName = "bot.name", botFolder = "bot.folder"
     case xSafariRead = "x.safari_read", xHandle = "x.handle", xGlanceFile = "x.glance_file"
     case keepAwake = "mac.keep_awake"
+    case extrasWorkspace = "extras.workspace", extrasKeyFolder = "extras.key_folder", extrasReposFolder = "extras.repos_folder"
+    case extrasAIPauseCard = "extras.ai_pause_card", extrasZohoMail = "extras.zoho_mail", extrasTimeZone = "extras.time_zone"
+
+    /// Your extras (Settings → General): saved through ExtrasStore, refused while an owner settings file sets them.
+    var isExtra: Bool { rawValue.hasPrefix("extras.") }
 
     var defaultsKey: String {
         switch self {
@@ -166,6 +171,8 @@ enum AgentSetting: String, CaseIterable {
         case .botName: "HMBotName"; case .botFolder: BotSetup.folderKey
         case .xSafariRead: XSafariReader.enabledKey; case .xHandle: XSafariReader.handleKey; case .xGlanceFile: "HMXGlanceFile"
         case .keepAwake: KeepAwake.modeKey
+        case .extrasWorkspace, .extrasKeyFolder, .extrasReposFolder, .extrasAIPauseCard, .extrasZohoMail, .extrasTimeZone:
+            ExtrasStore.defaultsKey(rawValue) ?? rawValue
         }
     }
     /// Changing these needs the matching permission.
@@ -174,6 +181,8 @@ enum AgentSetting: String, CaseIterable {
         case .aiEnabled, .aiBudget: .spending
         case .botFolder: .routines   // where routines.md is written and problem notes are read from
         case .keepAwake: .jobs       // keeps the Mac from sleeping so jobs run
+        // Folders the app then reads (Find my key, the switch file, the workspace extras file) and the Zoho reader.
+        case .extrasWorkspace, .extrasKeyFolder, .extrasReposFolder, .extrasZohoMail: .connections
         case .xFile, .webDashboard, .xSafariRead, .xHandle, .xGlanceFile: .connections   // point the app at a file or an address it then reads
         default: nil
         }
@@ -198,6 +207,12 @@ enum AgentSetting: String, CaseIterable {
         case .botName: "what you call your bot, e.g. My Bot"
         case .botFolder: "path of the folder you and your bot share"
         case .keepAwake: "off, plugged-in or always (keep this Mac from idle sleep so routines run on time)"
+        case .extrasWorkspace: "path of your private workspace folder, or none (Your extras; see `hm extras`)"
+        case .extrasKeyFolder: "path of a folder of .env/key files Find my key looks in first, or none"
+        case .extrasReposFolder: "path of a folder of repositories Find my key also looks through, or none"
+        case .extrasAIPauseCard: "true, false or none (none = follow the workspace file): show the AI job pause card"
+        case .extrasZohoMail: "true, false or none: offer the Zoho Mail (Safari) reader in Settings → Connections → Mail"
+        case .extrasTimeZone: "a time zone id such as Europe/Berlin, or none for this Mac's own"
         }
     }
 
@@ -223,6 +238,14 @@ enum AgentSetting: String, CaseIterable {
         case .xPlanPrice: return InputRule.short.clean(v)
         case .project: return InputRule.name.clean(v)
         case .keepAwake: return oneOf(["off", "plugged-in", "always"])
+        case .extrasWorkspace, .extrasKeyFolder, .extrasReposFolder:
+            if v.lowercased() == "none" { return "none" }
+            let c = InputRule.path.clean(v)
+            return c.hasPrefix("/") || c.hasPrefix("~") ? c : nil   // a full path; relative paths belong in the workspace file
+        case .extrasAIPauseCard, .extrasZohoMail: return oneOf(["true", "false", "none"])
+        case .extrasTimeZone:
+            if v.lowercased() == "none" { return "none" }
+            return TimeZone.knownTimeZoneIdentifiers.first { $0.caseInsensitiveCompare(v) == .orderedSame }
         }
     }
 }
@@ -256,6 +279,22 @@ final class AgentBridge {
 
     // MARK: State
 
+    /// Your extras for `hm extras` and state.json: each one's state, value (a path or zone, never a key), where it
+    /// comes from and whether only the owner can change it.
+    static func extrasRows() -> [String: Any] {
+        let e = Extras.current
+        let rows: [[String: Any]] = e.items(xFileSetting: XFileFeed.shared.path).map { i in
+            ["id": i.id, "title": i.title, "on": i.on, "value": i.value ?? NSNull(), "from": i.source.rawValue,
+             "owner_only": i.ownerOnly, "agent_can_set": !i.ownerOnly && AgentSetting(rawValue: i.id) != nil, "what": i.note]
+        }
+        let owner: [[String: Any]] = e.owner.isOn ? e.ownerOnly.map { ["id": $0.id, "title": $0.title, "on": $0.on, "owner_only": true, "why": $0.why] } : []
+        let fileState: String = switch e.fileState {
+        case .none: "no workspace folder"; case .missing: "missing"; case .ok: "read"; case .unreadable(let why): "not used: \(why)"
+        }
+        return ["items": rows, "owner_only": owner, "workspace_file": e.workspaceFileURL?.path ?? NSNull(), "workspace_file_state": fileState,
+                "how_to_set": "hm set key=<id> value=<value> for ids with agent_can_set (value none clears), or write config/hmunmawi-extras.json in the workspace folder (snake_case keys: key_folder, repos_folder, ai_pause_card, zoho_mail, x_file, time_zone)."]
+    }
+
     /// Rewrites state.json when what the app shows has changed.
     func publishState() {
         guard let model else { return }
@@ -285,6 +324,7 @@ final class AgentBridge {
             "x_plan": ["name": XPlan.shared.name, "price": XPlan.shared.price, "source": XPlan.shared.source,
                        "renews": XPlan.shared.renews.map { iso.string(from: $0) } ?? NSNull()] as [String: Any],
             "settings": settings,
+            "extras": Self.extrasRows(),
             "agent_may_do_without_asking": AgentPolicy.shared.fullTrust ? AgentAction.allCases.map(\.rawValue) : AgentPolicy.shared.allowed.sorted(),
             // Rules for one badged agent ("allow" or "ask" per kind of action); any kind not listed follows the list above.
             "agent_rules": AgentPolicy.shared.perAgent,
@@ -435,6 +475,9 @@ final class AgentBridge {
                 return ["ok": false, "error": "Unknown setting. Settable: " + AgentSetting.allCases.map(\.rawValue).joined(separator: ", ")]
             }
             guard key.validate(args["value"] ?? "") != nil else { return ["ok": false, "error": "Bad value for \(key.rawValue): expected \(key.help)."] }
+            if key.isExtra, Extras.current.items().first(where: { $0.id == key.rawValue })?.source == .owner {
+                return ["ok": false, "error": "\(key.rawValue) is set by the owner settings file; only the owner can change it there."]
+            }
         }
         // Script routines are the owner's alone: refused at once, never parked for an OK that would then fail.
         if ["routine-add", "routine-set"].contains(command),
@@ -625,6 +668,8 @@ final class AgentBridge {
                 out.append(["app": name, "versions": Array(versions)])
             }
             return ["ok": true, "result": ["apps": out, "note": "went_live_seen is the go-live day: from Apple's public App Store page for the version on sale now, otherwise when Hmunmawi saw the live version change."]]
+        case "extras":
+            return ["ok": true, "result": Self.extrasRows()]
         case "mail-status":
             let d = UserDefaults.standard
             return ["ok": true, "result": ["source": MailWatch.kind.rawValue, "server": d.string(forKey: MailWatch.hostKey) ?? "",
@@ -897,6 +942,8 @@ final class AgentBridge {
         case .xSafariRead: XSafariReader.shared.enabled = value == "true"
         case .xHandle: XSafariReader.shared.handle = value
         case .keepAwake: KeepAwake.shared.mode = KeepAwake.Mode(rawValue: value) ?? .off
+        case .extrasWorkspace, .extrasKeyFolder, .extrasReposFolder, .extrasAIPauseCard, .extrasZohoMail, .extrasTimeZone:
+            ExtrasStore.set(key.rawValue, value == "none" ? nil : value)
         case .xPlanSource: XPlan.shared.source = value
         case .xPlan: XPlan.shared.name = value
         case .xPlanPrice: XPlan.shared.price = value
@@ -929,6 +976,7 @@ enum AgentGuide {
         ["name": "bank-list|bank-add", "args": "[bank=posts] [text=<a ready draft>] [tag=<word>]", "does": "Prepared drafts a routine uses before any AI", "needs": "bank-add: routines"],
         ["name": "data-read", "args": "[kind=<event kind>] [since=YYYY-MM-DD] [app=<name>] [limit=200]", "does": "Stored numbers by kind (sales, search, crashes, mail list...), newest first; with no kind, the kinds stored and their counts (read only)", "needs": "nothing"],
         ["name": "release-timeline", "args": "[app=<name>]", "does": "Each app's versions, state, when Hmunmawi saw them go live and what the numbers did around it (read only)", "needs": "nothing"],
+        ["name": "extras", "does": "Your extras (Settings → General): workspace folder, Find my key folders, AI pause card, Zoho reader, X file, fixed time zone and owner-only ones; each with on/off, value, where it comes from and whether an agent may set it (read only; set with `set key=extras.<name>`)", "needs": "nothing"],
         ["name": "mail-status", "does": "Where outreach replies are read from (Apple Mail or IMAP): server, user, whether a password is saved, last read (read only; the password is never shown)", "needs": "nothing"],
         ["name": "mail-source", "args": "kind=<off|apple-mail|zoho-safari|imap> [host=<imap server, or the Zoho address for zoho-safari>] [user=<address>] [port=993]", "does": "Choose the mailbox for outreach replies. Never takes a password (the owner types it in the app); changing server or address clears any saved password", "needs": "connections"],
         ["name": "quota-list", "args": "", "does": "Request limits that services report about themselves (App Store Connect, X ...): used percent, requests left, reset time (read only)", "needs": "nothing"],

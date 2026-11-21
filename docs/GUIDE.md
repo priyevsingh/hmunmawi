@@ -512,9 +512,13 @@ Settings (⌘,) lists its panes in a sidebar on the left, like System Settings: 
 
 <details><summary>How it works</summary>
 
+**Your extras** (at the top): what your own setup switches on. A **workspace folder** (your private repo: Find my key looks in it, Settings → Jobs finds its switch file there), a **key folder** and a **repositories folder** Find my key looks in first (nothing is read until you press Find my key), the **AI job pause card** for your own AI runner (Today and the menu bar), the **Zoho Mail reader** (adds Zoho Mail to Connections → Mail, read through your Safari login), **X numbers from a file** and a **fixed time zone** that every date and "today" follows. Each row says where it comes from: Settings, your workspace's `config/hmunmawi-extras.json` ([recipe](PRIVATE-WORKSPACE.md#your-extras-from-your-workspace)) or, on a Mac that has one, the owner settings file, which wins and can't be changed here. A choice made here wins over the workspace file. The **Keychain-prompt watcher** row is read only: it comes only in builds you make yourself. Agents read the list with `hm extras` and change it with `hm set key=extras.<name>`.
+
 **Keep this Mac awake for routines** (Off, While plugged in, Always; off by default): stops idle sleep while Hmunmawi runs, so routines and Mac jobs run on time; the screen still sleeps and closing a laptop's lid still sleeps the Mac. **Words I never use**: one word or phrase per line, then `|` and why (optional); `re:` starts a pattern. Post drafts and reply ideas that use one are skipped, the drafting AI is told to avoid them, and scripts and agents check any text with `hm lint-text`. Rating-drop alerts, star ratings from the public App Store page, a warning at 80% of a service's request limit, quiet hours, the weekly digest, the add-on sandbox, and fix scripts that run by themselves when a problem appears (they wait for a new OK if the file changes).
 
 </details>
+
+![General: Your extras](images/guide/set-general-00.png)
 
 ![General: alerts, quiet hours, digest, sandbox, fix scripts](images/guide/set-general-01.png)
 

@@ -5,7 +5,7 @@ import Security
 import SwiftUI
 
 /// "Find my key": looks for a connection's key where people usually keep them (nothing is read until you press it):
-///   1. folders you added under "Also look in" (and, on an owner Mac, the owner's key folder and hub; see OwnerConfig)
+///   1. folders you added under "Also look in", your key folder and workspace (Your extras; the owner's on an owner Mac)
 ///   2. .env and config.toml in standard places (~/.config, .env files in your home folder) and those folders
 ///   3. App Store Connect AuthKey_*.p8 files
 ///   4. keys an older Hmunmawi saved in the Keychain under an older name ("Keychain · <service>")
@@ -61,18 +61,23 @@ enum KeyFinder {
         UserDefaults.standard.set((UserDefaults.standard.stringArray(forKey: foldersKey) ?? []).filter { $0 != path }, forKey: foldersKey)
     }
 
+    /// Your key folder and workspace (Settings → General → Your extras), or the owner's on an owner Mac.
+    nonisolated static var extraFolders: [URL] {
+        let e = Extras.current
+        return [e.keyFolder.url, e.workspace.url].compactMap { $0 }
+    }
+
     /// Where Find my key looks, in order: your chosen folders, the owner's folders (owner Macs only), then standard
     /// places. Never a hard-coded personal folder.
     nonisolated static func envRoots() -> [URL] {
         let home = URL.homeDirectory
         var roots: [URL] = userFolders
-        if let k = SecretSourceDefaults.keyFolder() { roots.append(k) }
-        if let h = SecretSourceDefaults.hub() { roots.append(h) }
+        for u in extraFolders where !roots.contains(u) { roots.append(u) }
         roots.append(home.appending(path: ".config"))
         for name in ((try? FileManager.default.contentsOfDirectory(atPath: home.path)) ?? []) where name == ".env" || name.hasSuffix(".env") {
             roots.append(home.appending(path: name))
         }
-        if let repos = OwnerConfig.current.reposURL,
+        if let repos = Extras.current.reposFolder.url,
            let list = try? FileManager.default.contentsOfDirectory(at: repos, includingPropertiesForKeys: nil) {
             roots += list.prefix(40)
         }
@@ -81,7 +86,7 @@ enum KeyFinder {
 
     /// Folders that rank first (yours, and the owner's own).
     nonisolated static func preferredRoot(_ path: String) -> Bool {
-        let firsts = userFolders + [SecretSourceDefaults.keyFolder(), SecretSourceDefaults.hub()].compactMap { $0 }
+        let firsts = userFolders + extraFolders
         return firsts.contains { path.hasPrefix($0.path) }
     }
 

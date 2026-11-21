@@ -85,8 +85,14 @@ and asks before it acts. Users' guide: [README.md](README.md).
   how it runs), its form in `RoutinesSheet.swift`, a row in [docs/ROUTINES.md](docs/ROUTINES.md), and a test.
 - **New agent command:** add the case and its guide row in `AgentBridge.swift`; read-only commands also go in
   `readCommands` in `Sources/hmunmawi-cli/main.swift`.
-- **A setting only one person needs:** put it behind an `OwnerConfig` field (`owner.json` in the app's data
-  folder, off unless it says `"enabled": true`). Never put personal paths or names in code.
+- **An extra some people need** (a folder to look in, a card, a reader, a time zone): make it a generic extra in
+  `Sources/HmunmawiCore/Extras.swift` (a `UserExtras` field, a row in `items()`, a snake_case key for the workspace
+  file `config/hmunmawi-extras.json`), an `extras.*` key in `AgentSetting` with its permission, a row in
+  `ExtrasSection.swift` and a test in `ExtrasTests`. Order: owner settings file > Settings > workspace file.
+- **A setting only one person can have** (it runs a program they name, needs a build made on their Mac, or keeps
+  keys outside the Keychain): put it behind an `OwnerConfig` field (`owner.json` in the app's data folder, off unless
+  it says `"enabled": true`), list it in `Extras.ownerOnly` with why, and never make it agent-settable. Never put
+  personal paths or names in code.
 
 ## Ground rules
 
