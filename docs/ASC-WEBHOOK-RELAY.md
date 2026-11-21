@@ -1,12 +1,12 @@
 # ASC webhook event relay (protocol v2)
 
 > **Who needs this:** only developers working on Hmunmawi's live-sales worker (the small Cloudflare worker you can
-> deploy to your own account from Settings → Connections → Live sales). Users don't need to read it: the app sets
+> deploy to your own account from Settings → General → Live sales). Users don't need to read it: the app sets
 > the worker up for you.
 
 ## How live sales reach your Mac, in plain words
 
-1. You switch on *within seconds* in Settings → Connections; Hmunmawi deploys a small worker to **your own**
+1. You switch on *within seconds* in Settings → General → Live sales; Hmunmawi deploys a small worker to **your own**
    Cloudflare account and shows its address.
 2. You paste that address into App Store Connect once.
 3. When someone buys or renews, Apple sends a signed notification to your worker. It keeps only Apple-signed ones,
@@ -24,7 +24,7 @@ flowchart LR
     M --> Y["Sale shown and alert sent"]
 ```
 
-The live-sales worker only takes notifications for the bundle ids in your app names (Settings → Connections → Live
+The live-sales worker only takes notifications for the bundle ids in your app names (Settings → General → Live
 sales); without that list it takes nothing (HTTP 503) and Hmunmawi asks for the names before it deploys. Bodies over
 64 KB are refused. The webhook-only worker (`hmunmawi-hooks`) receives App Store Connect webhooks on `/asc` and has
 no app list; its `/asc` paths are unaffected.

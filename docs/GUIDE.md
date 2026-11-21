@@ -532,6 +532,11 @@ Settings (⌘,) lists its panes in a sidebar on the left, grouped like System Se
 
 </details>
 
+**Live sales** (near the bottom of General) sets up a small worker in your own Cloudflare account. Fill in your app
+names (`bundle.id=Name`) first: the worker only takes your own apps' notifications. When a new Hmunmawi version
+brings worker changes, it updates the worker by itself with the token you saved (address and keys stay the same);
+**Update worker**, next to Remove, does it on demand; if Cloudflare refused the saved token, Live sales says so and a field for a new one shows there. [How it works](ASC-WEBHOOK-RELAY.md#keeping-the-worker-up-to-date)
+
 ![General: Your extras](images/guide/set-general-00.png)
 
 ![General: alerts, quiet hours, digest, sandbox, fix scripts](images/guide/set-general-01.png)
@@ -552,11 +557,6 @@ Appearance, the currency money is shown in, the ad cost per download, **Export y
 One section per source, keys saved in the Keychain, *Find my key*, Check Now and Disconnect. A key that was found from a file is re-imported from that file at launch, in the background after the window is up, so a protected folder never freezes the start; if macOS refuses the file, only that connection is marked as needing attention. A key saved by a differently signed copy of the app is re-saved in a fresh Keychain item, with no password box. Also **how fast sales arrive**: next morning (Apple's daily report), within minutes (Apple's notification history, with an In-App Purchase key) or within seconds (a free worker in your own Cloudflare account, see [the relay guide](ASC-WEBHOOK-RELAY.md)), and **Outreach replies** (Apple Mail, or IMAP with presets for Gmail, iCloud, Outlook and Fastmail).
 
 </details>
-
-**Live sales** (at the bottom of Connections) sets up a small worker in your own Cloudflare account. Fill in your app
-names (`bundle.id=Name`) first: the worker only takes your own apps' notifications. When a new Hmunmawi version
-brings worker changes, it updates the worker by itself with the token you saved (address and keys stay the same);
-**Update worker**, next to Remove, does it on demand; if Cloudflare refused the saved token, a field for a new one shows there. [How it works](ASC-WEBHOOK-RELAY.md#keeping-the-worker-up-to-date)
 
 ![Connections](images/guide/set-connections-00.png)
 

@@ -406,7 +406,7 @@ final class LivePurchases {
         defaults.set(Self.workerCodeVersion, forKey: Self.workerUpdateTriedKey)
         defaults.set(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "", forKey: Self.workerUpdateTriedBuildKey)
         guard let token = liveSecret("hookCloudflareToken") else {
-            status = "Your webhook worker is an older version. Paste a Cloudflare token and press Update worker (Settings → Connections → Live sales)."
+            status = "Your webhook worker is an older version. Paste a Cloudflare token and press Update worker (Settings → General → Live sales)."
             return
         }
         _ = await updateHooksWorker(token: token)

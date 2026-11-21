@@ -2,6 +2,13 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.6 (build 156), 21 Nov 2026
+
+**Fixed**
+- Live sales is in **Settings → General**. The What's new buttons for the live-sales changes, the worker message in Live sales and the docs (Guide, relay doc, Security, capability list) said Connections; they now point to General.
+
+Hmunmawi still does everything it did in 1.5.5. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.5 (build 155), 21 Nov 2026
 
 **Fixed**
@@ -32,7 +39,7 @@ Hmunmawi still does everything it did in 1.5.2. Full list: [docs/CAPABILITIES.md
 - **Worker fixes now reach existing setups.** The Cloudflare workers Hmunmawi deploys report a code version (`code_version` at `/asc/capabilities`). When the webhook worker in your account is older than the app's, Hmunmawi updates it at start with the Cloudflare token you saved, keeping its address, store and relay key, and checks the new version. One try per version: a failure is said plainly in Live sales and never retried in a loop. This brings 1.5.1's live-sales protections (only your own apps, nothing over 64 KB) to workers set up before.
 
 **New**
-- **Update worker** next to Remove in Settings → Connections → Live sales, for the webhook worker and for a purchase worker you deployed from the app (with a token field when none is saved).
+- **Update worker** next to Remove in Settings → General → Live sales, for the webhook worker and for a purchase worker you deployed from the app (with a token field when none is saved).
 
 **Docs**
 - Guide pictures of Settings retaken with the grouped sidebar (and a new one of Settings → Jobs with Set up…), in dark mode. New diagrams: how an agent's request is decided (Guide) and how the worker stays up to date (live-sales relay doc). Capability list, README, ROUTINES, the private-workspace AGENTS starter and AGENTS.md (new worker-version rule) follow 1.5.1 and 1.5.2.
@@ -47,7 +54,7 @@ Hmunmawi still does everything it did in 1.5.1: the daily answer, Apple apps wit
 - **Mac jobs:** agents can schedule only your own Mac jobs (the same prefix check as `job-run`, never `com.apple.*`); a routine that starts a Mac job needs "Run or pause Mac jobs"; only you can change the Mac jobs prefixes.
 - **Web checks** (link check, outreach check) read at most their size limit while downloading, give up after 30 seconds, and never follow a redirect to this Mac or your own network. Links to local addresses are skipped.
 - **Fixed time zone** set by an agent now needs "Run or change routines" (it moves every routine's time).
-- **Live sales:** the worker takes nothing until your app names are set (Hmunmawi asks for them before it deploys) and refuses bodies over 64 KB. Redeploy from Settings → Connections → Live sales to get it.
+- **Live sales:** the worker takes nothing until your app names are set (Hmunmawi asks for them before it deploys) and refuses bodies over 64 KB. Redeploy from Settings → General → Live sales to get it.
 - The owner settings and key-folder environment variables only work in test profiles.
 
 **Better**

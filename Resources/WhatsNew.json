@@ -2,12 +2,22 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.5.6",
+      "items": [
+        {
+          "title": "Live sales buttons open the right place",
+          "detail": "Live sales is in Settings → General. The What's new buttons and messages about your worker now point there.",
+          "action": "settings:general"
+        }
+      ]
+    },
+    {
       "version": "1.5.5",
       "items": [
         {
           "title": "A new token when Cloudflare refuses the old one",
           "detail": "If Cloudflare refuses the token saved for your live-sales worker, Live sales says so and asks for a new one next to Update worker.",
-          "action": "settings:connections"
+          "action": "settings:general"
         }
       ]
     },
@@ -26,7 +36,7 @@
         {
           "title": "Worker updates with a one-account token",
           "detail": "Updating your live-sales worker now also works with a Cloudflare token that is limited to one account.",
-          "action": "settings:connections"
+          "action": "settings:general"
         }
       ]
     },
@@ -36,7 +46,7 @@
         {
           "title": "Your live-sales worker stays up to date",
           "detail": "When a new version changes the worker, Hmunmawi updates the one in your Cloudflare account by itself. Update worker in Live sales does it on demand.",
-          "action": "settings:connections"
+          "action": "settings:general"
         }
       ]
     },
