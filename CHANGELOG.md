@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.4 (build 154), 21 Nov 2026
+
+**New**
+- **What changed, in plain words.** The update window shows the notes of this version and the four before it, and after an update Today shows a one-time **What's new** card: what is new since the version you last used, a line or two each, with a button to the screen it is on (for example Settings → Jobs). **Got it** puts it away. A fresh install shows a short **Start here** instead.
+- One source for both: `Resources/WhatsNew.json`. `release.sh` stops before building when a version has no notes and after building when the feed item has none.
+
+Hmunmawi still does everything it did in 1.5.3. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.3 (build 153), 21 Nov 2026
 
 **Fixed**

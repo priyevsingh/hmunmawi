@@ -148,7 +148,7 @@ everything else is exactly what the app shows.
 5. **Stuck?** See *When something's wrong* (under Everything else), or open an issue on GitHub.
 
 Your first real numbers appear within a few minutes of connecting; Apple's daily reports arrive the next morning.
-Hmunmawi updates itself: Hmunmawi → Check for Updates…
+Hmunmawi updates itself: Hmunmawi → Check for Updates… The update window says what changed, and after the update Today shows a one-time **What's new** card with a button to each new screen (a fresh install gets a short **Start here** instead).
 
 
 ## Documentation

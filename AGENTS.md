@@ -78,6 +78,8 @@ and asks before it acts. Users' guide: [README.md](README.md).
   `workerCore.mjs`, `LivePurchases.workerCodeVersion` and `Resources/LiveWorkerVersion.json` (new `sha256`);
   `WorkerVersionTests` enforces it. That version is how installed apps know to update a deployed worker
   ([docs/ASC-WEBHOOK-RELAY.md](docs/ASC-WEBHOOK-RELAY.md#keeping-the-worker-up-to-date)).
+- **Releases:** add the version's user-facing notes at the top of `Resources/WhatsNew.json` (Today's What's new card
+  and the update window both read it; `release.sh` refuses a version without notes). CHANGELOG.md is the developer record.
 - **MCP tools:** `readCommands`, `changeCommands` and `actCommands` in `Sources/hmunmawi-cli/main.swift` build the
   tools' lists; a new agent command goes in one of them (`MCPToolListTests` checks every guide command has a tool).
   A new pane is a new case there; `hm set settings.tab` and `SettingsPaneTests` follow it.

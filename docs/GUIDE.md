@@ -41,12 +41,26 @@ The latest sale, renewal, refund or review slides by at the top; a real sale als
 
 </details>
 
+#### 🆕 What's new and Start here
+**Know what changed after an update, once.**
+
+<details><summary>How it works</summary>
+
+After an update, a card under the headline lists what is new since the version you last used (up to five versions,
+newest first), each change in a line or two with a button to its screen. **Got it** puts it away for good. A fresh
+install shows **Start here** instead: three short pointers to Today, Connections and Automations. The update window
+shows the same notes before you install; both come from one file in the app.
+
+</details>
+
+![What's new card on Today](images/guide/today-whatsnew.png)
+
 #### 📊 Money, Reach, Health
 **Know in three numbers whether today is good.**
 
 <details><summary>How it works</summary>
 
-People paying now and 14-day earnings; how many times you were seen on Google, YouTube and Bing; crash-free sessions and anything that needs a look (developer membership, a version in review).
+People paying now and 14-day earnings (its change since your last look says what it measures); how many times you were seen on Google, YouTube and Bing; crash-free sessions, with anything that needs a look (developer membership, a version in review) on the line under it.
 
 </details>
 

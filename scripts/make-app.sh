@@ -130,6 +130,7 @@ cp "$root/Resources/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"   # fro
 cp "$root/Resources/PrivacyInfo.xcprivacy" "$app/Contents/Resources/PrivacyInfo.xcprivacy"   # Apple privacy manifest
 # Live sales: the small Cloudflare worker Hmunmawi uploads to your own account when you switch it on.
 cp -R "$root/Resources/LiveWorker" "$app/Contents/Resources/LiveWorker"
+cp "$root/Resources/WhatsNew.json" "$app/Contents/Resources/WhatsNew.json"   # the Today card's and update window's notes
 # Login agent: starts Hmunmawi at login and relaunches it if it ever crashes.
 mkdir -p "$app/Contents/Library/LaunchAgents"
 cp "$root/Resources/io.github.priyevsingh.Hmunmawi.agent.plist" "$app/Contents/Library/LaunchAgents/"

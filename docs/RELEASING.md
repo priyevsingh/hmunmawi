@@ -19,7 +19,8 @@ the hardened runtime, Apple's notary check and a stapled ticket. `scripts/releas
 Before tagging, tick the docs checklist: Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](CAPABILITIES.md); other docs point to it, including [PRIVATE-WORKSPACE.md](PRIVATE-WORKSPACE.md) and the AGENTS.md starter inside it. The release notes and the GitHub release description must not drop any capability either.
 
 ```sh
-# bump CFBundleShortVersionString / CFBundleVersion in Resources/Info.plist, update CHANGELOG.md, then:
+# bump CFBundleShortVersionString / CFBundleVersion in Resources/Info.plist, update CHANGELOG.md, add the version's
+# user-facing notes at the top of Resources/WhatsNew.json, then:
 NOTARY_PROFILE=hmunmawi-notary scripts/release.sh
 ```
 
@@ -43,6 +44,15 @@ commit to pass, and only then tags `v<version>` and publishes the GitHub release
 (notes from the matching CHANGELOG.md section). If CI fails or never starts, nothing is tagged or published. Never
 tag or run `gh release create` by hand before CI is green. CodeQL runs separately and slowly; check its alerts after.
 
+**Release notes, one source.** `Resources/WhatsNew.json` holds the user-facing notes, newest first (1-3 short items
+per version, each with an optional button: `settings:<pane>` or `page:<today|apps|log|automations>`). `release.sh`
+stops before building when the version has none; after notarizing it writes them with `scripts/release-notes.py html`
+next to the zip, `generate_appcast --embed-release-notes` puts them in the feed item's `<description>` (this version
+and the four before it, so someone who skipped updates still reads what changed), and `release-notes.py check` stops
+the release if the feed item ends up without notes. The app bundles the same file for Today's one-time **What's new**
+card (`WhatsNewCard`, `WhatsNew` in HmunmawiCore); `WhatsNewFileTests` fails when the current version has no entry.
+CHANGELOG.md stays the developers' record.
+
 ### The release gate, as a picture
 
 In plain words:
@@ -56,13 +66,17 @@ In plain words:
 
 ```mermaid
 flowchart TD
-    B["release.sh: build, sign, notarize"] --> G{"Same signing requirement as last release?"}
+    W{"Notes for this version in WhatsNew.json?"} -->|no| WS["Stop before building"]
+    W -->|yes| B["release.sh: build, sign, notarize"]
+    B --> G{"Same signing requirement as last release?"}
     G -->|no| S["Stop: fix the signing identity"]
-    G -->|yes| P["publish-release.sh: gate again, push main"]
+    G -->|yes| F["Feed: notes embedded, checked not empty"]
+    F --> P["publish-release.sh: gate again, push main"]
     P --> C{"CI green?"}
     C -->|no| N["Nothing tagged or published"]
     C -->|yes| R["Tag and GitHub release with appcast"]
-    R --> U["Users update after asking"]
+    R --> U["Users see the notes, update after asking"]
+    U --> T["Today: What's new card once"]
 ```
 
 ## Owner builds

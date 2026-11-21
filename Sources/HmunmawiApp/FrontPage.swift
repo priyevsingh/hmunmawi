@@ -22,6 +22,7 @@ struct FrontPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 headline(facts: facts, earned: earned, sales: sales, since: since)
+                WhatsNewCard()
                 SetupChecklist(model: model, permissions: Permissions.shared) { step in
                     UserDefaults.standard.set(step, forKey: "HMSetupStep")
                     UserDefaults.standard.set(false, forKey: SetupState.doneKey)
