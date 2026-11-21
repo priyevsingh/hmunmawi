@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.5 (build 155), 21 Nov 2026
+
+**Fixed**
+- **A new token when Cloudflare refuses the saved one.** When the last update of your webhook worker was refused (no access, or the token sees no account), Live sales says so and shows a token field with **Update worker**, instead of offering only the saved token again.
+- Start here's first row no longer has an "Open Today" button (it already shows on Today).
+
+Hmunmawi still does everything it did in 1.5.4. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.4 (build 154), 21 Nov 2026
 
 **New**

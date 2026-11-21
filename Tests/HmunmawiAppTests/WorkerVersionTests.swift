@@ -40,4 +40,14 @@ import Testing
         let old = try JSONDecoder().decode(AscWebhookStream.Capabilities.self, from: Data(#"{"asc_queue_v2":true}"#.utf8))
         #expect(old.code_version == nil)
     }
+
+    /// A refused saved token makes Live sales ask for a new one (1.5.5).
+    @Test func refusedTokenIsRecognised() {
+        #expect(LivePurchases.tokenRefused(putOK: false, putHTTP: 403, error: nil))
+        #expect(LivePurchases.tokenRefused(putOK: false, putHTTP: 401, error: nil))
+        #expect(LivePurchases.tokenRefused(putOK: false, putHTTP: 0, error: "Cloudflare refused: No access to the specified resource.. Check the token's permissions."))
+        #expect(LivePurchases.tokenRefused(putOK: false, putHTTP: 0, error: "That token can't see a Cloudflare account. Create it with …"))
+        #expect(!LivePurchases.tokenRefused(putOK: true, putHTTP: 403, error: "old"))            // a later success clears it
+        #expect(!LivePurchases.tokenRefused(putOK: false, putHTTP: 500, error: "Cloudflare is down"))  // not a token problem
+    }
 }

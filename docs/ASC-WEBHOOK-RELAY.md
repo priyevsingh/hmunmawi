@@ -36,7 +36,9 @@ counts as 0). When Hmunmawi starts and the webhook worker is older than the code
 with the Cloudflare token you saved, keeping its address, store and relay key, then checks the new version. A failed
 update is not retried by itself (one try per code version and app build); it says so in Live sales, and the worker keeps running as
 before. **Update worker** (next to Remove, for the webhook worker and for a purchase worker you deployed from the app)
-does the same on demand.
+does the same on demand. If Cloudflare refused the saved token (no access, or it sees no account), Live sales says so
+and shows a token field next to Update worker: paste a token with Workers Scripts: Edit and Workers KV Storage: Edit
+for that account.
 
 ```mermaid
 flowchart TD
@@ -49,6 +51,7 @@ flowchart TD
     D --> R{"Reports the new version?"}
     R -->|yes| U["Updated"]
     R -->|no| F["Plain note in Live sales; Update worker tries again"]
+    D -->|"token refused"| N["Live sales asks for a new token"]
 ```
 
 For developers: whenever any file in `Resources/LiveWorker/` changes, bump `WORKER_CODE_VERSION` in `workerCore.mjs`,

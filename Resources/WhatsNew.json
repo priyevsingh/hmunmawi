@@ -2,6 +2,16 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.5.5",
+      "items": [
+        {
+          "title": "A new token when Cloudflare refuses the old one",
+          "detail": "If Cloudflare refuses the token saved for your live-sales worker, Live sales says so and asks for a new one next to Update worker.",
+          "action": "settings:connections"
+        }
+      ]
+    },
+    {
       "version": "1.5.4",
       "items": [
         {
@@ -53,8 +63,7 @@
   "start_here": [
     {
       "title": "Today is your daily answer",
-      "detail": "One sentence each morning: what went well, what to watch and what to do next. Sample numbers show until your own arrive.",
-      "action": "page:today"
+      "detail": "One sentence each morning: what went well, what to watch and what to do next. Sample numbers show until your own arrive."
     },
     {
       "title": "Connect your apps",

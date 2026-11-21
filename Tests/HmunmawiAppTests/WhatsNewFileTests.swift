@@ -20,6 +20,7 @@ import Testing
             if let a = item.action { #expect(WhatsNewCard.buttonTitle(a) != nil, "\(a) opens nothing") }
         }
         #expect(notes.versions.allSatisfy { (1...3).contains($0.items.count) } && !notes.start_here.isEmpty)
+        #expect(notes.start_here.first?.action == nil)   // Start here shows on Today: no button back to Today
         #expect(WhatsNewCard.buttonTitle("settings:jobs") == "Open Jobs" && WhatsNewCard.buttonTitle("page:automations") == "Open Automations")
     }
 }

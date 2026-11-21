@@ -834,7 +834,7 @@ private struct LiveSalesSection: View {
                             }
                             if live.hasHookWorker {
                                 HStack {
-                                    if live.canUpdateHooksWorker {
+                                    if live.canUpdateHooksWorker && !live.hookTokenRefused {
                                         Button("Update worker") { Task { await live.updateHooksWorkerWithSavedToken() } }
                                             .disabled(live.busy)
                                             .help("Puts this version's worker code on Cloudflare; its address and keys stay the same. It also happens by itself when a new version brings worker changes.")
@@ -842,7 +842,11 @@ private struct LiveSalesSection: View {
                                     ConfirmButton(title: "Remove webhook worker from Cloudflare", question: "Remove the webhook worker?", detail: "App Store Connect updates stop arriving until you set it up again.") { Task { await live.removeHooks() } }
                                         .disabled(live.busy)
                                 }
-                                if !live.canUpdateHooksWorker {
+                                if live.hookTokenRefused {
+                                    Label("Cloudflare refused the saved token. Paste one with Workers Scripts: Edit and Workers KV Storage: Edit for this account.", systemImage: "exclamationmark.triangle.fill")
+                                        .font(.callout).foregroundStyle(Brand.caution).fixedSize(horizontal: false, vertical: true)
+                                }
+                                if !live.canUpdateHooksWorker || live.hookTokenRefused {
                                     HStack {
                                         SecureField("", text: $cfToken, prompt: Text("Cloudflare API token, to update the webhook worker"))
                                             .accessibilityLabel("Cloudflare API token to update the webhook worker").input(.secret, $cfToken)

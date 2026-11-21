@@ -456,9 +456,22 @@ final class LivePurchases {
     private(set) var hasSavedPurchaseToken = false
     var canUpdateHooksWorker: Bool { hasHookWorker && hasSavedHookToken }
     var canUpdatePurchaseWorker: Bool { ownWorker && hasSavedPurchaseToken }
+    /// The last webhook-worker deploy was refused by Cloudflare (no access, or the token sees no account): the saved
+    /// token can't update it, so Settings asks for a new one.
+    private(set) var hookTokenRefused = false
+    nonisolated static func tokenRefused(putOK: Bool, putHTTP: Int, error: String?) -> Bool {
+        guard !putOK else { return false }
+        if putHTTP == 401 || putHTTP == 403 { return true }
+        let e = (error ?? "").lowercased()
+        return e.contains("can't see a cloudflare account") || e.contains("no access") || e.contains("authentication")
+            || e.contains("check the token's permissions")
+    }
     func refreshSavedTokens() {
         hasSavedHookToken = keychainPresence("hookCloudflareToken") == .present
         hasSavedPurchaseToken = keychainPresence("cloudflareToken") == .present
+        hookTokenRefused = defaults.object(forKey: "HMAscProbeDeployPutOK") != nil
+            && Self.tokenRefused(putOK: defaults.bool(forKey: "HMAscProbeDeployPutOK"), putHTTP: defaults.integer(forKey: "HMAscProbeDeployPutHTTP"),
+                                 error: defaults.string(forKey: "HMAscProbeDeployCfError"))
     }
 
     // MARK: Collecting
