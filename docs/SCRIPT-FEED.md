@@ -116,6 +116,36 @@ programs) with one event of kind `growth.programs`:
 `status` is `approved`, `review` (in review), `next` (apply next) or `later`. Click the card for every program,
 grouped by status.
 
+## "Needs a look" (amber, not a failure)
+
+For something a person should look at that isn't a broken job (a content queue that went quiet, a check that found
+something odd), send `job.attention`. It shows as an amber **Needs a look** item: counted in the health pill
+("1 needs a look"), listed in Today's Health card and timeline, and sent by the rule "A script says something needs a
+look" (Rules → Add; at most once a day, so a state that lasts doesn't repeat). Red "needs fixing" stays for real
+failures (`job.failed`).
+
+```json
+{ "events": [ { "kind": "job.attention", "app": "Site content", "occurredAt": 1794600000000,
+  "dedupeKey": "content-stuck-2026-11-21",
+  "payload": { "routine": "content_engine", "title": "Nothing new went live since 10 Nov",
+               "detail": "The weekly job publishes the next post" } } ] }
+```
+
+- `app` names the item; `payload.title` is the line shown, `payload.detail` (optional) the explanation.
+- `payload.routine` (or `payload.label` for a launchd job) identifies the job; without one, `app` does.
+- Use one `dedupeKey` per day (or per state) so resending every run keeps one item.
+- **Clear it** by sending a success for the same job: `routine.ok` with the same `payload.routine` (or `job.finished`
+  with the same label or app). The item goes away at once; an item older than a day goes away by itself.
+
+```mermaid
+flowchart LR
+    S["Your script"] -->|"job.attention"| N["Needs a look (amber)"]
+    N --> P["Health pill: 1 needs a look"]
+    N --> T["Today: Health card and timeline"]
+    N --> R["Rule alert, once a day at most"]
+    S -->|"routine.ok, same job"| C["Cleared"]
+```
+
 ## Events that start a fix script
 
 The script feed accepts any event kind. Four kinds can start a **fix script** you picked in Settings → General:

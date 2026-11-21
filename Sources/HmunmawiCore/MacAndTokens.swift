@@ -131,6 +131,7 @@ public enum EventText {
             let crashed = event.payload[path: "crashed"]?.number.map { String(Int(safe: $0)) } ?? "?"
             return "\(app): \(crashed) crashes in 24 hours"
         case "job.failed": return "Mac job “\(app)” failed"
+        case "job.attention": return event.payload[path: "title"]?.string.map { "\(app): \($0)" } ?? "“\(app)” needs a look"
         case "job.finished": return "Mac job “\(app)” finished"
         case "quota.high": return event.payload[path: "title"]?.string ?? "A service is near its request limit"
         case "rating.drop": return event.payload[path: "title"]?.string ?? "\(app): rating fell"

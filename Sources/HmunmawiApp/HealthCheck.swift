@@ -155,6 +155,9 @@ struct HealthCheck: View {
         let crashing = crashes.filter { ($0.payload[path: "crashed"]?.number ?? 0) > 0 }
         let failed = stillFailing(latest(model, "job.failed", within: 1), successes: model.events.filter { JobFailures.successKinds.contains($0.kind) })
         let down = latest(model, "site.down", within: 1)
+        // A script's "needs a look" (amber): open until a success for the same job arrives.
+        let look = JobFailures.needingLook(latest(model, JobFailures.attentionKind, within: 1),
+                                           successes: model.events.filter { JobFailures.successKinds.contains($0.kind) })
         let trend = crashTrend(model), worstRate = trend.last?.1
         var out: [Check] = []
 
@@ -173,6 +176,17 @@ struct HealthCheck: View {
         jobs.paragraphs = [failed.isEmpty ? "Every watched routine ran fine today." : failed.map { EventText.describe($0) }.joined(separator: "\n")]
         out.append(Check(id: "jobs", symbol: "gearshape.2.fill", title: "Mac jobs",
                          value: failed.isEmpty ? "All ran" : failed.count == 1 ? "\(failed[0].app.map { MacJobRoutine.shortName($0) } ?? "1") failed" : "\(failed.count) failed", level: failed.isEmpty ? .good : .bad, detail: jobs))
+
+        if !look.isEmpty {
+            var info = InfoModel(icon: .symbol("exclamationmark.bubble.fill"), tint: Brand.caution, title: "Needs a look")
+            info.paragraphs = [look.map { e in
+                let detail = e.payload[path: "detail"]?.string ?? e.payload[path: "error"]?.string
+                return EventText.describe(e) + (detail.map { ". \($0)" } ?? "")
+            }.joined(separator: "\n")]
+            out.append(Check(id: "attention", symbol: "exclamationmark.bubble.fill", title: "Needs a look",
+                             value: look.count == 1 ? (look[0].app ?? "1 thing") : "\(look.count) things",
+                             apps: look.compactMap(\.app), level: .caution, detail: info))
+        }
 
         var site = InfoModel(icon: .symbol("globe"), tint: Brand.Category.users, title: "Website")
         site.paragraphs = [down.isEmpty ? "All pages loading. Checked every few minutes." : (down.first.map { EventText.describe($0) } ?? "")]

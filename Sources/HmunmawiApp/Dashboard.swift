@@ -31,7 +31,7 @@ struct TodayTimeline: View {
     let events: [StoredEvent]
     var heals: [String: AppModel.HealState] = [:]
     // Money moments live in the ticker; Today keeps everything else that happened.
-    static let kinds: Set<String> = ["review.new", "mail.reply", "job.failed", "site.down", "disk.low", "crash.spike", "testflight.feedback", "ci.build"]
+    static let kinds: Set<String> = ["review.new", "mail.reply", "job.failed", "job.attention", "site.down", "disk.low", "crash.spike", "testflight.feedback", "ci.build"]
 
     var body: some View {
         let dayAgo = Millis(Date.now.timeIntervalSince1970 * 1000) - TodayBuilder.day
@@ -400,6 +400,7 @@ enum ActivityText {
         "job.done": "Job done",
         "job.retry": "Will retry",
         "job.failed": "Job failed",
+        "job.attention": "Needs a look",
         "testflight.feedback": "TestFlight feedback",
         "ci.build": "Xcode Cloud build",
         "job.approved": "Approved",

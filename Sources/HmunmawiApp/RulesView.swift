@@ -185,6 +185,7 @@ enum RuleText {
         .init(kind: "story.win", name: "A win in today's story"), .init(kind: "story.worry", name: "A worry in today's story"),
         .init(kind: "story.digest", name: "The morning story"), .init(kind: "story.weekly", name: "The weekly digest"), .init(kind: "job.failed", name: "A Mac job fails"),
         .init(kind: "job.finished", name: "A Mac job finishes"),
+        .init(kind: "job.attention", name: "A script says something needs a look"),
         .init(kind: "site.down", name: "The website goes down"), .init(kind: "disk.low", name: "Disk space runs low"),
         .init(kind: "offercodes.status", name: "Offer codes check (daily)"),
         .init(kind: "testflight.feedback", name: "A TestFlight tester sends feedback"),
@@ -239,6 +240,7 @@ enum RuleText {
         case "story.worry": "exclamationmark.triangle.fill"
         case "story.digest": "sunrise.fill"
         case "job.failed", "job.finished": "gearshape.2.fill"
+        case "job.attention": "exclamationmark.bubble.fill"
         case "site.down": "globe"
         case "disk.low": "internaldrive.fill"
         case "offercodes.status": "ticket.fill"
@@ -285,6 +287,8 @@ enum RuleTemplates {
         Group(title: "Stability", symbol: "checkmark.shield.fill", tint: Brand.Category.users, rules: [
             notify("tpl-crash-worry", "story.worry", "imessage", [Condition(field: "family", op: .contains, value: .string("crash"))], cooldown: 86_400),
             notify("tpl-job-failed", "job.failed", "ntfy", cooldown: 3_600),
+            // A script's "needs a look": once a day at most, so a state that lasts doesn't repeat.
+            notify("tpl-job-attention", "job.attention", "imessage", cooldown: 86_400),
             notify("tpl-job-finished", "job.finished", "imessage"),
             notify("tpl-site-down", "site.down", "imessage", cooldown: 3_600),
         ]),

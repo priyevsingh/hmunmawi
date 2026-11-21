@@ -118,6 +118,7 @@ enum EventStyle {
         case "revenue.billing_issue": ("creditcard.trianglebadge.exclamationmark", Brand.bad)
         case "crash.daily": ("bolt.trianglebadge.exclamationmark", Brand.bad)
         case "job.failed": ("gearshape.2.fill", Brand.bad)
+        case "job.attention": ("exclamationmark.bubble.fill", Brand.caution)
         case "testflight.feedback": ("airplane.departure", Brand.Category.users)
         case "ci.build": ("hammer.fill", .secondary)
         case "site.down": ("globe", Brand.bad)

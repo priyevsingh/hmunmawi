@@ -2,6 +2,13 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.7 (build 157), 21 Nov 2026
+
+**New**
+- **"Needs a look" from your scripts.** A script-feed event `job.attention` shows as an amber **Needs a look** item instead of a red failure: counted in the health pill, listed in Today's Health card and timeline, and sent by the new rule "A script says something needs a look" (at most once a day). A `routine.ok` or `job.finished` for the same job clears it. Format: [Script feed](docs/SCRIPT-FEED.md#needs-a-look-amber-not-a-failure).
+
+Hmunmawi still does everything it did in 1.5.6. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.6 (build 156), 21 Nov 2026
 
 **Fixed**

@@ -564,6 +564,30 @@ public enum JobFailures {
         }
     }
 
+    /// A script's "needs a look" (amber, not a failure): `job.attention`, cleared by a later success for the same job.
+    public static let attentionKind = "job.attention"
+
+    /// The job behind an attention or success event: a routine id or launchd label, else the app name.
+    static func lookKey(_ e: StoredEvent) -> String? { jobKey(e) ?? e.app.map { "app:" + $0 } }
+
+    /// The newest open "needs a look" per job, newest first: dropped once a success (`job.finished`, `routine.ok`)
+    /// for the same job (same routine, label or app) arrives after it.
+    public static func needingLook(_ events: [StoredEvent], successes: [StoredEvent] = []) -> [StoredEvent] {
+        var ok: [String: Millis] = [:]
+        for e in successes where successKinds.contains(e.kind) {
+            for k in [jobKey(e), e.app.map { "app:" + $0 }].compactMap({ $0 }) { ok[k] = max(ok[k] ?? 0, e.occurredAt) }
+        }
+        var newest: [String: StoredEvent] = [:]
+        for e in events where e.kind == attentionKind {
+            guard let k = lookKey(e) else { continue }
+            if (newest[k]?.occurredAt ?? -1) < e.occurredAt { newest[k] = e }
+        }
+        return newest.filter { k, e in
+            let cleared = [k, e.app.map { "app:" + $0 }].compactMap { $0 }.contains { (ok[$0] ?? -1) > e.occurredAt }
+            return !cleared
+        }.values.sorted { $0.occurredAt > $1.occurredAt }
+    }
+
     /// The same events with recovered job failures removed (every other kind untouched, order kept).
     public static func withoutRecovered(_ events: [StoredEvent], states: [String: String], readAt: Millis) -> [StoredEvent] {
         let failed = events.filter { $0.kind == "job.failed" }
