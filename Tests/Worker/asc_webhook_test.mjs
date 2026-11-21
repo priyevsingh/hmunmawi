@@ -40,4 +40,10 @@ r = await worker.fetch(new Request("https://x/apple", { method: "POST", body: "{
 check("/apple bad JSON -> 400", r.status === 400);
 r = await worker.fetch(new Request("https://x/apple", { method: "POST", body: JSON.stringify({ signedPayload: "a.b.c" }) }), { ...env, BUNDLE_IDS: "com.example.app" });
 check("/apple unsigned payload refused", r.status >= 400 && r.status < 500);
+// The hooks worker has no BUNDLE_IDS: its /asc paths and capabilities keep working, and it reports its code version.
+r = await worker.fetch(new Request("https://x/asc/capabilities", { headers: { authorization: "Bearer k" } }), env);
+const caps = r.status === 200 ? await r.json() : {};
+check("capabilities without BUNDLE_IDS: 200 with code_version", r.status === 200 && Number.isInteger(caps.code_version) && caps.code_version >= 2);
+r = await worker.fetch(new Request("https://x/asc", { method: "POST", body, headers: { "x-apple-signature": good } }), env);
+check("/asc still accepted without BUNDLE_IDS", r.status === 200);
 process.exit(ok ? 0 : 1);

@@ -833,8 +833,22 @@ private struct LiveSalesSection: View {
                                 }
                             }
                             if live.hasHookWorker {
-                                ConfirmButton(title: "Remove webhook worker from Cloudflare", question: "Remove the webhook worker?", detail: "App Store Connect updates stop arriving until you set it up again.") { Task { await live.removeHooks() } }
-                                    .disabled(live.busy)
+                                HStack {
+                                    if live.canUpdateHooksWorker {
+                                        Button("Update worker") { Task { await live.updateHooksWorkerWithSavedToken() } }
+                                            .disabled(live.busy)
+                                            .help("Puts this version's worker code on Cloudflare; its address and keys stay the same. It also happens by itself when a new version brings worker changes.")
+                                    }
+                                    ConfirmButton(title: "Remove webhook worker from Cloudflare", question: "Remove the webhook worker?", detail: "App Store Connect updates stop arriving until you set it up again.") { Task { await live.removeHooks() } }
+                                        .disabled(live.busy)
+                                }
+                                if !live.canUpdateHooksWorker {
+                                    HStack {
+                                        SecureField("", text: $cfToken, prompt: Text("Cloudflare API token, to update the webhook worker"))
+                                            .accessibilityLabel("Cloudflare API token to update the webhook worker").input(.secret, $cfToken)
+                                        Button("Update worker") { Task { await live.updateHooksWorker(token: cfToken); cfToken = "" } }.disabled(cfToken.isEmpty || live.busy)
+                                    }
+                                }
                             } else {
                                 HStack {
                                     SecureField("", text: $cfToken, prompt: Text("Cloudflare API token, only to add webhook support to a worker set up earlier"))
@@ -860,6 +874,11 @@ private struct LiveSalesSection: View {
                         .padding(.vertical, 4)
                     }
                     if let t = live.lastTestAt { Label("Apple's test notification arrived \(Ago.text(t))", systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
+                    if live.canUpdatePurchaseWorker {
+                        Button("Update purchase worker") { Task { await live.updatePurchaseWorker() } }
+                            .disabled(live.busy)
+                            .help("Puts this version's worker code on Cloudflare with the token you saved; your app names must be filled in.")
+                    }
                     ConfirmButton(title: live.ownWorker ? "Remove from Cloudflare" : "Disconnect", question: live.ownWorker ? "Remove live updates from Cloudflare?" : "Disconnect live updates?", detail: "New purchases stop showing up live until you connect again.") { Task { await live.remove() } }
                 } else {
                     HStack {
@@ -887,6 +906,7 @@ private struct LiveSalesSection: View {
                 if let s = live.status { Text(s).font(.callout).foregroundStyle(.secondary) }
             }
         } header: { Label("Live sales", systemImage: "bolt.horizontal") }
+        .task(id: live.busy) { live.refreshSavedTokens() }
     }
 }
 

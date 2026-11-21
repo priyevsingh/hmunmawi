@@ -17,10 +17,43 @@
 ```mermaid
 flowchart LR
     A["Apple"] -->|"signed notification"| W["Your Cloudflare worker"]
-    W --> K["Kept 7 days"]
+    W --> B{"One of your apps?"}
+    B -->|"no, or no app list"| N["Refused"]
+    B -->|yes| K["Kept 7 days"]
     M["Hmunmawi on your Mac"] -->|"asks with your relay key"| W
     M --> Y["Sale shown and alert sent"]
 ```
+
+The live-sales worker only takes notifications for the bundle ids in your app names (Settings → Connections → Live
+sales); without that list it takes nothing (HTTP 503) and Hmunmawi asks for the names before it deploys. Bodies over
+64 KB are refused. The webhook-only worker (`hmunmawi-hooks`) receives App Store Connect webhooks on `/asc` and has
+no app list; its `/asc` paths are unaffected.
+
+## Keeping the worker up to date
+
+Each worker reports its code version at `GET /asc/capabilities` (`code_version`; workers from before 1.5.2 don't, which
+counts as 0). When Hmunmawi starts and the webhook worker is older than the code the app carries, it redeploys it once
+with the Cloudflare token you saved, keeping its address, store and relay key, then checks the new version. A failed
+update is not retried by itself (one try per code version); it says so in Live sales, and the worker keeps running as
+before. **Update worker** (next to Remove, for the webhook worker and for a purchase worker you deployed from the app)
+does the same on demand.
+
+```mermaid
+flowchart TD
+    S["Hmunmawi starts"] --> C["GET /asc/capabilities"]
+    C --> V{"code_version older than the app's?"}
+    V -->|no| OK["Nothing to do"]
+    V -->|yes| T{"Tried this version already?"}
+    T -->|yes| OK
+    T -->|no| D["Redeploy with your saved token: same address, store and key"]
+    D --> R{"Reports the new version?"}
+    R -->|yes| U["Updated"]
+    R -->|no| F["Plain note in Live sales; Update worker tries again"]
+```
+
+For developers: whenever any file in `Resources/LiveWorker/` changes, bump `WORKER_CODE_VERSION` in `workerCore.mjs`,
+`LivePurchases.workerCodeVersion` and `Resources/LiveWorkerVersion.json` (its `sha256` covers every worker file);
+`WorkerVersionTests` fails until all three match.
 
 The rest of this page is the technical design for developers.
 
@@ -77,6 +110,6 @@ SQLite **storage** billing on Paid plans begins no earlier than 2026-01-07; Free
 
 ## Operations checklist (post-activation)
 
-- [ ] Confirm `GET /asc/capabilities` returns `asc_queue_v2: true`
+- [ ] Confirm `GET /asc/capabilities` returns `asc_queue_v2: true` and the current `code_version`
 - [ ] Confirm Mac logs show stream connected; Worker metrics show **zero** KV `list` on normal path
 - [ ] Run bounded KV import once; verify oldest backlog event is still deliverable

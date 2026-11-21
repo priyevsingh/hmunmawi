@@ -381,6 +381,78 @@ final class LivePurchases {
         start()
     }
 
+    // MARK: Keeping the worker up to date
+
+    /// The worker code this app carries (WORKER_CODE_VERSION in Resources/LiveWorker/workerCore.mjs; a test keeps them equal).
+    nonisolated static let workerCodeVersion = 2
+    /// A deployed worker is older when it reports a lower code version, or none (workers before 1.5.2).
+    nonisolated static func workerNeedsUpdate(deployed: Int?, current: Int = workerCodeVersion) -> Bool { (deployed ?? 0) < current }
+    /// One automatic try per code version: a failed update is never retried in a loop; Update worker in Settings tries again.
+    nonisolated static func mayAutoUpdate(triedVersion: Int, current: Int = workerCodeVersion) -> Bool { triedVersion < current }
+    static let workerUpdateTriedKey = "HMHookWorkerUpdateTried"
+
+    /// Updates the webhook worker to this app's worker code when the deployed one is older, with the saved Cloudflare
+    /// token, keeping its address, store and relay key (deployHooks does that). At most once per code version.
+    func updateHooksWorkerIfOutdated(caps: AscWebhookStream.Capabilities?) async {
+        guard let caps, caps.asc_queue_v2, Self.workerNeedsUpdate(deployed: caps.code_version),
+              Self.mayAutoUpdate(triedVersion: defaults.integer(forKey: Self.workerUpdateTriedKey)) else { return }
+        defaults.set(Self.workerCodeVersion, forKey: Self.workerUpdateTriedKey)
+        guard let token = liveSecret("hookCloudflareToken") else {
+            status = "Your webhook worker is an older version. Paste a Cloudflare token and press Update worker (Settings → Connections → Live sales)."
+            return
+        }
+        _ = await updateHooksWorker(token: token)
+    }
+
+    /// Redeploys the webhook worker with this app's code and checks that it now reports the current code version.
+    @discardableResult
+    func updateHooksWorker(token: String) async -> Bool {
+        guard hasHookWorker else { status = "No webhook worker to update."; return false }
+        deployAscEventQueueV2 = true   // keep the event queue the running worker already has
+        await deployHooks(token: token)
+        guard defaults.bool(forKey: "HMAscProbeDeployPutOK") else {
+            status = "Couldn't update the webhook worker: \(status ?? "Cloudflare refused it"). It keeps running as before."
+            return false
+        }
+        if let base = hookURL, let key = liveSecret("hookRelayKey") {
+            for _ in 0..<5 {   // Cloudflare can serve the old code for a few seconds after an upload
+                if let c = await AscWebhookStream.fetchCapabilities(baseURL: base, relayKey: key), !Self.workerNeedsUpdate(deployed: c.code_version) {
+                    defaults.set(Self.workerCodeVersion, forKey: "HMHookWorkerCodeVersion")
+                    status = "Webhook worker updated (version \(Self.workerCodeVersion))."
+                    return true
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+        status = "Webhook worker uploaded; it will report the new version shortly."
+        return true
+    }
+
+    /// Updates the purchase worker you deployed here with this app's code (same token; a fresh relay key, as on setup).
+    func updatePurchaseWorker() async {
+        guard ownWorker, let token = liveSecret("cloudflareToken") else {
+            status = "Paste a Cloudflare token to update the worker."
+            return
+        }
+        await deploy(token: token)
+    }
+
+    func updateHooksWorkerWithSavedToken() async {
+        guard let token = liveSecret("hookCloudflareToken") else { status = "Paste a Cloudflare token to update the worker."; return }
+        await updateHooksWorker(token: token)
+    }
+
+    /// Whether a saved Cloudflare token can update a worker without typing one (read from the Keychain by
+    /// `refreshSavedTokens`, never while a view draws).
+    private(set) var hasSavedHookToken = false
+    private(set) var hasSavedPurchaseToken = false
+    var canUpdateHooksWorker: Bool { hasHookWorker && hasSavedHookToken }
+    var canUpdatePurchaseWorker: Bool { ownWorker && hasSavedPurchaseToken }
+    func refreshSavedTokens() {
+        hasSavedHookToken = keychainPresence("hookCloudflareToken") == .present
+        hasSavedPurchaseToken = keychainPresence("cloudflareToken") == .present
+    }
+
     // MARK: Collecting
 
     /// Collects new purchases every minute while the app runs.
@@ -433,6 +505,7 @@ final class LivePurchases {
             }
             await importKvBacklogIfNeeded(base: base, key: key, kvImportEnabled: caps?.kv_import == true)
             recordRelaySuppressReason("none")
+            await updateHooksWorkerIfOutdated(caps: caps)
             return
         }
         guard caps?.asc_queue_v2 == true else {

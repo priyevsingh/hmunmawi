@@ -8,10 +8,13 @@ final class AscWebhookStream {
         let asc_queue_v2: Bool
         let kv_import: Bool?
         let protocolVersion: Int?
+        /// The deployed worker's code version (missing on workers older than 1.5.2: treated as 0).
+        var code_version: Int? = nil
 
         enum CodingKeys: String, CodingKey {
             case asc_queue_v2
             case kv_import
+            case code_version
             case protocolVersion = "protocol"
         }
     }

@@ -1,0 +1,5 @@
+{
+  "code_version": 2,
+  "sha256": "547ec5822d7dd58ddc326840c0a2470119af4a9109b9f2db4e3b7faf2375f4cd",
+  "note": "sha256 over every .mjs in Resources/LiveWorker (sorted; name, newline, content, newline). Changed worker files need a new code_version here, in workerCore.mjs and in LivePurchases.workerCodeVersion."
+}

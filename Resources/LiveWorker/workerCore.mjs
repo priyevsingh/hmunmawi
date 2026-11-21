@@ -3,6 +3,10 @@ import { verifyJws, VerifyError } from "./verify.mjs";
 import { importKvPage, DEFAULT_IMPORT_BUDGET } from "./ascKvImport.mjs";
 
 const TTL = 7 * 24 * 3600;
+// The worker's code version, shown at /asc/capabilities. Bump it whenever any file in this folder changes (and update
+// Resources/LiveWorkerVersion.json and LivePurchases.workerCodeVersion; a test checks all three against the files), so
+// Hmunmawi knows a deployed worker is older and updates it.
+export const WORKER_CODE_VERSION = 2;
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
@@ -192,6 +196,7 @@ async function ascStream(request, env, url) {
 
 function ascCapabilities(env) {
   return json({
+    code_version: WORKER_CODE_VERSION,
     asc_queue_v2: queueV2(env),
     kv_outbox: true,
     kv_import: env.ASC_KV_IMPORT === "1" || env.ASC_KV_IMPORT === "true",

@@ -2,6 +2,19 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.2 (build 152), 21 Nov 2026
+
+**Safer**
+- **Worker fixes now reach existing setups.** The Cloudflare workers Hmunmawi deploys report a code version (`code_version` at `/asc/capabilities`). When the webhook worker in your account is older than the app's, Hmunmawi updates it at start with the Cloudflare token you saved, keeping its address, store and relay key, and checks the new version. One try per version: a failure is said plainly in Live sales and never retried in a loop. This brings 1.5.1's live-sales protections (only your own apps, nothing over 64 KB) to workers set up before.
+
+**New**
+- **Update worker** next to Remove in Settings → Connections → Live sales, for the webhook worker and for a purchase worker you deployed from the app (with a token field when none is saved).
+
+**Docs**
+- Guide pictures of Settings retaken with the grouped sidebar (and a new one of Settings → Jobs with Set up…), in dark mode. New diagrams: how an agent's request is decided (Guide) and how the worker stays up to date (live-sales relay doc). Capability list, README, ROUTINES, the private-workspace AGENTS starter and AGENTS.md (new worker-version rule) follow 1.5.1 and 1.5.2.
+
+Hmunmawi still does everything it did in 1.5.1: the daily answer, Apple apps with the Rejection Shield, live sales, websites and search with Search health, social (YouTube Shorts, Instagram Reels and carousels, Reddit, Discord and X: tracked, planned and reminded, never posted for you, with post drafts, reply ideas and opt-in automatic X unfollows), job switches, service watch, link and Python checks, publishing, outreach and mail, crashes and self-healing, money and offer codes, alerts, AI limits, share and show, Your extras, and autopilot with approval. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.1 (build 151), 21 Nov 2026
 
 **Safer**

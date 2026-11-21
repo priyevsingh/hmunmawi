@@ -71,8 +71,15 @@ and asks before it acts. Users' guide: [README.md](README.md).
   (`hm set key=mac.keep_awake`, off by default). Page-level "seen often, rarely clicked" is `PageCTR` in
   `SearchSites.swift`, shown by `Playbook.pageTitles`.
 - **Help a user build a private workspace:** point them to [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (folder layout, script feed example, job lists and hand-off files, workflow recipes such as search health, publishing on a schedule, social planning and AI jobs with the pause and one-at-a-time lock, STATE.md and AGENTS.md starters, secrets). Never put their keys, paths or private names in this public repo.
-- **Settings panes:** `SettingsPane` in `SettingsView.swift` is the one list (sidebar order, titles, symbols); the
-  window is a sidebar (`NavigationSplitView`), never a toolbar `TabView` (ten tabs overflowed behind ">>" in 1.4.0).
+- **Settings panes:** `SettingsPane` in `SettingsView.swift` is the one list (sidebar order, titles, symbols) and
+  `SettingsPane.groups` splits it into the sidebar's groups (System Settings style); the window is a sidebar
+  (`NavigationSplitView`), never a toolbar `TabView` (ten tabs overflowed behind ">>" in 1.4.0).
+- **Live-sales worker (`Resources/LiveWorker`):** whenever any worker file changes, bump `WORKER_CODE_VERSION` in
+  `workerCore.mjs`, `LivePurchases.workerCodeVersion` and `Resources/LiveWorkerVersion.json` (new `sha256`);
+  `WorkerVersionTests` enforces it. That version is how installed apps know to update a deployed worker
+  ([docs/ASC-WEBHOOK-RELAY.md](docs/ASC-WEBHOOK-RELAY.md#keeping-the-worker-up-to-date)).
+- **MCP tools:** `readCommands`, `changeCommands` and `actCommands` in `Sources/hmunmawi-cli/main.swift` build the
+  tools' lists; a new agent command goes in one of them (`MCPToolListTests` checks every guide command has a tool).
   A new pane is a new case there; `hm set settings.tab` and `SettingsPaneTests` follow it.
 - **Job switches (Settings → Jobs):** `Sources/HmunmawiCore/SwitchFile.swift` reads and edits the workspace's JSON
   switch file in place (only the flipped value changes; atomic write; checked before saving); the tab is
@@ -83,8 +90,8 @@ and asks before it acts. Users' guide: [README.md](README.md).
   add it to `Package.swift`'s add-on list, and add a test.
 - **New routine kind:** add it to `RoutineKind` in `Sources/HmunmawiApp/Routines.swift` (with what it needs and
   how it runs), its form in `RoutinesSheet.swift`, a row in [docs/ROUTINES.md](docs/ROUTINES.md), and a test.
-- **New agent command:** add the case and its guide row in `AgentBridge.swift`; read-only commands also go in
-  `readCommands` in `Sources/hmunmawi-cli/main.swift`.
+- **New agent command:** add the case and its guide row in `AgentBridge.swift`, and the name in `readCommands`,
+  `actCommands` or `changeCommands` in `Sources/hmunmawi-cli/main.swift`.
 - **An extra some people need** (a folder to look in, a card, a reader, a time zone): make it a generic extra in
   `Sources/HmunmawiCore/Extras.swift` (a `UserExtras` field, a row in `items()`, a snake_case key for the workspace
   file `config/hmunmawi-extras.json`), an `extras.*` key in `AgentSetting` with its permission, a row in

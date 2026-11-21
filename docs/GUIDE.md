@@ -539,6 +539,11 @@ One section per source, keys saved in the Keychain, *Find my key*, Check Now and
 
 </details>
 
+**Live sales** (at the bottom of Connections) sets up a small worker in your own Cloudflare account. Fill in your app
+names (`bundle.id=Name`) first: the worker only takes your own apps' notifications. When a new Hmunmawi version
+brings worker changes, it updates the worker by itself with the token you saved (address and keys stay the same);
+**Update worker**, next to Remove, does it on demand. [How it works](ASC-WEBHOOK-RELAY.md#keeping-the-worker-up-to-date)
+
 ![Connections](images/guide/set-connections-00.png)
 
 #### 🗂️ Projects
@@ -560,6 +565,8 @@ The on/off switches your own scripts read, from a small JSON file in your worksp
 At the top, **Run by Hmunmawi** lists the jobs Hmunmawi itself runs for you: X unfollows (automatic), Watch my services, Mac-alive heartbeat (Sentry), Check links on my site and Check my workspace Python. Each shows "Not set up" with a **Set up…** button (the same form as Automations → +) until you add it, then an on/off switch with when it runs and its last result. Nothing there deploys, repairs or posts without your OK.
 
 </details>
+
+![Jobs: Run by Hmunmawi with Set up…, and channel switches](images/guide/set-jobs-00.png)
 
 #### ⚡ Rules
 **It reacts to events the way you would.**
@@ -800,5 +807,18 @@ Each runs as a separate sandboxed add-on that never sees your keys. Write your o
 Claude Code, Cursor and other agents use Hmunmawi through the `hm` command or its MCP server, under the same
 approval rules as you. Settings → Rules → Agents chooses what an agent may do without asking, and gives it a badge. Once any badge exists, an agent without one shows as unverified and always waits for your OK.
 Every command: [hm commands](HM-COMMANDS.md). Notes for coding agents: [AGENTS.md](../AGENTS.md).
+
+```mermaid
+flowchart TD
+    A["An agent asks for a change"] --> B{"Badges exist and it sent none?"}
+    B -->|yes| W["Waits in Log, Waiting"]
+    B -->|no| C{"Always waits? (redeploy, Python repair, submit)"}
+    C -->|yes| W
+    C -->|no| D{"Its rule says ask?"}
+    D -->|yes| W
+    D -->|no| E{"Allowed, or Full Autopilot on?"}
+    E -->|yes| R["Runs and is logged"]
+    E -->|no| W
+```
 
 ![Rules: agents](images/guide/set-rules-00.png)
