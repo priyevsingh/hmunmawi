@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.3 (build 153), 21 Nov 2026
+
+**Fixed**
+- **Updating a worker with a token scoped to one account.** A Cloudflare token that can edit Workers and KV in one account but can't list accounts made the update stop with "That token can't see a Cloudflare account". Hmunmawi now uses the account the worker was deployed to (Cloudflare still refuses the upload if that's wrong).
+- A newer app build gets one more automatic try at updating an older worker (still one try per build, never a loop), so this fix reaches setups where 1.5.2's try failed.
+
+Hmunmawi still does everything it did in 1.5.2. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.2 (build 152), 21 Nov 2026
 
 **Safer**

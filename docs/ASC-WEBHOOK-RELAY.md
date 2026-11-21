@@ -34,7 +34,7 @@ no app list; its `/asc` paths are unaffected.
 Each worker reports its code version at `GET /asc/capabilities` (`code_version`; workers from before 1.5.2 don't, which
 counts as 0). When Hmunmawi starts and the webhook worker is older than the code the app carries, it redeploys it once
 with the Cloudflare token you saved, keeping its address, store and relay key, then checks the new version. A failed
-update is not retried by itself (one try per code version); it says so in Live sales, and the worker keeps running as
+update is not retried by itself (one try per code version and app build); it says so in Live sales, and the worker keeps running as
 before. **Update worker** (next to Remove, for the webhook worker and for a purchase worker you deployed from the app)
 does the same on demand.
 
@@ -43,7 +43,7 @@ flowchart TD
     S["Hmunmawi starts"] --> C["GET /asc/capabilities"]
     C --> V{"code_version older than the app's?"}
     V -->|no| OK["Nothing to do"]
-    V -->|yes| T{"Tried this version already?"}
+    V -->|yes| T{"Tried this version with this app build?"}
     T -->|yes| OK
     T -->|no| D["Redeploy with your saved token: same address, store and key"]
     D --> R{"Reports the new version?"}

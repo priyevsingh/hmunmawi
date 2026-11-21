@@ -387,16 +387,24 @@ final class LivePurchases {
     nonisolated static let workerCodeVersion = 2
     /// A deployed worker is older when it reports a lower code version, or none (workers before 1.5.2).
     nonisolated static func workerNeedsUpdate(deployed: Int?, current: Int = workerCodeVersion) -> Bool { (deployed ?? 0) < current }
-    /// One automatic try per code version: a failed update is never retried in a loop; Update worker in Settings tries again.
-    nonisolated static func mayAutoUpdate(triedVersion: Int, current: Int = workerCodeVersion) -> Bool { triedVersion < current }
+    /// One automatic try per code version and app build: a failed update is never retried in a loop (a newer app build,
+    /// which may fix the deploy itself, gets one more try); Update worker in Settings tries again on demand.
+    nonisolated static func mayAutoUpdate(triedVersion: Int, triedBuild: String? = nil, current: Int = workerCodeVersion,
+                                          build: String? = Bundle.main.infoDictionary?["CFBundleVersion"] as? String) -> Bool {
+        triedVersion < current || (triedBuild != nil && triedBuild != build)
+    }
     static let workerUpdateTriedKey = "HMHookWorkerUpdateTried"
+    static let workerUpdateTriedBuildKey = "HMHookWorkerUpdateTriedBuild"
 
     /// Updates the webhook worker to this app's worker code when the deployed one is older, with the saved Cloudflare
     /// token, keeping its address, store and relay key (deployHooks does that). At most once per code version.
     func updateHooksWorkerIfOutdated(caps: AscWebhookStream.Capabilities?) async {
+        // 1.5.2 noted the version it tried but not its build: a try without a build note was 1.5.2's (build 152).
         guard let caps, caps.asc_queue_v2, Self.workerNeedsUpdate(deployed: caps.code_version),
-              Self.mayAutoUpdate(triedVersion: defaults.integer(forKey: Self.workerUpdateTriedKey)) else { return }
+              Self.mayAutoUpdate(triedVersion: defaults.integer(forKey: Self.workerUpdateTriedKey),
+                                 triedBuild: defaults.string(forKey: Self.workerUpdateTriedBuildKey) ?? (defaults.integer(forKey: Self.workerUpdateTriedKey) > 0 ? "152" : nil)) else { return }
         defaults.set(Self.workerCodeVersion, forKey: Self.workerUpdateTriedKey)
+        defaults.set(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "", forKey: Self.workerUpdateTriedBuildKey)
         guard let token = liveSecret("hookCloudflareToken") else {
             status = "Your webhook worker is an older version. Paste a Cloudflare token and press Update worker (Settings → Connections → Live sales)."
             return

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import HmunmawiApp
+import HmunmawiProtocol
 
 @Test func ackOnlyAfterApply() {
     #expect(AscStreamProtocol.ackSeqAfterApply(appliedSeq: 5, candidate: 5) == 5)
@@ -88,6 +89,15 @@ import Testing
     let list: [[String: Any]] = [["id": "other-account"], ["id": pinned]]
     let picked = try WorkerDeployMetadata.pickHookDeployAccount(list: list, pinned: pinned)
     #expect(picked == pinned)
+}
+
+/// An account-scoped token lists no accounts; updating a deployed worker then uses its pinned account (1.5.3).
+@Test func hookDeployAccountUsesPinnedWhenTokenListsNone() throws {
+    let pinned = "0123456789abcdef0123456789abcdef"
+    #expect(try WorkerDeployMetadata.pickHookDeployAccount(list: [], pinned: pinned) == pinned)
+    #expect(throws: WireError.self) { try WorkerDeployMetadata.pickHookDeployAccount(list: [], pinned: nil) }
+    #expect(throws: WireError.self) { try WorkerDeployMetadata.pickHookDeployAccount(list: [], pinned: "not-an-account") }
+    #expect(try WorkerDeployMetadata.pickHookDeployAccount(list: [["id": "other"]], pinned: pinned) == "other")   // listed accounts still win
 }
 
 @Test @MainActor func deployMetadataValidationAcceptsHooksV2Shape() {

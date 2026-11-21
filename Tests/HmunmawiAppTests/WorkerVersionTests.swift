@@ -32,7 +32,9 @@ import Testing
         #expect(!LivePurchases.workerNeedsUpdate(deployed: 2, current: 2))
         #expect(!LivePurchases.workerNeedsUpdate(deployed: 3, current: 2))
         #expect(LivePurchases.mayAutoUpdate(triedVersion: 0, current: 2))
-        #expect(!LivePurchases.mayAutoUpdate(triedVersion: 2, current: 2))   // tried this version: no loop
+        #expect(!LivePurchases.mayAutoUpdate(triedVersion: 2, triedBuild: "153", current: 2, build: "153"))   // tried with this build: no loop
+        #expect(LivePurchases.mayAutoUpdate(triedVersion: 2, triedBuild: "152", current: 2, build: "153"))    // a newer build gets one try
+        #expect(!LivePurchases.mayAutoUpdate(triedVersion: 2, triedBuild: nil, current: 2, build: "153"))
         let caps = try JSONDecoder().decode(AscWebhookStream.Capabilities.self, from: Data(#"{"asc_queue_v2":true,"code_version":2,"protocol":2}"#.utf8))
         #expect(caps.code_version == 2)
         let old = try JSONDecoder().decode(AscWebhookStream.Capabilities.self, from: Data(#"{"asc_queue_v2":true}"#.utf8))

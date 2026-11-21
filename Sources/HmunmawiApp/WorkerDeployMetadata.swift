@@ -7,6 +7,9 @@ enum WorkerDeployMetadata {
     static func pickHookDeployAccount(list: [[String: Any]], pinned: String?) throws -> String {
         let ids = list.compactMap { $0["id"] as? String }
         if let pinned, ids.contains(pinned) { return pinned }
+        // A token scoped to one account (Workers Scripts and KV only, no account read) lists no accounts at all;
+        // the account the worker was deployed to is still the right one, and Cloudflare refuses the upload if not.
+        if let pinned, ids.isEmpty, pinned.wholeMatch(of: /[0-9a-f]{32}/) != nil { return pinned }
         if let first = ids.first { return first }
         throw WireError("cf", "That token can't see a Cloudflare account. Create it with Account → Workers Scripts: Edit and Workers KV Storage: Edit.")
     }
