@@ -2,6 +2,7 @@
 // Build:  swiftc -O scripts/uitest/ax.swift -o build/ax
 // Use:    build/ax list            prints every button and static text in Hmunmawi's windows
 //         build/ax press "Allow"   presses the first enabled button with that title (or help/description)
+//         build/ax menuitem "<title>"  presses an item of the app's own menu bar, e.g. "Check for Updates…"
 //         build/ax menubar         opens Hmunmawi's menu bar panel; build/ax windows lists its window numbers
 //         HM_AX_BUNDLE=<bundle id> points it at another copy (scripts/fresh-copy.sh uses ….freshtest)
 // Needs Accessibility permission for the process that runs it.
@@ -157,6 +158,16 @@ case "choose":
     if !picked { CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true)?.post(tap: .cghidEventTap); CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false)?.post(tap: .cghidEventTap) }
     print(picked ? "chose \(rest[1])" : "no item \(rest[1])")
     exit(picked ? 0 : 1)
+case "menuitem":
+    // ax menuitem "<title>"  — presses an item of the app's own menu bar (for example "Check for Updates…").
+    guard let title = args.dropFirst().first else { print("usage: ax menuitem <title>"); exit(2) }
+    var done = false
+    _ = walk(root) { element, role, _ in
+        guard role == "AXMenuItem", (attribute(element, kAXTitleAttribute) as String?) == title else { return false }
+        done = AXUIElementPerformAction(element, kAXPressAction as CFString) == .success; return true
+    }
+    print(done ? "pressed menu item \(title)" : "no menu item \(title)")
+    exit(done ? 0 : 1)
 case "fill":
     // ax fill "<field label>" < file   — focuses the text field with that label and types the file's text
     // (keystrokes, so the app's own field and Save path are used; the text is never printed).
