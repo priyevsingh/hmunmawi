@@ -8,7 +8,7 @@
     "test:legacy": "node asc_webhook_test.mjs"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.8.1",
-    "vitest": "^5.1.0"
+    "@cloudflare/vitest-plugin": "^1.8.5",
+    "vitest": "^5.1.1"
   }
 }
