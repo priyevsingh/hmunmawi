@@ -98,7 +98,10 @@ final class XUnfollower {
         guard XSafariReader.shared.enabled, let me else { return .failure(Why(text: "Switch on Read via your Safari login and enter your handle (Settings → General → X numbers).")) }
         if let wait = Permissions.shared.deferIfNeeded([.safari]) { return .failure(Why(text: wait)) }
         let tab = SafariTab(path: "\(me)/following")
-        guard await tab.open() else { return .failure(Why(text: "Couldn't use Safari. Allow Hmunmawi to control Safari (Settings → Permissions).")) }
+        guard await tab.open() else {
+            return .failure(Why(text: tab.wasBusy ? "Safari is busy with another Hmunmawi job. It will be tried again at the next run."
+                                                  : "Couldn't use Safari. Allow Hmunmawi to control Safari (Settings → Permissions)."))
+        }
         var best: [XUnfollow.Account]? = nil, lastCount = -1, still = 0
         for _ in 0..<60 {
             try? await Task.sleep(for: .seconds(2.5))
@@ -235,7 +238,9 @@ final class XUnfollower {
 
     private func process(_ a: XUnfollow.Account, me: String, dry: Bool) async -> (XUnfollow.Result, String) {
         let tab = SafariTab(path: a.handle)
-        guard await tab.open() else { return (.fail, "could not open a Safari tab") }
+        guard await tab.open() else {
+            return (.fail, tab.wasBusy ? "Safari was busy with another Hmunmawi job, will be tried again" : "could not open a Safari tab")
+        }
         let out = await verifyAndClick(a, me: me, tab: tab, dry: dry)
         if !(await tab.close()) {
             try? await Task.sleep(for: .seconds(2))
@@ -299,7 +304,9 @@ final class XUnfollower {
             }
             return (.fail, confirmed.isEmpty ? "the Unfollow confirmation did not appear" : "clicked Unfollow but the button did not change to Follow")
         } catch SafariTab.Failure.noTab {
-            return (.safety, "lost its Safari tab")
+            // The tab is found by its tag, not its position, so other jobs can't cause this any more; it only happens
+            // when the tab was closed during the run. Not a safety stop: the account is tried again with a fresh tab.
+            return (.fail, "its Safari tab was closed during the run, will be tried again")
         } catch {
             return (.fail, "Safari error: \(error)")
         }
@@ -315,135 +322,50 @@ extension XUnfollow {
     }
 }
 
-/// Exactly one new background Safari tab for one x.com page: opened once (never retried), found again only among
-/// tabs showing that page and carrying our tag, closed at the end. Through /usr/bin/osascript, so macOS asks about
-/// Hmunmawi controlling Safari once, as for the X numbers read.
+/// Exactly one new background Safari tab for one x.com page, through `SafariAuto` (the shared Safari lock, a tag set
+/// as soon as the page has loaded, found again only by that tag and never by position, closed on every path). Other
+/// jobs adding or closing tabs can no longer make it "lost". Through /usr/bin/osascript, so macOS asks about Hmunmawi
+/// controlling Safari once, as for the X numbers read.
 @MainActor
 final class SafariTab {
     enum Failure: Error { case noTab, script(String) }
-    let path: String, url: String, mark: String
-    private var windowID: Int?, index: Int?
+    let path: String, url: String
+    private var session: SafariAuto.Session?, tab: SafariAuto.Tab?
     private(set) var marked = false
+    /// True when opening failed only because another Safari job held Safari for too long.
+    private(set) var wasBusy = false
 
     init(path: String) {
         self.path = path
         url = "https://x.com/" + path
-        mark = "hm-uf-\(Int(Date.now.timeIntervalSince1970))-\(Int.random(in: 1000...9999))"
-    }
-
-    nonisolated static func quoted(_ s: String) -> String {
-        "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }
 
     func open() async -> Bool {
         guard url.wholeMatch(of: /https:\/\/x\.com\/[A-Za-z0-9_]{1,15}(\/following)?/) != nil else { return false }
-        let script = """
-        tell application "Safari"
-          if (count of windows) = 0 then make new document
-          set w to window 1
-          set wid to id of w
-          set n to count of tabs of w
-          make new tab at end of tabs of w with properties {URL:\(Self.quoted(url))}
-          return (wid as text) & " " & (n as text)
-        end tell
-        """
-        guard case .success(let out) = await Self.run(script, timeout: 30) else { return false }
-        let parts = out.split(separator: " ").compactMap { Int($0) }
-        guard parts.count == 2 else { return false }
-        windowID = parts[0]; index = parts[1] + 1
+        let s = SafariAuto.Session(job: "x_unfollow")
+        do { try await s.enter(timeout: 150) } catch { wasBusy = (error as? SafariAuto.Failure) == .busy; return false }
+        do { tab = try await s.open(url: url, needle: "x.com", seconds: 40) } catch { await s.exit(); return false }
+        session = s
+        marked = true
         return true
     }
 
-    /// AppleScript that sets `t` to our tab, or returns "__NOTAB__".
-    private var find: String {
-        let page = Self.quoted("x.com/" + path)
-        if marked {
-            return """
-            set t to missing value
-              repeat with x in (tabs of w)
-                if (URL of x) contains \(page) then
-                  if ((do JavaScript "window.name" in x) as text) is \(Self.quoted(mark)) then
-                    set t to x
-                    exit repeat
-                  end if
-                end if
-              end repeat
-              if t is missing value then return "__NOTAB__"
-            """
-        }
-        return """
-        if (count of tabs of w) < \(index ?? 0) then return "__NOTAB__"
-          set t to tab \(index ?? 0) of w
-          if (URL of t) does not contain \(page) then return "__NOTAB__"
-        """
-    }
-
     func js(_ code: String) async throws -> String {
-        guard let windowID else { throw Failure.noTab }
-        let script = """
-        tell application "Safari"
-          try
-            set w to window id \(windowID)
-          on error
-            return "__NOTAB__"
-          end try
-          \(find)
-          return (do JavaScript \(Self.quoted(code)) in t) as text
-        end tell
-        """
-        switch await Self.run(script, timeout: 45) {
-        case .success(let out): if out == "__NOTAB__" { throw Failure.noTab }; return out
-        case .failure(let e): throw e
-        }
+        guard let tab else { throw Failure.noTab }
+        do { return try await tab.js(code) }
+        catch SafariAuto.Failure.noTab { throw Failure.noTab }
+        catch SafariAuto.Failure.script(let m) { throw Failure.script(m) }
+        catch { throw Failure.script("\(error)") }
     }
 
-    /// Tags the tab once it shows the page (window.name survives X's in-page navigation).
-    func tag() async throws -> Bool {
-        if marked { return true }
-        let got = try await js("(function(){if(!window.name){window.name=\(XUnfollow.jsString(mark));}return window.name;})()")
-        if got == mark { marked = true }
-        return marked
-    }
+    /// The tab is tagged when it opens; kept so the callers read the same.
+    func tag() async throws -> Bool { tab != nil }
 
     func close() async -> Bool {
-        guard let windowID else { return true }
-        let body = marked ? find + "\n  close t\n  return \"closed\"" : """
-        if (count of tabs of w) is not \(index ?? 0) then return "__NOTAB__"
-          set t to tab \(index ?? 0) of w
-          if (URL of t) does not contain \(Self.quoted("x.com/" + path)) and (URL of t) is not "" and (URL of t) does not start with "about:" then return "__NOTAB__"
-          close t
-          return "closed"
-        """
-        let script = """
-        tell application "Safari"
-          try
-            set w to window id \(windowID)
-          on error
-            return "__NOTAB__"
-          end try
-          \(body)
-        end tell
-        """
-        if case .success(let out) = await Self.run(script, timeout: 30) { return out == "closed" }
-        return false
-    }
-
-    nonisolated static func run(_ script: String, timeout: Int) async -> Result<String, Failure> {
-        await Task.detached { () -> Result<String, Failure> in
-            let p = Process(), out = Pipe(), err = Pipe(), input = Pipe()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-"]
-            p.standardInput = input; p.standardOutput = out; p.standardError = err
-            guard (try? p.run()) != nil else { return .failure(.script("osascript did not start")) }
-            try? input.fileHandleForWriting.write(contentsOf: Data(script.utf8)); try? input.fileHandleForWriting.close()
-            let killer = Task.detached { try? await Task.sleep(for: .seconds(timeout)); if p.isRunning { p.terminate() } }
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            let errData = err.fileHandleForReading.readDataToEndOfFile()
-            p.waitUntilExit(); killer.cancel()
-            guard p.terminationStatus == 0 else {
-                return .failure(.script(String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines).prefix(200).description))
-            }
-            return .success(String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
-        }.value
+        guard let session else { return true }
+        let ok = await tab?.close() ?? true
+        await session.exit()
+        self.session = nil; self.tab = nil
+        return ok
     }
 }

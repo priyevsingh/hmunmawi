@@ -2,6 +2,16 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.8 (build 158), 22 Nov 2026
+
+**Fixed**
+- **No more "lost its tab" and no leftover Safari tabs.** Every Safari job of the app (X unfollows, the X numbers and reply reads, the Zoho Mail reader, the Payouts fill and the offer-code import) now goes through one helper, `SafariAuto`: jobs take turns on one lock file (`safari.lock` in Hmunmawi's folder), each opens its own tab and tags it as soon as the page has loaded (inside one AppleScript call that closes the tab itself if the page never loads), finds it again only by that tag and never by its position, and closes it on every path. Tabs with an old tag of ours (or an older mark), left by a run that was killed, are closed at the start of the next one. Before, X unfollows could stop for the day with "lost its tab" when another job added or closed a tab at the same moment, and the Payouts fill and the offer-code import left the tab they had opened.
+- **A lost tab no longer stops X unfollows for the day.** The account is tried again with a fresh tab (it still counts towards the "different accounts failing in a row" stop); Safari being busy with another job only delays the next try.
+
+Your own tabs are never closed. Only tabs on a few known hosts are asked for their tag name when leftovers are swept. Format for your own scripts: [Your private workspace](docs/PRIVATE-WORKSPACE.md#scripts-that-use-safari).
+
+Hmunmawi still does everything it did in 1.5.7. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.7 (build 157), 21 Nov 2026
 
 **New**

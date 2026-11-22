@@ -28,34 +28,28 @@ final class PayoutBook {
     func fillFromAppStoreConnect(openTab: Bool) async -> String {
         if let note = Permissions.shared.deferIfNeeded([.safari]) { return note }
         let js = BankPayments.script()
-        let script = """
-        tell application "Safari"
-            set t to missing value
-            repeat with w in windows
-                repeat with x in tabs of w
-                    if URL of x contains "appstoreconnect.apple.com" then set t to x
-                end repeat
-            end repeat
-            if t is missing value then
-                if \(openTab ? "true" : "false") is false then return "ERR notab"
-                if (count of windows) is 0 then make new document
-                set t to make new tab at end of tabs of window 1 with properties {URL:"https://appstoreconnect.apple.com/itc/payments_and_financial_reports"}
-                delay 8
-            end if
-            return do JavaScript "\(js)" in t
-        end tell
-        """
-        let text: String? = await Task.detached {
-            let p = Process(), out = Pipe(), input = Pipe()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-"]
-            p.standardInput = input; p.standardOutput = out; p.standardError = FileHandle.nullDevice
-            guard (try? p.run()) != nil else { return nil }
-            try? input.fileHandleForWriting.write(contentsOf: Data(script.utf8)); try? input.fileHandleForWriting.close()
-            let killer = Task.detached { try? await Task.sleep(for: .seconds(120)); if p.isRunning { p.terminate() } }
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            p.waitUntilExit(); killer.cancel()
-            return p.terminationStatus == 0 ? String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) : nil
+        let allowOpen = openTab
+        let text: String? = await Task.detached { () -> String? in
+            // An App Store Connect tab you already have open is only read. Without one (and only when you pressed the
+            // button) a tab of its own is opened through SafariAuto: tagged, read, and closed again.
+            switch await SafariAuto.run(SafariAuto.readExistingScript, args: ["appstoreconnect.apple.com", js], timeout: 120) {
+            case .failure: return nil
+            case .success(let out): if out != "__NONE__" { return out }
+            }
+            guard allowOpen else { return "ERR notab" }
+            let session = SafariAuto.Session(job: "payouts")
+            do { try await session.enter(timeout: 150) } catch { return nil }
+            do {
+                let tab = try await session.open(url: "https://appstoreconnect.apple.com/itc/payments_and_financial_reports",
+                                                 needle: "appstoreconnect.apple.com", seconds: 30)
+                try? await Task.sleep(for: .seconds(6))
+                let out = try await tab.js(js, timeout: 90)
+                await session.exit()
+                return out
+            } catch {
+                await session.exit()
+                return nil
+            }
         }.value
         guard let text else { return "Couldn't read Safari. Check Settings → Permissions → Safari." }
         if text == "ERR notab" { return "No App Store Connect tab open in Safari." }

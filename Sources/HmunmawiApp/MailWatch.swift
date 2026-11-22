@@ -138,32 +138,31 @@ enum ZohoSafariReader {
         guard hosts.contains(host) else { return .failure(WireError("mail", "Pick the Zoho address you sign in at.")) }
         return await Task.detached(priority: .utility) { () -> Result<[MailRow], Error> in
             let js = "(function(){var rows=document.querySelectorAll('.zmList');if(!rows.length)return '';return JSON.stringify(Array.prototype.slice.call(rows,0,60).map(function(r){function q(s){var e=r.querySelector(s);return e?((e.getAttribute('title')||e.innerText||'').trim()):'';}return {id:r.id,from:q('.zmLSenderName'),subject:q('.zmLSub'),folder:q('.zmLFolder')};}));})()"
-            let script = """
-            tell application "Safari"
-                if (count of windows) is 0 then make new document
-                set t to make new tab at end of tabs of window 1 with properties {URL:"https://\(host)/zm/#mail/views/all"}
-                set res to ""
-                repeat 20 times
-                    delay 1.5
-                    try
-                        set res to do JavaScript "\(js.replacingOccurrences(of: "\"", with: "\\\""))" in t
-                    end try
-                    if res is not "" and res is not "[]" and res is not missing value then exit repeat
-                end repeat
-                close t
-                return res
-            end tell
-            """
-            var error: NSDictionary?
-            guard let apple = NSAppleScript(source: script) else { return .failure(WireError("mail", "Couldn't prepare the Safari read.")) }
-            let d = apple.executeAndReturnError(&error)
-            if let error {
-                let code = error[NSAppleScript.errorNumber] as? Int ?? 0
-                return .failure(WireError("mail", code == -1743
+            // Its own tagged tab through SafariAuto: the shared Safari lock, found by tag, closed on every path.
+            let session = SafariAuto.Session(job: "zoho_mail")
+            func fail(_ e: Error) -> Result<[MailRow], Error> {
+                if case SafariAuto.Failure.busy = e {
+                    return .failure(WireError("mail", "Safari is busy with another Hmunmawi job; the mail read is tried again at the next check."))
+                }
+                let msg = (e as? SafariAuto.Failure).flatMap { if case .script(let m) = $0 { return m } else { return nil } } ?? ""
+                return .failure(WireError("mail", msg.contains("-1743")
                     ? "Safari isn't allowed yet: switch it on in Settings → Permissions."
-                    : "Safari couldn't be read (error \(code)). In Safari, turn on Develop → Allow JavaScript from Apple Events."))
+                    : "Safari couldn't be read (\(msg.isEmpty ? "unknown error" : String(msg.prefix(80)))). In Safari, turn on Develop → Allow JavaScript from Apple Events."))
             }
-            guard let text = d.stringValue, !text.isEmpty, let data = text.data(using: .utf8),
+            do { try await session.enter(timeout: 240) } catch { return fail(error) }
+            var found = ""
+            do {
+                let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "mail.zoho", seconds: 30)
+                for _ in 0..<20 {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    if let r = try? await tab.js(js), !r.isEmpty, r != "[]", r != "missing value" { found = r; break }
+                }
+            } catch {
+                await session.exit()
+                return fail(error)
+            }
+            await session.exit()
+            guard !found.isEmpty, let data = found.data(using: .utf8),
                   let list = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
                 return .failure(WireError("mail", "Zoho's list didn't load. Are you signed in to \(host) in Safari? (If you are, Zoho may have changed its page.)"))
             }

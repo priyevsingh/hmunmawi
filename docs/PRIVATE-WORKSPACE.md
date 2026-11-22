@@ -583,6 +583,35 @@ flowchart LR
   and stops when git refuses (a local edit, a diverged branch). It never merges, rebases or resets. Hmunmawi shows it
   on the Automations map and tells you when it fails.
 
+### Scripts that use Safari
+
+Some scripts need a page that only your logged-in Safari can read (a mail list, a dashboard, X). Keep it tidy with the
+same rules Hmunmawi follows, so your scripts and the app never trip over each other:
+
+1. **Take the lock.** `flock` the file `~/Library/Application Support/Hmunmawi/safari.lock` (exclusive) while your
+   script has a tab open, and release it when done (a crash releases it for you). Wait up to a few minutes for it;
+   if it stays busy, try again at the next run.
+2. **Open your own tab, tag it, close it.** Open the page in a new tab, wait until it has loaded, then set
+   `window.name = "hm-auto:<owner>:<job>:<epoch>:<random>"` (a name set before loading is cleared by Safari) and do
+   this in one AppleScript call that closes the tab itself if the page never loads. After that find the tab only by
+   that name, never by its position or as "the last tab", and close it in a `finally` that always runs.
+3. **Sweep leftovers.** At the start of a run, close tabs on your own sites whose name starts with `hm-auto:` and is more
+   than two minutes old (a run that was killed left it).
+
+```mermaid
+flowchart LR
+    A["Take safari.lock"] --> B["Close old tagged tabs"]
+    B --> C["Open own tab, wait for load, tag it"]
+    C --> D["Work: find the tab by its tag"]
+    D --> E["Close the tab, always"]
+    E --> F["Release the lock"]
+    C -->|page never loads| X["Script closes the tab itself"]
+    X --> F
+```
+
+The owner's hub does exactly this in one small Python module; every Safari job there, and every Safari job in
+Hmunmawi, uses it, so there is never a leftover tab and never a job that fails because "its tab wasn't there".
+
 ### Sentry uptime monitors
 
 - **For:** hearing that your website is down even when this Mac is off.

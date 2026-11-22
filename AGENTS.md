@@ -115,6 +115,11 @@ Every docs, README, release-note or GitHub description update must check and kee
   sends messages wait for the user's OK in the app (see [SECURITY.md](SECURITY.md)).
 - **Say what the code really does.** If you change behaviour, update [PRIVACY.md](PRIVACY.md),
   [SECURITY.md](SECURITY.md), the README and the CHANGELOG in the same change.
+- **Safari tabs (owner rules 22 Nov 2026):** anything that needs a Safari page goes through `SafariAuto`
+  (`Sources/HmunmawiApp/SafariAuto.swift`): a tab of its own, never a tab the user already has open (reading one the
+  user has open is allowed, read only), tagged, found by tag and never by position, closed on every path, and the
+  shared `safari.lock` held meanwhile. Never `front document`, never `last tab`, never a tab by index. A job must not
+  fail because a tab is not open: it opens its own. Tests: `SafariAutoTests`.
 - **Add-ons never receive keys.** See [docs/ADD-ONS.md](docs/ADD-ONS.md) before touching the add-on host.
 - **Signing:** sign every build with the same certificate (`SIGN_ID` or `scripts/.sign-id`); a different one makes
   saved keys unreadable. Check with `Hmunmawi --verify-secrets` (prints ok/fail only). A release is refused unless its signing

@@ -277,39 +277,29 @@ final class OfferCodes {
         guard let u = InputCheck.httpsURL(address), let host = u.host, host.wholeMatch(of: /[A-Za-z0-9.-]+/) != nil
         else { return "Enter a full https:// address (a plain host name, no special characters)" }
         if let note = Permissions.shared.deferIfNeeded([.safari]) { return note }
-        // Safe inside both the AppleScript string and the JavaScript string: no backslash, double or single quote.
+        // Safe inside the JavaScript string: no backslash, double or single quote.
         let esc = u.absoluteString.replacingOccurrences(of: "\\", with: "").replacingOccurrences(of: "\"", with: "")
             .replacingOccurrences(of: "'", with: "%27")
-        let script = """
-        tell application "Safari"
-            set t to missing value
-            repeat with w in windows
-                repeat with x in tabs of w
-                    if URL of x starts with "https://\(host)/" then set t to x
-                end repeat
-            end repeat
-            if t is missing value then
-                if (count of windows) is 0 then make new document
-                set t to make new tab at end of tabs of window 1 with properties {URL:"https://\(host)/"}
-                delay 6
-            end if
-            return do JavaScript "var x=new XMLHttpRequest();x.open('GET','\(esc)',false);x.send();x.status==200?x.responseText:'HTTP '+x.status" in t
-        end tell
-        """
-        // A separate osascript process (NSAppleScript is main-thread only, and would freeze the window while Safari
-        // loads); stopped after 60 seconds.
-        let text: String? = await Task.detached {
-            let p = Process(), out = Pipe(), input = Pipe()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-"]
-            p.standardInput = input; p.standardOutput = out; p.standardError = FileHandle.nullDevice
-            guard (try? p.run()) != nil else { return nil }
-            try? input.fileHandleForWriting.write(contentsOf: Data(script.utf8)); try? input.fileHandleForWriting.close()
-            let killer = Task.detached { try? await Task.sleep(for: .seconds(60)); if p.isRunning { p.terminate() } }
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            p.waitUntilExit(); killer.cancel()
-            guard p.terminationStatus == 0 else { return nil }
-            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let js = "var x=new XMLHttpRequest();x.open('GET','\(esc)',false);x.send();x.status==200?x.responseText:'HTTP '+x.status"
+        // A tab of yours that already shows the site is only read. Without one, a tab of its own is opened through
+        // SafariAuto (shared lock, tagged), read, and closed again; stopped after about 2 minutes.
+        let text: String? = await Task.detached { () -> String? in
+            switch await SafariAuto.run(SafariAuto.readExistingScript, args: ["https://\(host)/", js], timeout: 60) {
+            case .failure: return nil
+            case .success(let out): if out != "__NONE__" { return out }
+            }
+            let session = SafariAuto.Session(job: "offer_codes")
+            do { try await session.enter(timeout: 150) } catch { return nil }
+            do {
+                let tab = try await session.open(url: "https://\(host)/", needle: host, seconds: 30)
+                try? await Task.sleep(for: .seconds(2))
+                let out = try await tab.js(js, timeout: 60)
+                await session.exit()
+                return out
+            } catch {
+                await session.exit()
+                return nil
+            }
         }.value
         guard let text, let data = text.data(using: .utf8), text.hasPrefix("{") else {
             return text.map { "Couldn't read it (\($0.prefix(40))). Are you logged in to \(host) in Safari?" }

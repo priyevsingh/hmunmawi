@@ -67,40 +67,25 @@ final class XSafariReader {
         // Only x.com pages, and only URL-safe characters (search queries arrive percent-encoded).
         guard url.hasPrefix("https://x.com/"), url.count < 600,
               url.wholeMatch(of: /https:\/\/x\.com\/[A-Za-z0-9_\/?=&%.\-+~]+/) != nil else { return nil }
-        let esc = js.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let script = """
-        tell application "Safari"
-            if (count of windows) is 0 then make new document
-            set t to make new tab at end of tabs of window 1 with properties {URL:"\(url)"}
-            set r to ""
-            repeat 15 times
-                delay 2
-                try
-                    set r to (do JavaScript "\(esc)" in t) as text
-                on error e
-                    set r to "{\\"error\\":\\"" & e & "\\"}"
-                end try
-                if r contains "\(until)" or r contains "signed out" then exit repeat
-            end repeat
-            try
-                close t
-            end try
-            return r
-        end tell
-        """
-        return await Task.detached { () -> String? in
-            let p = Process(), out = Pipe(), input = Pipe()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-"]
-            p.standardInput = input; p.standardOutput = out; p.standardError = FileHandle.nullDevice
-            guard (try? p.run()) != nil else { return nil }
-            try? input.fileHandleForWriting.write(contentsOf: Data(script.utf8)); try? input.fileHandleForWriting.close()
-            let killer = Task.detached { try? await Task.sleep(for: .seconds(60)); if p.isRunning { p.terminate() } }
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            p.waitUntilExit(); killer.cancel()
-            guard p.terminationStatus == 0 else { return nil }
-            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        }.value
+        // Its own tagged tab through SafariAuto: the shared Safari lock, found by tag, closed on every path.
+        let session = SafariAuto.Session(job: "x_read")
+        do { try await session.enter(timeout: 240) } catch { return nil }
+        var answer = ""
+        do {
+            let tab = try await session.open(url: url, needle: "x.com", seconds: 40)
+            for _ in 0..<15 {
+                try? await Task.sleep(for: .seconds(2))
+                do { answer = try await tab.js(js) }
+                catch SafariAuto.Failure.noTab { break }
+                catch { answer = "{\"error\":\"\(error)\"}" }
+                if answer.contains(until.replacingOccurrences(of: "\\\"", with: "\"")) || answer.contains("signed out") { break }
+            }
+        } catch {
+            await session.exit()
+            return nil
+        }
+        await session.exit()
+        return answer
     }
 
     // MARK: For people without a bot (read-only, same files a bot would write)
