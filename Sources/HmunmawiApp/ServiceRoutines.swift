@@ -277,9 +277,12 @@ extension Routines {
         p.terminationHandler = { _ in done.signal() }
         do { try p.run() } catch { return (-1, error.localizedDescription) }
         let box = Box()
-        DispatchQueue.global(qos: .utility).async { box.data = pipe.fileHandleForReading.readDataToEndOfFile(); read.signal() }
+        // The reader runs at a higher priority and is given up to 10 s after a normal exit: on a busy machine (a CI
+        // runner) a 2 s wait could end before the reader thread was scheduled and return the output empty. A child
+        // that keeps the pipe open after exiting still can't hold this up for long.
+        DispatchQueue.global(qos: .userInitiated).async { box.data = pipe.fileHandleForReading.readDataToEndOfFile(); read.signal() }
         if done.wait(timeout: .now() + timeout) == .timedOut { p.terminate(); _ = read.wait(timeout: .now() + 2); return (-2, "timed out") }
-        _ = read.wait(timeout: .now() + 2)
+        _ = read.wait(timeout: .now() + 10)
         return (p.terminationStatus, String(decoding: box.data.prefix(20_000), as: UTF8.self))
     }
 
