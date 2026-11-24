@@ -4,13 +4,19 @@ name: Sign-off
 # This checks each commit in a pull request for a matching "Signed-off-by:" line. No third-party service.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dco:
     name: Every commit is signed off
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -21,18 +27,4 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          # Not needed for: Dependabot's and GitHub's own bots, and a pull request that only adds an app to the
-          # Wall of Apps (data, checked against the App Store by its own workflow).
-          files=$(git diff --name-only "$BASE...$HEAD")
-          if [ "$files" = "docs/wall-of-apps.json" ]; then echo "Wall of Apps entry only: no sign-off needed."; exit 0; fi
-          bad=0
-          for c in $(git rev-list --no-merges "$BASE..$HEAD"); do
-            email=$(git log -1 --format='%ae' "$c")
-            case "$email" in *"[bot]@users.noreply.github.com") continue;; esac
-            if ! git log -1 --format='%B' "$c" | grep -qiE "^Signed-off-by: .+ <${email}>$"; then
-              echo "::error::Commit $(git log -1 --format='%h %s' "$c") has no 'Signed-off-by:' line for $email. Use: git commit -s --amend"
-              bad=1
-            fi
-          done
-          exit $bad
+        run: scripts/check-signoffs.sh "$BASE" "$HEAD"

@@ -1,7 +1,9 @@
 name: Wall of Apps
 
 # A pull request that touches the wall is checked against Apple's public App Store lookup (real, live, no
-# duplicates). After a merge to main, the icons, mosaic image, full list and README block are rebuilt and committed.
+# duplicates). After a merge to main, the icons, mosaic image, full list and README block are rebuilt on a
+# follow-up pull request (main requires a PR; the Actions app cannot bypass that on a personal repo). Auto-merge
+# completes it once the required checks are green.
 on:
   pull_request:
     paths: ["docs/wall-of-apps.json"]
@@ -13,8 +15,8 @@ on:
 permissions: {}   # each job asks only for what it needs
 
 concurrency:
-  group: wall-of-apps-${{ github.ref }}
-  cancel-in-progress: false
+  group: wall-of-apps-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -27,22 +29,30 @@ jobs:
       - name: Check the entries
         run: python3 scripts/wall-of-apps.py --check
 
-  build:
+  rebuild:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Install Pillow
         run: python3 -m pip install --quiet pillow
       - name: Check and rebuild
         run: python3 scripts/wall-of-apps.py --check --build
-      - name: Commit the rebuilt wall
+      - name: Open a pull request for the rebuilt wall
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md docs/WALL-OF-APPS.md docs/wall
           if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
-          git commit -m "Wall of Apps: rebuild the mosaic and list"
-          git push
+          branch="wall-rebuild-$(git rev-parse --short HEAD)"
+          git checkout -B "$branch"
+          git commit -s -m "Wall of Apps: rebuild the mosaic and list"
+          git push -u origin "$branch"
+          pr=$(gh pr create --base main --head "$branch" --title "Wall of Apps: rebuild the mosaic and list" \
+            --body "Automatic rebuild after a Wall of Apps entry was merged. This is the picture and the full list only.")
+          gh pr merge --auto --squash "$pr"

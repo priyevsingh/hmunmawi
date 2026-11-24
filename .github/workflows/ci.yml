@@ -4,6 +4,7 @@ name: CI
 # live-sales Cloudflare worker on Linux. Read-only, no secrets: signing and releases happen on the maintainer's Mac.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -11,13 +12,16 @@ on:
 permissions:
   contents: read
 
+# One group per pull request (or per branch/tag on other events). A new push to a PR cancels the previous run so a
+# stale macOS job is not left queued and later reported as a failure. Runs on main and on tags are never cancelled.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   app:
     name: App (swift build and test)
+    if: github.event.action != 'closed'
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -34,6 +38,7 @@ jobs:
 
   worker:
     name: Live-sales worker (Node tests)
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

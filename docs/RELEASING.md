@@ -18,9 +18,19 @@ the hardened runtime, Apple's notary check and a stapled ticket. `scripts/releas
 
 Before tagging, tick the docs checklist: Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](CAPABILITIES.md); other docs point to it, including [PRIVATE-WORKSPACE.md](PRIVATE-WORKSPACE.md) and the AGENTS.md starter inside it. The release notes and the GitHub release description must not drop any capability either.
 
+Every change, including a version bump, lands on `main` only through a signed-off pull request. Use `git commit -s`.
+When the pull request is ready:
+
+```sh
+scripts/merge-pr.sh <pr-number>
+```
+
+That helper checks every commit has a `Signed-off-by` line, waits until the required checks are green (App, Worker,
+and Sign-off; CodeQL is not required), and squash-merges. Then, on the updated `main`:
+
 ```sh
 # bump CFBundleShortVersionString / CFBundleVersion in Resources/Info.plist, update CHANGELOG.md, add the version's
-# user-facing notes at the top of Resources/WhatsNew.json, then:
+# user-facing notes at the top of Resources/WhatsNew.json (in the pull request, before merge-pr.sh), then:
 NOTARY_PROFILE=hmunmawi-notary scripts/release.sh
 ```
 
@@ -39,10 +49,11 @@ Calendars, Accessibility, Automation and Keychain "Always Allow" to that require
 re-grant everything after updating. There is no override: fix the signing identity instead. Check by hand:
 `scripts/check-designated-requirement.sh build/Hmunmawi-<version>.zip [previous.zip|previous.app|requirement.txt]`.
 
-Then publish with `scripts/publish-release.sh <version>`. It pushes `main`, waits for the **CI** workflow on that
-commit to pass, and only then tags `v<version>` and publishes the GitHub release with the zip and `appcast.xml`
-(notes from the matching CHANGELOG.md section). If CI fails or never starts, nothing is tagged or published. Never
-tag or run `gh release create` by hand before CI is green. CodeQL runs separately and slowly; check its alerts after.
+Then publish with `scripts/publish-release.sh <version>`. It does not add commits to `main`. It checks that local
+`main` matches `origin/main`, runs the signature gate again, waits for the **CI** workflow on that commit to pass,
+and only then tags `v<version>` and publishes the GitHub release with the zip and `appcast.xml` (notes from the
+matching CHANGELOG.md section). If CI fails or never starts, nothing is tagged or published. Never tag or run
+`gh release create` by hand before CI is green. CodeQL runs separately and slowly; check its alerts after.
 
 **Release notes, one source.** `Resources/WhatsNew.json` holds the user-facing notes, newest first (1-3 short items
 per version, each with an optional button: `settings:<pane>` or `page:<today|apps|log|automations>`). `release.sh`
@@ -57,22 +68,25 @@ CHANGELOG.md stays the developers' record.
 
 In plain words:
 
-1. `release.sh` builds, signs with Developer ID and gets Apple's notary ticket.
-2. The signature gate compares the new build's signing requirement with the previous release. Any difference stops
+1. The change (version, notes, code) is merged with `scripts/merge-pr.sh` only when sign-off and the required checks
+   are green. `main` is never pushed to directly.
+2. `release.sh` builds, signs with Developer ID and gets Apple's notary ticket.
+3. The signature gate compares the new build's signing requirement with the previous release. Any difference stops
    the release, so an update never asks users for permissions or keys again.
-3. `publish-release.sh` runs the gate again, pushes `main` and waits for CI.
-4. Only when CI is green is the tag made and the GitHub release published with the zip and `appcast.xml`.
-5. Users' copies find the update through the signed appcast and install it after asking.
+4. `publish-release.sh` runs the gate again, confirms `main` matches the origin, and waits for CI on that commit.
+5. Only when CI is green is the tag made and the GitHub release published with the zip and `appcast.xml`.
+6. Users' copies find the update through the signed appcast and install it after asking.
 
 ```mermaid
 flowchart TD
+    M["merge-pr.sh: sign-off and required checks green, squash-merge"] --> W
     W{"Notes for this version in WhatsNew.json?"} -->|no| WS["Stop before building"]
     W -->|yes| B["release.sh: build, sign, notarize"]
     B --> G{"Same signing requirement as last release?"}
     G -->|no| S["Stop: fix the signing identity"]
     G -->|yes| F["Feed: notes embedded, checked not empty"]
-    F --> P["publish-release.sh: gate again, push main"]
-    P --> C{"CI green?"}
+    F --> P["publish-release.sh: gate again, main already on origin"]
+    P --> C{"CI green on main?"}
     C -->|no| N["Nothing tagged or published"]
     C -->|yes| R["Tag and GitHub release with appcast"]
     R --> U["Users see the notes, update after asking"]
@@ -128,10 +142,15 @@ python3 scripts/wall-of-apps.py --since 2026-11-14   # the previous release's da
 
 ## Repository settings
 
-`scripts/github-settings.sh` applies the repository's GitHub settings with the `gh` CLI: squash merges only, merged
-branches deleted, sign-off required on web edits, only GitHub's own Actions with a read-only token, Dependabot alerts
-and security updates, and, for a public repository, approval before outside contributors' workflows run, secret
-scanning with push protection, private vulnerability reporting, CodeQL code scanning, and rulesets that protect
-`main` (no force pushes, no deletion, no bypass for anyone) and the `v*` release
-tags (no moving or deleting; only the maintainer can bypass, to publish releases). `main` has no "require a pull request" rule on purpose: the Wall of Apps workflow commits its rebuilt mosaic straight to `main`, and GitHub lets the Actions app bypass rules only on organization repositories. Outside contributors cannot push at all; they fork and open a pull request. Run it after creating the repository and again after
-making it public; it says which settings it applied and which aren't available yet.
+`scripts/github-settings.sh` applies the repository's GitHub settings with the `gh` CLI: squash merges only, auto-merge
+allowed, merged branches deleted, sign-off required on web edits, only GitHub's own Actions with a read-only token,
+Dependabot alerts and security updates, and, for a public repository, approval before outside contributors' workflows
+run, secret scanning with push protection, private vulnerability reporting, CodeQL code scanning, and rulesets that
+protect `main` and the `v*` release tags. `main` requires a pull request, the App / Worker / Sign-off checks to be
+green and the branch to be up to date, squash merges only, and no force pushes or deletion (no bypass, no required
+approving reviews, so a solo maintainer can still merge). The Wall of Apps rebuild opens a follow-up pull request
+and enables auto-merge instead of pushing to `main` (a personal repository cannot let the Actions app bypass a
+"require pull request" rule). Release tags cannot be moved or deleted; only the maintainer can bypass that, to
+publish releases. Outside contributors cannot push at all; they fork and open a pull request. Run the script after
+creating the repository and again after making it public; it says which settings it applied and which aren't
+available yet. After changing the ruleset, confirm with `gh api repos/priyevsingh/hmunmawi/rulesets`.

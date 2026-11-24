@@ -1,7 +1,9 @@
 #!/bin/bash
-# publish-release.sh <version> — push main, wait for CI to pass on that commit, then tag and publish.
-# Run after scripts/release.sh has built build/Hmunmawi-<version>.zip (and build/feed/appcast.xml if present).
-# Nothing is tagged or published unless the CI workflow on the pushed commit succeeds.
+# publish-release.sh <version> — wait for CI on main, then tag and publish.
+# Order: merge the release change with scripts/merge-pr.sh (sign-off + required checks green),
+# then scripts/release.sh, then this script. This script does not add commits to main
+# (main only moves through squash-merged pull requests).
+# Nothing is tagged or published unless the CI workflow on origin/main succeeds.
 set -euo pipefail
 VERSION="${1:?usage: scripts/publish-release.sh <version>}"
 cd "$(dirname "$0")/.."
@@ -9,6 +11,12 @@ ZIP="build/Hmunmawi-$VERSION.zip"
 [[ -f "$ZIP" ]] || { echo "Missing $ZIP: run scripts/release.sh first" >&2; exit 2; }
 [[ -z "$(git status --porcelain)" ]] || { echo "Working tree not clean" >&2; exit 2; }
 [[ "$(git branch --show-current)" == main ]] || { echo "Not on main" >&2; exit 2; }
+git fetch -q origin main
+# Refuse to push new commits: main is updated only by merging a pull request.
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+  echo "publish-release: local main and origin/main differ. Merge your change with scripts/merge-pr.sh, then pull, then run this again. Do not push commits to main." >&2
+  exit 2
+fi
 NOTES="$(awk -v v="$VERSION" 'index($0,"## "v)==1{f=1;next} f&&/^## /{exit} f' CHANGELOG.md)"
 [[ -n "${NOTES//[[:space:]]/}" ]] || { echo "No CHANGELOG.md section for $VERSION" >&2; exit 2; }
 
