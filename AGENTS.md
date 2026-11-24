@@ -7,6 +7,10 @@ Owner policy (not part of this app's runtime): API-credit usage limits are not t
 Hmunmawi is a calm, local-first Mac app for indie app developers: it reads your numbers, tells you what matters
 and asks before it acts. Users' guide: [README.md](README.md).
 
+
+## Never mention the developer's location (P S, 24 Nov 2026)
+Never mention the developer's location (city, state, country) in any public copy: website, app UI, App Store metadata, posts, pitches, JSON-LD. Do not write Bangalore, Bengaluru, Karnataka, "from India", "based in India", or any similar phrase about the indie developer or studio. "Supports indie development" (with no place) is fine.
+
 ## Build and test
 
 - macOS 26+, Xcode 26+ (Swift 6). `swift test` runs the suite; `scripts/make-app.sh` builds
