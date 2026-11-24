@@ -64,10 +64,12 @@ struct OpeningTitle: View {
     }
 }
 
-/// A real sale while the app is open: the app icon drops in at the centre with its flag, the amount counts
-/// up inside a burst of light in the money colour, then everything flies up into the toolbar.
+/// A payment while the app is open: paid sales and renewals count up and fly to the toolbar; free trials and
+/// intro offers arrive as a gift; refunds and the other payment events appear more quietly and fade. Reduce Motion skips them.
 struct SaleMoment: View {
     let event: StoredEvent?
+    var token: Int = 0
+    var replay: Bool = false
     @State private var shown: StoredEvent?
     @State private var step = 0  // 0 hidden · 1 in · 2 counted · 3 leaving
     @State private var playing: Task<Void, Never>?
@@ -76,30 +78,37 @@ struct SaleMoment: View {
     var body: some View {
         GeometryReader { g in
             if let e = shown {
+                let style = PaymentMoment.style(e)
+                let tint = Self.tint(e)
                 let amount = Money.shared.amount(e)
-                let text = amount.map { Money.shared.format($0, from: Money.shared.target, decimals: 0) } ?? ""
-                let zero = text.replacingOccurrences(of: "[0-9]", with: "0", options: .regularExpression)
+                let paid = (amount ?? 0) > 0 && style == .sale
+                let text = paid ? (amount.map { Money.shared.format($0, from: Money.shared.target, decimals: 0) } ?? "")
+                    : style == .gift ? "Free" : (amount.map { Money.shared.format($0, from: Money.shared.target, decimals: 0) } ?? "")
+                let zero = paid ? text.replacingOccurrences(of: "[0-9]", with: "0", options: .regularExpression) : text
                 ZStack {
-                    Color.black.opacity(step == 1 || step == 2 ? 0.12 : 0).ignoresSafeArea()
-                    ForEach(0..<2, id: \.self) { i in
-                        Circle().stroke(Brand.Category.money.opacity(0.5), lineWidth: 3)
-                            .frame(width: 160, height: 160)
-                            .scaleEffect(step >= 2 ? 3.2 + Double(i) : 0.4)
-                            .opacity(step >= 2 ? 0 : (step == 1 ? 0.9 : 0))
-                            .animation(.easeOut(duration: 1.1).delay(Double(i) * 0.15), value: step)
+                    Color.black.opacity(step == 1 || step == 2 ? (style == .subtle ? 0.06 : 0.12) : 0).ignoresSafeArea()
+                    if style != .subtle {
+                        ForEach(0..<2, id: \.self) { i in
+                            Circle().stroke(tint.opacity(0.5), lineWidth: 3)
+                                .frame(width: 160, height: 160)
+                                .scaleEffect(step >= 2 ? 3.2 + Double(i) : 0.4)
+                                .opacity(step >= 2 ? 0 : (step == 1 ? 0.9 : 0))
+                                .animation(.easeOut(duration: 1.1).delay(Double(i) * 0.15), value: step)
+                        }
                     }
                     VStack(spacing: 12) {
-                        AppIcon(app: e.app, size: 96)
+                        AppIcon(app: e.app, size: style == .subtle ? 72 : 96,
+                                badge: PaymentMoment.symbol(e.kind))
                             .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
-                            .offset(y: step >= 1 ? 0 : -220)
+                            .offset(y: step >= 1 ? 0 : (style == .subtle ? 0 : -220))
                         HStack(spacing: 8) {
                             if let flag = TickerItems.flag(e) { Text(flag).font(.title) }
-                            Text(e.kind == "revenue.renewal" ? "Renewal · \(e.app ?? "")" : "New sale · \(e.app ?? "")").font(Kit.outcome)
+                            Text(PaymentMoment.headline(e)).font(Kit.outcome)
                         }
                         if !text.isEmpty {
                         Text(step >= 2 ? text : zero)
-                            .font(.system(size: 56, weight: .bold)).monospacedDigit()
-                            .foregroundStyle(Brand.Category.money.gradient)
+                            .font(.system(size: style == .subtle ? 36 : 56, weight: .bold)).monospacedDigit()
+                            .foregroundStyle(tint.gradient)
                             .contentTransition(.numericText())
                         }
                     }
@@ -107,19 +116,20 @@ struct SaleMoment: View {
                     .background(Color(nsColor: .windowBackgroundColor), in: .rect(cornerRadius: 28))
                     .shadow(color: .black.opacity(0.2), radius: 30, y: 12)
                     .opacity(step == 0 || step == 3 ? 0 : 1)
-                    .scaleEffect(step == 3 ? 0.15 : 1)
-                    .offset(y: step == 3 ? -g.size.height / 2 + 20 : 0)
+                    .scaleEffect(step == 3 && style != .subtle ? 0.15 : (step == 3 ? 0.96 : 1))
+                    .offset(y: step == 3 && style != .subtle ? -g.size.height / 2 + 20 : 0)
                 }
                 .frame(width: g.size.width, height: g.size.height)
             }
         }
         .allowsHitTesting(false)
-        .onChange(of: event?.id) { _, _ in
-            guard !reduceMotion, let e = event, ["revenue.purchase", "revenue.renewal"].contains(e.kind) else { return }
-            // Only a sale that just happened is an event; older ones arriving late from the feed stay quiet.
-            guard Date.now.timeIntervalSince1970 * 1000 - Double(e.occurredAt) < 15 * 60 * 1000 else { return }
-            play(e)
-        }
+        .onChange(of: token) { _, _ in attemptPlay() }
+        .onChange(of: event?.id) { _, _ in attemptPlay() }
+    }
+
+    private func attemptPlay() {
+        guard let e = event, PaymentMoment.shouldPlay(event: e, replay: replay, reduceMotion: reduceMotion) else { return }
+        play(e)
     }
 
     private func play(_ e: StoredEvent) {
@@ -127,17 +137,27 @@ struct SaleMoment: View {
         playing?.cancel()
         shown = e
         step = 0
+        let style = PaymentMoment.style(e)
         playing = Task { @MainActor in
             withAnimation(.spring(response: 0.55, dampingFraction: 0.7)) { step = 1 }
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(for: .milliseconds(style == .subtle ? 300 : 500))
             if Task.isCancelled { return }
-            withAnimation(.smooth(duration: 0.9)) { step = 2 }
-            try? await Task.sleep(for: .milliseconds(2000))
+            withAnimation(.smooth(duration: style == .subtle ? 0.4 : 0.9)) { step = 2 }
+            try? await Task.sleep(for: .milliseconds(style == .subtle ? 1400 : 2000))
             if Task.isCancelled { return }
-            withAnimation(.easeIn(duration: 0.55)) { step = 3 }
+            withAnimation(.easeIn(duration: style == .subtle ? 0.4 : 0.55)) { step = 3 }
             try? await Task.sleep(for: .milliseconds(600))
             if Task.isCancelled { return }
             if shown?.id == e.id { shown = nil; step = 0 }
+        }
+    }
+
+    private static func tint(_ e: StoredEvent) -> Color {
+        switch PaymentMoment.style(e) {
+        case .sale: Brand.Category.money
+        case .gift: Brand.good
+        case .subtle:
+            ["revenue.refund", "revenue.revoked", "revenue.refund_declined"].contains(e.kind) ? Brand.bad : Brand.caution
         }
     }
 }

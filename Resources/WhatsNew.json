@@ -2,6 +2,26 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.5.9",
+      "items": [
+        {
+          "title": "Replay a sale’s moment",
+          "detail": "Right-click any purchase on Today, or choose Replay last purchase animation in the menu bar panel, to play that sale’s moment again. It uses the real purchase and does not add a new one or send a notification.",
+          "action": "page:today"
+        },
+        {
+          "title": "Every payment gets its own moment",
+          "detail": "Free trials, intro offers, refunds and the other payment events now appear in the list, and each plays its own short moment, not only paid sales and renewals.",
+          "action": "page:today"
+        },
+        {
+          "title": "A sale you missed still plays when you come back",
+          "detail": "If a payment arrived while Hmunmawi wasn’t in front, its moment plays when you bring the window back, even if a few minutes have passed.",
+          "action": "page:today"
+        }
+      ]
+    },
+    {
       "version": "1.5.8",
       "items": [
         {

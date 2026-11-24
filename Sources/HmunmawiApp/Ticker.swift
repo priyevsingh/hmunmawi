@@ -3,8 +3,7 @@ import SwiftUI
 
 /// The moments worth a glance as they happen: money (sales, renewals, refunds, cancellations) and new reviews.
 enum TickerItems {
-    static let kinds: Set<String> = ["revenue.purchase", "revenue.renewal", "revenue.refund", "revenue.cancelled",
-                                     "revenue.expired", "revenue.billing_issue", "review.new"]
+    static let kinds: Set<String> = PaymentMoment.paymentKinds.union(["review.new"])
 
     /// The last day's moments, newest first; if the day was quiet, the latest ten from the week.
     static func recent(_ events: [StoredEvent], now: Date = .now) -> [StoredEvent] {
@@ -16,9 +15,12 @@ enum TickerItems {
 
     static func symbol(_ kind: String) -> (String, Color) {
         switch kind {
-        case "revenue.purchase": ("bag.fill", Brand.good)
-        case "revenue.renewal": ("arrow.triangle.2.circlepath", Brand.good)
-        case "revenue.refund", "revenue.cancelled", "revenue.expired", "revenue.billing_issue": ("arrow.uturn.backward", Brand.bad)
+        case "revenue.purchase": (PaymentMoment.symbol(kind), Brand.good)
+        case "revenue.renewal", "revenue.renewal_extended", "revenue.refund_reversed": (PaymentMoment.symbol(kind), Brand.good)
+        case "revenue.free": (PaymentMoment.symbol(kind), Brand.good)
+        case "revenue.refund", "revenue.cancelled", "revenue.expired", "revenue.billing_issue",
+             "revenue.revoked", "revenue.refund_declined", "revenue.consumption_request",
+             "revenue.plan_change", "revenue.price_increase": (PaymentMoment.symbol(kind), Brand.bad)
         default: ("star.fill", Brand.Category.users)
         }
     }

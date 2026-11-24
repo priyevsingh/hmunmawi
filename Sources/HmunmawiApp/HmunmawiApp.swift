@@ -217,6 +217,7 @@ struct HmunmawiApp: App {
         .commands {
             CommandGroup(replacing: .appInfo) { AboutMenuItem(); CheckForUpdatesItem() }
             CommandGroup(replacing: .appSettings) { SettingsMenuItem() }
+            CommandGroup(after: .toolbar) { ReplayLastMomentItem(model: model) }
         }
 
         // A regular window, so Settings resizes like any Mac window (⌘, still opens it).
@@ -239,6 +240,20 @@ private struct AboutMenuItem: View {
 struct SettingsMenuItem: View {
     @Environment(\.openWindow) private var openWindow
     var body: some View { Button("Settings…") { openWindow(id: "settings") }.keyboardShortcut(",", modifiers: .command) }
+}
+
+private struct ReplayLastMomentItem: View {
+    let model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        Button("Replay Last Purchase Animation") {
+            if let e = model.lastReplayableMoment() { model.replaySaleMoment(e) }
+        }
+        .disabled(model.lastReplayableMoment() == nil || reduceMotion)
+        .help(reduceMotion
+              ? "Turn off Reduce Motion in System Settings to play this."
+              : "Play the latest payment's moment again. It uses the real row and doesn't add an entry or send a notification.")
+    }
 }
 
 /// Opens Settings from anywhere in the app (replaces SettingsLink, which only opens the built-in scene).

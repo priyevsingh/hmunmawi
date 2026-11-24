@@ -103,7 +103,7 @@ struct MainView: View {
             // whole pages alive and compositing for a third of a second; measured with Instruments, Nov 2026).
             .id(page)
         }
-        .overlay { SaleMoment(event: model.flash) }
+        .overlay { SaleMoment(event: model.flash, token: model.flashToken, replay: model.flashReplays) }
         // Startup problems, connections waiting for your OK, or a slow launch step: said plainly at the top.
         // Above the page, never over it (it used to cover the greeting line).
         .safeAreaInset(edge: .top, spacing: 0) { VStack(spacing: 0) { StartupBanners(model: model); HiddenIconHint() } }

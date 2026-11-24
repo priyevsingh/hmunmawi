@@ -113,6 +113,10 @@ final class AppModel {
     private var healedEvent: [String: Int64] = [:]
     /// A new sale, renewal, refund or review that arrived since the last refresh; the pill shows it for a few seconds.
     private(set) var flash: StoredEvent?
+    /// Bumped on every play, including a replay of the same row, so the moment can run again.
+    private(set) var flashToken: Int = 0
+    /// True when this flash was asked for (a replay, or a missed moment you came back to), not a live arrival.
+    private(set) var flashReplays: Bool = false
     private var newestMoment: Millis?
     var addOns: [AddOnRow] = []
     var errorText: String?
@@ -706,7 +710,7 @@ final class AppModel {
         // Not looking (window hidden or another app in front): keep it and play it when you come back.
         // The menu bar "H" pulses either way; the window's animation is kept to replay.
         if !Self.windowInFront() { missedMoment = newest }
-        showFlash(newest)
+        showFlash(newest, replay: false)
     }
 
     /// A sale or renewal that arrived while Hmunmawi wasn't in front; played once when you bring it back (12 h at most).
@@ -718,9 +722,9 @@ final class AppModel {
             Task { @MainActor in
                 guard let self, let m = self.missedMoment else { return }
                 self.missedMoment = nil
-                guard Date.now.timeIntervalSince1970 * 1000 - Double(m.occurredAt) < 12 * 3_600_000 else { return }
+                guard PaymentMoment.shouldReplayMissed(event: m) else { return }
                 try? await Task.sleep(for: .milliseconds(600))   // let the window come forward first
-                self.showFlash(m)
+                self.showFlash(m, replay: true)
             }
         }
     }
@@ -728,11 +732,30 @@ final class AppModel {
         NSApp.isActive && NSApp.windows.contains { $0.isVisible && $0.isKeyWindow && $0.title.hasPrefix("Hmunmawi") }
     }
 
-    private func showFlash(_ newest: StoredEvent) {
+    /// Plays the on-screen moment for `event`. A replay uses that row's real data: no new entry, no notification, no stats change.
+    func showFlash(_ newest: StoredEvent, replay: Bool = false) {
+        flashReplays = replay
+        flashToken += 1
+        let token = flashToken
         flash = newest
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(6))
-            if self?.flash?.id == newest.id { self?.flash = nil }
+            if self?.flashToken == token { self?.flash = nil; self?.flashReplays = false }
+        }
+    }
+
+    /// Newest payment in the current project that can play a moment (for "Replay last purchase animation").
+    func lastReplayableMoment() -> StoredEvent? {
+        PaymentMoment.lastReplayable(events, shown: { ProjectStore.shared.shows($0) })
+    }
+
+    /// Replays the moment for an existing row. Does not write the store, notify, or change counts.
+    func replaySaleMoment(_ event: StoredEvent) {
+        guard PaymentMoment.canPlay(event) else { return }
+        WindowOpener.show(page: "today")
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            showFlash(event, replay: true)
         }
     }
 
