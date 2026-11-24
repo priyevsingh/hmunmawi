@@ -16,7 +16,13 @@ bad=0
 for c in $(git rev-list --no-merges "$BASE..$HEAD"); do
   email=$(git log -1 --format='%ae' "$c")
   case "$email" in *"[bot]@users.noreply.github.com") continue;; esac
-  if ! git log -1 --format='%B' "$c" | grep -qiE "^Signed-off-by: .+ <${email}>$"; then
+  # Escape the email so a '+' in a GitHub noreply address is not treated as a regex quantifier.
+  if ! git log -1 --format='%B' "$c" | EMAIL="$email" python3 -c '
+import os, re, sys
+email = os.environ["EMAIL"]
+body = sys.stdin.read()
+sys.exit(0 if re.search(r"(?im)^Signed-off-by: .+ <" + re.escape(email) + r">$", body) else 1)
+'; then
     echo "::error::Commit $(git log -1 --format='%h %s' "$c") has no 'Signed-off-by:' line for $email. Use: git commit -s --amend"
     bad=1
   fi
