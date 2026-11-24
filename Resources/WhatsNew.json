@@ -6,12 +6,12 @@
       "items": [
         {
           "title": "Replay a sale’s moment",
-          "detail": "Right-click any purchase on Today, or choose Replay last purchase animation in the menu bar panel, to play that sale’s moment again. It uses the real purchase and does not add a new one or send a notification.",
+          "detail": "Right-click any purchase on Today, or Replay last purchase animation in the menu bar panel (the panel closes first). It uses the real purchase and does not add a new one or send a notification.",
           "action": "page:today"
         },
         {
           "title": "Every payment gets its own moment",
-          "detail": "Free trials, intro offers, refunds and the other payment events now appear in the list, and each plays its own short moment, not only paid sales and renewals.",
+          "detail": "Free trials, intro offers, refunds and the other payment events now appear in Purchases, the ticker and the menu bar’s Latest list, and each plays its own short moment, not only paid sales and renewals.",
           "action": "page:today"
         },
         {

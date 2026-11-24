@@ -4,8 +4,8 @@ import Foundation
 /// A number that isn't known is nil (hidden), never shown as 0.
 public enum MenuBarFacts {
     public static let saleKinds: Set<String> = ["revenue.purchase", "revenue.renewal"]
-    public static let feedKinds: Set<String> = ["revenue.purchase", "revenue.renewal", "revenue.refund", "revenue.cancelled",
-                                                "review.new", "asc.webhook", "ci.build"]
+    /// Same payment kinds as Purchases and the ticker, plus reviews, builds and webhook status. Today's sales count still uses saleKinds only.
+    public static let feedKinds: Set<String> = PaymentMoment.paymentKinds.union(["review.new", "asc.webhook", "ci.build"])
 
     public struct Today: Equatable, Sendable {
         public var sales: Int

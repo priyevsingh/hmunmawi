@@ -123,13 +123,18 @@ struct MenuBarPanel: View {
     @State private var policy = AIPolicyService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private func open(_ page: String) {
+    /// Closes this panel (the menu-bar extra or the floating copy) so what happens next is not hidden behind it.
+    private func closePanel() {
         if let panelClose {
             panelClose()   // the floating copy (shortcut / window button): its openWindow isn't a scene's, keep the saved one
         } else {
             WindowOpener.open = openWindow
             dismiss()   // the panel closes once it hands you to a window, instead of floating over it
         }
+    }
+
+    private func open(_ page: String) {
+        closePanel()
         WindowOpener.show(page: page)
     }
 
@@ -361,6 +366,7 @@ struct MenuBarPanel: View {
     @ViewBuilder private var replayRow: some View {
         let last = model.lastReplayableMoment()
         Button("Replay last purchase animation") {
+            closePanel()
             if let last { model.replaySaleMoment(last) }
         }
         .disabled(last == nil || reduceMotion)

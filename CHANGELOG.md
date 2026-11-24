@@ -10,6 +10,7 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 
 **Fixed**
 - **A sale that arrived while you were away still plays when you come back.** If Hmunmawi wasn’t in front when a payment arrived, the moment is kept and plays when you bring the window forward, instead of being skipped once more than a few minutes had passed.
+- **The menu bar’s Latest list shows every payment.** Free trials, intro offers and the other payment kinds now appear there, same as Purchases and the ticker (today’s sales count is still only paid sales and renewals). Choosing Replay last purchase animation closes the panel first and brings the main window forward, so the moment is never hidden behind the panel.
 
 Hmunmawi still does everything it did in 1.5.8. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 

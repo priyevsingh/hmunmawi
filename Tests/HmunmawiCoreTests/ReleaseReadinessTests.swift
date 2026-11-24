@@ -228,6 +228,25 @@ import Testing
         let e = (1...8).map { Self.ev(Int64($0), "revenue.purchase", hoursAgo: Double($0)) } + [Self.ev(99, "growth.x")]
         #expect(MenuBarFacts.feed(e, limit: 5).map(\.id) == [1, 2, 3, 4, 5])
     }
+
+    @Test func feedIncludesEveryPaymentKindAndKeepsReviewsAndBuilds() {
+        #expect(PaymentMoment.paymentKinds.isSubset(of: MenuBarFacts.feedKinds))
+        for kind in ["review.new", "asc.webhook", "ci.build"] {
+            #expect(MenuBarFacts.feedKinds.contains(kind), "\(kind)")
+        }
+        // Today's sales count still ignores free trials and other non-sale payments.
+        #expect(MenuBarFacts.saleKinds == ["revenue.purchase", "revenue.renewal"])
+        #expect(!MenuBarFacts.saleKinds.contains("revenue.free"))
+    }
+
+    @Test func feedShowsFreeTrialsAheadOfOlderCancellations() {
+        let trial = Self.ev(1, "revenue.free", hoursAgo: 0.5, app: "Presence")
+        let intro = Self.ev(2, "revenue.free", hoursAgo: 18, app: "RepSquad")
+        let cancelled = Self.ev(3, "revenue.cancelled", hoursAgo: 20, app: "RepSquad")
+        let renewal = Self.ev(4, "revenue.renewal", hoursAgo: 30, app: "Body Vitals")
+        #expect(MenuBarFacts.feed([cancelled, renewal, intro, trial], limit: 4).map(\.id) == [1, 2, 3, 4])
+        #expect(MenuBarFacts.feed([cancelled, renewal, intro, trial], limit: 2).map(\.app) == ["Presence", "RepSquad"])
+    }
 }
 
 /// Owner extras (P S's hub paths, AI pause, Zoho, X file feed, watcher, fixed time zone) are off for everyone else.
