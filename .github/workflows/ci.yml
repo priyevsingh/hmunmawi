@@ -1,13 +1,7 @@
 name: CI
 
-# Every pull request and every push to main: build and test the app on a GitHub-hosted macOS 26 Intel Mac (Xcode 26
-# and the macOS 26 SDK), and test the live-sales Cloudflare worker on Linux. Read-only, no secrets: signing and
-# releases happen on the maintainer's Mac.
-#
-# The app requires the macOS 26 SDK (Package.swift platforms macOS 26.0), so macos-15 cannot build it.
-# macos-latest is the same Apple Silicon pool as macos-26; that pool is capacity-constrained, and a job left queued
-# there is cancelled by GitHub ("not acquired by Runner") and reported as a failure. macos-26-intel is a separate
-# x64 pool with the same SDK. timeout-minutes must be long enough that a queue wait is not cut off around 30 minutes.
+# Every pull request and every push to main: build and test the app on a GitHub-hosted macOS 26 Mac, and test the
+# live-sales Cloudflare worker on Linux. Read-only, no secrets: signing and releases happen on the maintainer's Mac.
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -28,8 +22,8 @@ jobs:
   app:
     name: App (swift build and test)
     if: github.event.action != 'closed'
-    runs-on: macos-26-intel
-    timeout-minutes: 90
+    runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Tools

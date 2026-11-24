@@ -26,9 +26,7 @@ scripts/merge-pr.sh <pr-number>
 ```
 
 That helper checks every commit has a `Signed-off-by` line, waits until the required checks are green (App, Worker,
-and Sign-off; CodeQL is not required), and squash-merges. The App check runs on `macos-26-intel` so it can get a
-runner from a pool that is not the constrained Apple Silicon one; do not cancel or re-run that job by hand (that
-is reported as a failure and sends an alert). Then, on the updated `main`:
+and Sign-off; CodeQL is not required), and squash-merges. Then, on the updated `main`:
 
 ```sh
 # bump CFBundleShortVersionString / CFBundleVersion in Resources/Info.plist, update CHANGELOG.md, add the version's
