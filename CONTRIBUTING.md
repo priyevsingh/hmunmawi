@@ -68,18 +68,23 @@ Every commit needs a `Signed-off-by` line, which says you wrote the change or ot
 git commit -s -m "Fix the refund count on the Today page"
 ```
 
-Pull requests without it can't be merged. Edits made in GitHub's web editor can add it for you.
+Always use `git commit -s` (the `-s` adds the line). Pull requests without it can't be merged. Edits made in GitHub's web editor can add it for you.
 
 ## What happens to your pull request
 
 1. **Checks run by themselves** (GitHub Actions): the app is built and every Swift test runs on a macOS 26 Mac,
    the live-sales worker's tests run on Linux, every commit is checked for a sign-off (not needed for a Wall of Apps entry, or for Dependabot), and a change to the Wall of
    Apps is checked against the App Store. If you're new here, the checks start after the maintainer approves the run.
+   A new push to the same pull request cancels the previous CI run, so a stale macOS job is never left queued.
 2. **A green pull request gets reviewed.** The maintainer may ask for changes; push them to the same branch and the
    checks run again.
-3. **Merging** needs every check green and the maintainer's approval.
+3. **Merging** is a squash merge into `main`, only when the App, Worker and Sign-off checks are green and the branch
+   is up to date. There is no required review count (the project has one maintainer), but nothing lands on `main`
+   except through a pull request. The maintainer merges with `scripts/merge-pr.sh <number>`, which checks sign-off
+   and waits for those required checks before merging.
 4. **Releases** are built, signed and notarized by the maintainer on their own Mac (the signing certificate never
-   goes to GitHub), so a merged change reaches users in the next release.
+   goes to GitHub). The order is: merge with `scripts/merge-pr.sh`, then `scripts/release.sh`, then
+   `scripts/publish-release.sh`. See [docs/RELEASING.md](docs/RELEASING.md).
 
 Run the same checks before you push: `swift test`, and for the worker `cd Tests/Worker && npm ci && npm test`.
 

@@ -8,8 +8,9 @@ ok() { echo "✓ $1"; }; skip() { echo "– $1 (not available: $2)"; }
 api() { gh api "$@" >/dev/null 2>/tmp/ghs.err; }
 
 # Merging: squash only (one clean commit per change), delete merged branches, sign-off required on web edits.
+# Auto-merge lets the Wall of Apps rebuild pull request land itself once required checks are green.
 api -X PATCH "repos/$R" -F allow_squash_merge=true -F allow_merge_commit=false -F allow_rebase_merge=false \
-  -F delete_branch_on_merge=true -F allow_update_branch=true -F web_commit_signoff_required=true \
+  -F delete_branch_on_merge=true -F allow_update_branch=true -F allow_auto_merge=true -F web_commit_signoff_required=true \
   -F has_wiki=false -F has_issues=true && ok "merge settings" || skip "merge settings" "$(cat /tmp/ghs.err)"
 
 # Actions: only GitHub's own actions, read-only token by default, workflows can't approve pull requests.
@@ -33,20 +34,43 @@ api -X PUT "repos/$R/private-vulnerability-reporting" && ok "private vulnerabili
 api -X PATCH "repos/$R/code-scanning/default-setup" -f state=configured -f query_suite=default \
   && ok "CodeQL code scanning (default setup)" || skip "CodeQL" "public repos only"
 
-# Rulesets: main needs a pull request with green checks and the code owner's review; no force pushes or deletion.
-# Release tags v* can't be moved or deleted. Repository admins (the maintainer) can bypass, for releases.
+# Rulesets: main needs a pull request, up-to-date required checks (App, Worker, Sign-off), squash only, and no force
+# pushes or deletion. Zero required reviews (solo maintainer). No bypass: even the maintainer merges through a PR.
+# The Wall of Apps rebuild opens a follow-up PR (auto-merge) instead of pushing to main, because a personal repo
+# cannot let the Actions app bypass a "require pull request" rule.
+# Release tags v* can't be moved or deleted. Repository admins (the maintainer) can bypass tags, for releases.
 upsert_ruleset() {  # name, json
   local id; id=$(gh api "repos/$R/rulesets" -q ".[] | select(.name==\"$1\") | .id" 2>/dev/null | grep -E '^[0-9]+$' | head -1)
   if [ -n "$id" ]; then echo "$2" | api -X PUT "repos/$R/rulesets/$id" --input -; else echo "$2" | api -X POST "repos/$R/rulesets" --input -; fi
 }
-# main can never be force-pushed or deleted, by anyone (no bypass). Outside contributors cannot push at all: they fork and open
-# a pull request, which only the maintainer can merge. A "require pull request" rule is NOT used: the Wall of Apps workflow commits
-# its rebuilt mosaic straight to main with GitHub's own token, and GitHub only lets the Actions app bypass rules on organization
-# repositories (a personal repo answers 422 "Actor GitHub Actions integration must be part of the ruleset source or owner organization").
-upsert_ruleset "Protect main" '{"name":"Protect main","target":"branch","enforcement":"active",
+upsert_ruleset "Protect main" "$(cat <<'JSON'
+{"name":"Protect main","target":"branch","enforcement":"active",
  "bypass_actors":[],
  "conditions":{"ref_name":{"include":["~DEFAULT_BRANCH"],"exclude":[]}},
- "rules":[{"type":"deletion"},{"type":"non_fast_forward"}]}' \
+ "rules":[
+   {"type":"deletion"},
+   {"type":"non_fast_forward"},
+   {"type":"pull_request","parameters":{
+     "required_approving_review_count":0,
+     "dismiss_stale_reviews_on_push":false,
+     "required_reviewers":[],
+     "require_code_owner_review":false,
+     "require_last_push_approval":false,
+     "required_review_thread_resolution":false,
+     "allowed_merge_methods":["squash"]
+   }},
+   {"type":"required_status_checks","parameters":{
+     "strict_required_status_checks_policy":true,
+     "do_not_enforce_on_create":false,
+     "required_status_checks":[
+       {"context":"App (swift build and test)"},
+       {"context":"Live-sales worker (Node tests)"},
+       {"context":"Every commit is signed off"}
+     ]
+   }}
+ ]}
+JSON
+)" \
   && ok "ruleset: protect main" || skip "ruleset main" "$(cat /tmp/ghs.err)"
 upsert_ruleset "Protect release tags" '{"name":"Protect release tags","target":"tag","enforcement":"active",
  "bypass_actors":[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"}],

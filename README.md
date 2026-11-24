@@ -443,8 +443,8 @@ Apps shipped by indie developers who use Hmunmawi.
   pull request that adds it to [`docs/wall-of-apps.json`](docs/wall-of-apps.json), through your own GitHub
   command-line login (`gh`). Agents can preview it with `hm wall-plan app=<App Store id>`.
 - **Checked automatically:** every pull request is checked against Apple's public App Store lookup (a real, live
-  app, listed once). After it's merged, the picture below and the [full list](docs/WALL-OF-APPS.md) rebuild
-  themselves.
+  app, listed once). After it's merged, a follow-up pull request rebuilds the picture below and the
+  [full list](docs/WALL-OF-APPS.md); it merges itself once the required checks are green.
 - **Share it:** once your app is on the wall, Hmunmawi offers a ready post for your own X account (you post it).
 - **See everyone's apps in the app:** Settings → About → *Show the community's apps*.
 
