@@ -72,14 +72,10 @@ Always use `git commit -s` (the `-s` adds the line). Pull requests without it ca
 
 ## What happens to your pull request
 
-1. **Checks run by themselves** (GitHub Actions): the app is built and every Swift test runs on a GitHub-hosted
-   macOS 26 Intel Mac (the app needs the macOS 26 SDK, so a macOS 15 runner cannot build it; `macos-latest` is the
-   same scarce Apple Silicon pool as `macos-26`, which can sit queued until GitHub gives up and reports a failure),
+1. **Checks run by themselves** (GitHub Actions): the app is built and every Swift test runs on a macOS 26 Mac,
    the live-sales worker's tests run on Linux, every commit is checked for a sign-off (not needed for a Wall of Apps entry, or for Dependabot), and a change to the Wall of
    Apps is checked against the App Store. If you're new here, the checks start after the maintainer approves the run.
    A new push to the same pull request cancels the previous CI run, so a stale macOS job is never left queued.
-   Do not cancel or re-run CI jobs by hand: a cancel, or a re-run of a job that never got a runner, is reported as a
-   failure and sends an alert.
 2. **A green pull request gets reviewed.** The maintainer may ask for changes; push them to the same branch and the
    checks run again.
 3. **Merging** is a squash merge into `main`, only when the App, Worker and Sign-off checks are green and the branch
