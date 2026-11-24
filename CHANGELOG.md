@@ -2,6 +2,18 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.5.9 (build 159), 24 Nov 2026
+
+**New**
+- **Replay a sale’s moment.** Right-click a purchase on Today, or choose Replay last purchase animation in the menu bar panel (also under View in the menu bar), to play that payment’s animation again. It uses the real row: no extra entry, no notification, and no change to your numbers. The moment is drawn above an open story card, so a replay from a purchase row is visible while you are looking at Purchases. Reduce Motion still turns it off.
+- **Every payment gets its own moment.** Free trials, introductory offers, refunds and the other payment events now show in the purchases list, and each plays a short moment of its own (a count-up for paid sales and renewals, a gift moment for free trials and intro offers, a quieter one for refunds and billing). The ticker at the top of Today follows the same events. Payment notifications that were previously dropped (redeemed offers, plan changes, refund reversals, failed renewals, price increases, and the rest) are stored too.
+
+**Fixed**
+- **A sale that arrived while you were away still plays when you come back.** If Hmunmawi wasn’t in front when a payment arrived, the moment is kept and plays when you bring the window forward, instead of being skipped once more than a few minutes had passed.
+- **The menu bar’s Latest list shows every payment.** Free trials, intro offers and the other payment kinds now appear there, same as Purchases and the ticker (today’s sales count is still only paid sales and renewals). Choosing Replay last purchase animation closes the panel first and brings the main window forward, so the moment is never hidden behind the panel.
+
+Hmunmawi still does everything it did in 1.5.8. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.8 (build 158), 22 Nov 2026
 
 **Fixed**

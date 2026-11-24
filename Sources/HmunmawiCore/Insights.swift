@@ -37,8 +37,10 @@ public struct Metric: Sendable, Identifiable {
 /// Core event kinds of the Hmunmawi protocol carry their direction (sales up, refunds down, crashes down).
 public enum MetricExtractor {
     static let protocolDirection: [String: Metric.Better] = [
-        "revenue.purchase": .up, "revenue.renewal": .up, "revenue.free": .up,
+        "revenue.purchase": .up, "revenue.renewal": .up, "revenue.free": .up, "revenue.refund_reversed": .up,
+        "revenue.renewal_extended": .up,
         "revenue.refund": .down, "revenue.cancelled": .down, "revenue.expired": .down, "revenue.billing_issue": .down,
+        "revenue.revoked": .down, "revenue.refund_declined": .down, "revenue.price_increase": .down,
         "review.new": .up, "crash.daily|crashed": .down, "crash.daily|crash_free_rate": .up,
         "revenue.daily|units": .up, "revenue.daily|proceeds_usd": .up,
     ]
@@ -255,7 +257,11 @@ public enum MetricExtractor {
     static func kindName(_ kind: String) -> String {
         ["revenue.purchase": "New subscribers", "revenue.renewal": "Renewals", "revenue.cancelled": "Cancellations",
          "revenue.refund": "Refunds", "revenue.expired": "Expired subscriptions", "revenue.billing_issue": "Billing problems",
-         "revenue.free": "Free claims", "review.new": "New reviews"][kind] ?? readable(kind.split(separator: ".").last.map(String.init) ?? kind)
+         "revenue.free": "Free trials", "revenue.refund_reversed": "Refunds reversed",
+         "revenue.refund_declined": "Refunds declined", "revenue.plan_change": "Plan changes",
+         "revenue.price_increase": "Price increases", "revenue.renewal_extended": "Renewals extended",
+         "revenue.revoked": "Access revoked", "revenue.consumption_request": "Refund checks",
+         "review.new": "New reviews"][kind] ?? readable(kind.split(separator: ".").last.map(String.init) ?? kind)
     }
 }
 

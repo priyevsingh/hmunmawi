@@ -77,8 +77,7 @@ struct PaymentRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            AppIcon(app: event.app, size: 32,
-                    badge: event.kind == "revenue.renewal" ? "arrow.triangle.2.circlepath" : "bag.fill")
+            AppIcon(app: event.app, size: 32, badge: PaymentMoment.symbol(event.kind))
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(EventText.describe(event)).font(.callout.weight(.medium))
@@ -98,7 +97,14 @@ struct PaymentRow: View {
         .contentShape(.rect)
         .onTapGesture { open = true }
         .popover(isPresented: $open, arrowEdge: .leading) { PurchaseDetail(event: event) }
-        .help("Click for the purchase details")
+        .contextMenu {
+            if PaymentMoment.canPlay(event) {
+                Button("Replay animation") { model?.replaySaleMoment(event) }
+            }
+        }
+        .help(PaymentMoment.canPlay(event)
+              ? "Click for the purchase details. Right-click to replay its animation."
+              : "Click for the purchase details")
     }
 }
 

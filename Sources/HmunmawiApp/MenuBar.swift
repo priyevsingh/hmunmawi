@@ -35,7 +35,7 @@ struct MenuBarLabel: View {
         let badge = MenuBarFacts.badge(settings.number.rawValue, events: model.events, isSample: model.isDemo, counts: counts,
                                        hideZero: settings.hideZero, showSymbol: settings.numberSymbol,
                                        amount: { Money.shared.amount($0) }, money: { Money.shared.format($0, from: Money.shared.target, decimals: 0) })
-        let pulse = model.flash.map { MenuBarFacts.saleKinds.contains($0.kind) ? $0.id : 0 } ?? 0
+        let pulse = model.flash.map { PaymentMoment.canPlay($0) ? Int64(model.flashToken) : 0 } ?? 0
         HStack(spacing: 3) {
             // MenuBarExtra labels drop inline symbols in Text, so the symbol is drawn into the icon image.
             Image(nsImage: MenuBarIcon.image(model.truth.dot, symbol: badge?.symbol))
@@ -121,14 +121,20 @@ struct MenuBarPanel: View {
     @State private var settings = MenuBarSettings.shared
     @State private var checking = false
     @State private var policy = AIPolicyService.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private func open(_ page: String) {
+    /// Closes this panel (the menu-bar extra or the floating copy) so what happens next is not hidden behind it.
+    private func closePanel() {
         if let panelClose {
             panelClose()   // the floating copy (shortcut / window button): its openWindow isn't a scene's, keep the saved one
         } else {
             WindowOpener.open = openWindow
             dismiss()   // the panel closes once it hands you to a window, instead of floating over it
         }
+    }
+
+    private func open(_ page: String) {
+        closePanel()
         WindowOpener.show(page: page)
     }
 
@@ -154,6 +160,7 @@ struct MenuBarPanel: View {
             macPermissions
             if settings.number != .waiting { waiting }
             if let p = settings.pauseText { Label(p, systemImage: "bell.slash").font(.callout).foregroundStyle(.secondary) }
+            replayRow
             Divider()
             footer
         }
@@ -354,6 +361,21 @@ struct MenuBarPanel: View {
                 if model.waiting.count > 3 { Text("and \(model.waiting.count - 3) more in Log").font(.caption).foregroundStyle(.secondary) }
             }
         }
+    }
+
+    @ViewBuilder private var replayRow: some View {
+        let last = model.lastReplayableMoment()
+        Button("Replay last purchase animation") {
+            closePanel()
+            if let last { model.replaySaleMoment(last) }
+        }
+        .disabled(last == nil || reduceMotion)
+        .help(reduceMotion
+              ? "Turn off Reduce Motion in System Settings to play this."
+              : last == nil
+                ? "A purchase, trial, refund or other payment has to be in the list first."
+                : "Play that payment's moment again. It uses the real row and doesn't add an entry or send a notification.")
+        .controlSize(.small)
     }
 
     private var footer: some View {

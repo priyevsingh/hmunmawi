@@ -866,34 +866,39 @@ final class LivePurchases {
     /// Apple's notification → the same event the rest of the app shows (ticker, sale moment, Money).
     func event(_ i: [String: Any]) -> Event? {
         if i["title"] != nil, let uuid = i["uuid"] as? String { return hubEvent(i, uuid: uuid) }
+        return Self.parseApplePayment(i, appName: name(for:))
+    }
+
+    /// Testable mapping: Sandbox items are ignored; payment notification types (including ones that used to be dropped) become events.
+    nonisolated static func parseApplePayment(_ i: [String: Any], appName: (String) -> String) -> Event? {
         guard i["environment"] as? String != "Sandbox" else { return nil }   // test purchases aren't sales
         let type = i["type"] as? String ?? "", sub = i["subtype"] as? String
-        let kind: String? = switch type {
-        case "SUBSCRIBED", "ONE_TIME_CHARGE": "revenue.purchase"
-        case "DID_RENEW": "revenue.renewal"
-        case "DID_CHANGE_RENEWAL_STATUS" where sub == "AUTO_RENEW_DISABLED": "revenue.cancelled"
-        case "EXPIRED": "revenue.expired"
-        case "REFUND": "revenue.refund"
-        default: nil
-        }
-        guard let kind else { return nil }
+        let price = i["price"] as? Double
+        let offer = (i["offer"] as? Int) ?? (i["offerType"] as? Int) ?? (i["offer"] as? Double).map { Int(safe: $0) }
+        let discount = i["offerDiscountType"] as? String
+        guard let kind = PaymentMoment.kind(appleType: type, subtype: sub, price: price, offerType: offer, offerDiscountType: discount) else { return nil }
         let bundle = i["bundleId"] as? String ?? ""
         let product = i["product"] as? String ?? ""
-        var facts: [String: JSONValue] = ["product": .string(product)]
+        var facts: [String: JSONValue] = ["product": .string(product), "type": .string(type)]
         var detail = Self.plan(product)
-        if let price = i["price"] as? Double, let currency = i["currency"] as? String {
+        if let price, let currency = i["currency"] as? String {
             facts["price"] = .number(price)
             facts["currency"] = .string(currency)
             detail += " · " + price.formatted(.currency(code: currency))
+        } else if let price {
+            facts["price"] = .number(price)
         }
         if let s = i["storefront"] as? String { facts["storefront"] = .string(s) }
         if i["inFamily"] as? Bool == true { facts["family"] = .bool(true) }
+        if let sub, !sub.isEmpty { facts["subtype"] = .string(sub) }
+        if let offer { facts["offerType"] = .number(Double(offer)) }
+        if let discount, !discount.isEmpty { facts["offerDiscountType"] = .string(discount) }
         let given = i["at"] as? Double
         let at = Int64(safe: given ?? Date.now.timeIntervalSince1970 * 1000)
         // Fallback key from the item itself, never from the time we read it (that made each re-read a new alert).
         let tx = (i["transactionId"] as? String) ?? (i["originalTransactionId"] as? String) ?? given.map { String(Int64(safe: $0)) } ?? ""
 
-        return Event(source: "live", kind: kind, app: name(for: bundle),
+        return Event(source: "live", kind: kind, app: appName(bundle),
                      payload: .object(["detail": .string(detail), "facts": .object(facts)]),
                      occurredAt: at, dedupeKey: "live:\(i["key"] as? String ?? "\(type)|\(bundle)|\(product)|\(tx)")")   // no key: one built from the item itself, so a resend is a duplicate, not a second alert
     }
@@ -907,11 +912,7 @@ final class LivePurchases {
             + APPName.known
         let app = known.first { title.hasPrefix($0 + " ") } ?? String(title.split(separator: " ").first ?? "")
         let label = title.hasPrefix(app) ? String(title.dropFirst(app.count)).trimmingCharacters(in: .whitespaces) : title
-        let l = label.lowercased()
-        let kind: String? = tags == "gift" ? "revenue.free"
-            : l.contains("renew") ? "revenue.renewal" : l.contains("refund") ? "revenue.refund"
-            : l.contains("cancel") ? "revenue.cancelled" : l.contains("expire") ? "revenue.expired"
-            : (l.contains("sale") || l.contains("purchase") || l.contains("subscri")) ? "revenue.purchase" : nil
+        let kind: String? = PaymentMoment.kind(label: label, tags: tags)
         guard let kind else { return nil }
         var p: [String: JSONValue] = ["label": .string(label), "detail": .string(i["body"] as? String ?? ""), "uuid": .string(uuid)]
         if let f = i["flag"] as? String { p["flag"] = .string(f) }
@@ -926,7 +927,7 @@ final class LivePurchases {
     }
 
     /// "com.x.weekly" → "Weekly"; the plan name people know.
-    static func plan(_ product: String) -> String {
+    nonisolated static func plan(_ product: String) -> String {
         let last = product.split(separator: ".").last.map(String.init) ?? product
         for p in ["weekly", "monthly", "yearly", "annual", "lifetime"] where last.lowercased().contains(p) { return p == "annual" ? "Yearly" : p.capitalized }
         return last

@@ -33,11 +33,11 @@ One sentence on how things are going, the biggest win and worry, then the cards 
 the toolbar (All projects, or one project) narrows every page to that project's apps and websites.
 
 #### ✨ Headline and moments
-**Feel every sale as it happens.**
+**Feel every payment as it happens.**
 
 <details><summary>How it works</summary>
 
-The latest sale, renewal, refund or review slides by at the top; a real sale also plays a short moment. Reduce Motion (System Settings) turns the animations off.
+The latest payment (a sale, renewal, free trial, intro offer, refund or review) slides by at the top, and each payment also plays a short moment of its own. The menu bar’s Latest list shows the same payments. Right-click a row in Purchases, or choose Replay last purchase animation in the menu bar panel, to play that moment again (the real payment, with no new entry or notification). The panel closes first so the moment plays in the main window. Reduce Motion (System Settings) turns the animations off. A payment that arrived while the window was in the background still plays when you bring Hmunmawi forward.
 
 </details>
 
@@ -489,7 +489,8 @@ Helpers that should never stop (a relay, a local server), with safety nets and w
 
 - An **H** in the menu bar with a health dot (green, amber, red, grey), an optional number (sales, downloads,
   reviews, things waiting for you, or things to fix), and a panel with today's headline, connections, the latest
-  moments, approvals and quick numbers.
+  moments (every payment, including free trials and intro offers), a Replay last purchase animation button
+  that closes the panel first so the moment plays in front, approvals and quick numbers.
 
 #### 🔔 Notifications
 **Hear about what matters, and only that.**
