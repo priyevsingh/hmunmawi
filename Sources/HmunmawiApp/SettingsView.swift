@@ -510,6 +510,7 @@ struct AddOnSection: View {
     @State private var saved: [String: String] = [:]
     @State private var justSaved = false
     @State private var busy = false
+    @State private var helperNote: String?
 
     private var changed: Bool {
         row.manifest.settings.contains { s in
@@ -565,7 +566,10 @@ struct AddOnSection: View {
                     }
                     Spacer()
                     if row.id == "vercel" {
-                        Button("Detect from repo…") { detectVercelRepo() }
+                        Button("Auto-fill") { Task { await autoFillVercel() } }
+                            .buttonStyle(.pill).disabled(busy)
+                            .help("Read your Vercel projects, team ID, sites and GitHub token automatically from your saved keys and local repos")
+                        Button("Pick repo…") { detectVercelRepo() }
                             .buttonStyle(.pill)
                             .help("Read project and team IDs from .vercel/project.json and GitHub repo/branch from .git/config")
                     }
@@ -635,6 +639,9 @@ struct AddOnSection: View {
                     } else if !XFileFeed.planLine.isEmpty {
                         Text(XFileFeed.planLine).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
+                }
+                if let helperNote {
+                    Text(helperNote).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 if row.approved, rowDisplay.tone != .good, let problem = rowDisplay.detail {
                     Label(problem, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Brand.bad)
@@ -743,6 +750,33 @@ struct AddOnSection: View {
             Text(name)
             if !hint.isEmpty { Text(hint).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
         }
+    }
+
+    private func autoFillVercel() async {
+        busy = true
+        helperNote = nil
+        let typedToken = values["apiToken"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedToken = (typedToken?.isEmpty == false ? typedToken : nil)
+            ?? model.secretForAutoFill(plugin: "vercel", name: "apiToken")
+        let hasGH = row.savedSecrets.contains("githubToken")
+        let members = ProjectStore.shared.projects.flatMap(\.members)
+        let res = await VercelDetector.autoDetect(
+            currentValues: values,
+            apiToken: savedToken,
+            hasSavedGitHubToken: hasGH,
+            knownMembers: members
+        )
+        values = res.values
+        if let tok = res.foundAPIToken {
+            values["apiToken"] = tok
+            if let ref = res.apiTokenSource { model.recordSecretSource(plugin: "vercel", name: "apiToken", ref: ref) }
+        }
+        if let gh = res.foundGitHubToken {
+            values["githubToken"] = gh
+            if let ref = res.githubTokenSource { model.recordSecretSource(plugin: "vercel", name: "githubToken", ref: ref) }
+        }
+        helperNote = res.summary
+        busy = false
     }
 
     private func detectVercelRepo() {

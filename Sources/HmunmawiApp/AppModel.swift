@@ -139,6 +139,7 @@ final class AppModel {
     func succeededConnections() async -> [String: Millis] { await engine?.succeeded() ?? [:] }
     private var loops: [Task<Void, Never>] = []
     private var loadStarted = false
+    private var vercelAutoConfigured = false
 
     private var configURL: URL { supportDirectory.appending(path: "config.json") }
     private var currentStore: Store? { isDemo ? demoStore : liveStore }
@@ -883,6 +884,48 @@ final class AppModel {
         enableRefundTextIfIMessageReady(rows)
         if wasDemo != isDemo { await refresh() }
         updateTruth()
+        if !vercelAutoConfigured, rows.contains(where: { $0.id == "vercel" && $0.approved && !$0.missing.isEmpty }) {
+            Task { await autoConfigureVercelIfNeeded() }
+        }
+    }
+
+    func secretForAutoFill(plugin: String, name: String) -> String? {
+        try? secrets.peekSecret(plugin: plugin, name: name)
+    }
+
+    /// Automatically fills missing Vercel configuration (project IDs, team ID, site names, GitHub repos, and CLI/Keychain
+    /// tokens) when Vercel is already approved and missing required fields, so the user doesn't have to fill them by hand.
+    func autoConfigureVercelIfNeeded() async {
+        guard TestProfile.name == nil, !Fixtures.noHub, !vercelAutoConfigured,
+              let row = addOns.first(where: { $0.id == "vercel" }),
+              row.approved, !row.missing.isEmpty else { return }
+        vercelAutoConfigured = true
+
+        let existing = config.plugins["vercel"] ?? [:]
+        let peekedToken = try? secrets.peekSecret(plugin: "vercel", name: "apiToken")
+        let hasSavedGH = row.savedSecrets.contains("githubToken")
+        let members = ProjectStore.shared.projects.flatMap(\.members)
+
+        let res = await VercelDetector.autoDetect(
+            currentValues: existing,
+            apiToken: peekedToken,
+            hasSavedGitHubToken: hasSavedGH,
+            knownMembers: members
+        )
+
+        var toSave = res.values
+        if let tok = res.foundAPIToken, !row.savedSecrets.contains("apiToken") {
+            toSave["apiToken"] = tok
+            if let ref = res.apiTokenSource { recordSecretSource(plugin: "vercel", name: "apiToken", ref: ref) }
+        }
+        if let gh = res.foundGitHubToken, !hasSavedGH {
+            toSave["githubToken"] = gh
+            if let ref = res.githubTokenSource { recordSecretSource(plugin: "vercel", name: "githubToken", ref: ref) }
+        }
+
+        let hasProject = !(toSave["project"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard hasProject || res.foundAPIToken != nil || res.foundGitHubToken != nil else { return }
+        await save(toSave, for: row)
     }
 
     /// Settings > General > Alerts: quiet hours (alerts wait; urgent rules still go out).

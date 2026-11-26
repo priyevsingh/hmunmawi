@@ -77,4 +77,49 @@ private struct OldStore: LegacySecretSource {
         #expect(d.branch == "main")
         #expect(VercelDetector.extractGitHubSlug("https://github.com/octocat/hello-world.git") == "octocat/hello-world")
     }
+
+    @Test func vercelAPIProjectsParserMapsMembersFiltersScratchAndMergesCleanly() throws {
+        let json = """
+        {
+          "projects": [
+            {
+              "id": "prj_scratch",
+              "name": "internal-preview",
+              "accountId": "team_123456",
+              "targets": { "production": { "alias": ["internal-preview.vercel.app"] } }
+            },
+            {
+              "id": "prj_site2",
+              "name": "acme-tours",
+              "accountId": "team_123456",
+              "link": { "type": "github", "org": "acme", "repo": "acmetours", "productionBranch": "main" },
+              "targets": { "production": { "alias": ["acmetours.example", "www.acmetours.example"] } }
+            },
+            {
+              "id": "prj_site1",
+              "name": "portal.example",
+              "accountId": "team_123456",
+              "link": { "type": "github", "org": "acme", "repo": "portal.example", "productionBranch": "main" },
+              "targets": { "production": { "alias": ["portal.example", "portal-acme.vercel.app"] } }
+            }
+          ]
+        }
+        """
+        let parsed = VercelDetector.parseAPIProjects(
+            data: Data(json.utf8),
+            defaultTeamID: nil,
+            knownMembers: ["portal.example", "Acme Tours"],
+            localRepos: []
+        )
+        #expect(parsed.count == 2)
+        #expect(parsed.map(\.projectID) == ["prj_site1", "prj_site2"])
+        #expect(parsed.map(\.projectName) == ["portal.example", "Acme Tours"])
+
+        let merged = VercelDetector.merge(values: [:], detected: parsed)
+        #expect(merged["teamID"] == "team_123456")
+        #expect(merged["project"] == "prj_site1, prj_site2")
+        #expect(merged["siteName"] == "portal.example, Acme Tours")
+        #expect(merged["repo"] == "acme/portal.example, acme/acmetours")
+        #expect(merged["branch"] == "main")
+    }
 }
