@@ -278,9 +278,13 @@ import Testing
 
         let detected = ReleaseSubscriberMailMatch.detect(mail: mail, book: book)
         #expect(detected.count == 3)
-        #expect(detected.contains(where: { $0.mailID == "m-sub-unsub" && $0.email == "alex@example.com" && $0.kind == .unsubscribe }))
-        #expect(detected.contains(where: { $0.mailID == "m-body-unsub" && $0.email == "bob@example.org" && $0.kind == .unsubscribe }))
-        #expect(detected.contains(where: { $0.mailID == "m-bounce" && $0.email == "carol@example.net" && $0.kind == .bounce }))
+        let byMailID = Dictionary(detected.map { ($0.mailID, $0) }, uniquingKeysWith: { a, _ in a })
+        #expect(byMailID["m-sub-unsub"]?.email == "alex@example.com")
+        #expect(byMailID["m-sub-unsub"]?.kind == .unsubscribe)
+        #expect(byMailID["m-body-unsub"]?.email == "bob@example.org")
+        #expect(byMailID["m-body-unsub"]?.kind == .unsubscribe)
+        #expect(byMailID["m-bounce"]?.email == "carol@example.net")
+        #expect(byMailID["m-bounce"]?.kind == .bounce)
 
         let applied = ReleaseSubscriberMailMatch.apply(detected, to: &book)
         #expect(applied.count == 3)
