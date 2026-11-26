@@ -209,6 +209,7 @@ import Testing
             OSuggestion(id: "\(entryID)|checkin|m-self-1", entry: entryID, outlet: "Example Site", app: "ExampleApp", kind: "answer", why: "asked you something 5 days ago", mailFrom: nil, mailSubject: "ExampleApp pitch", day: "2026-11-10", sure: true, state: "new"),
             OSuggestion(id: "\(cleanEntryID)|checkin|m-them-2", entry: cleanEntryID, outlet: "Other Site", app: "ExampleApp", kind: "answer", why: "asked you something 5 days ago", mailFrom: nil, mailSubject: "Other pitch", day: "2026-11-10", sure: true, state: "new"),
         ]
+        side.draftedIDs = ["sug|\(entryID)|checkin|m-self-1", "v2|sug|\(entryID)|checkin|m-self-1", "sug|\(cleanEntryID)|checkin|m-them-2"]
 
         let purged = Outreach.purgeSelfAuthoredThreads(side: &side, items: [item], mail: [selfMail, externalMail], own: own)
 
@@ -220,5 +221,20 @@ import Testing
         #expect(side.suggestions.first { $0.id == "\(entryID)|checkin|m-self-1" }?.state == "dismissed")
         #expect(side.suggestions.first { $0.id == "\(entryID)|thread|m-self-1" }?.state == "dismissed")
         #expect(side.suggestions.first { $0.id == "\(cleanEntryID)|checkin|m-them-2" }?.state == "new")
+        #expect(side.draftedIDs == ["sug|\(cleanEntryID)|checkin|m-them-2"])
+    }
+
+    @Test func outreachSheetSeparatesRealEmailsFromListingsAndForms() {
+        let emailPitch = OItem(id: "Podcast|AppA|press pitch", outlet: "Podcast", app: "AppA", type: "press pitch", status: "submitted", date: "2026-11-01", contact: "host@podcast.example")
+        let nominationForm = OItem(id: "Apple featuring nomination|AppA|press pitch", outlet: "Apple featuring nomination", app: "AppA", type: "press pitch", status: "submitted", date: "2026-10-29", contact: nil)
+        let directory = OItem(id: "Indie App Catalog|AppA|directory", outlet: "Indie App Catalog", app: "AppA", type: "directory", status: "pending review", date: "2026-10-30")
+        let social = OItem(id: "YouTube Shorts|AppA|social", outlet: "YouTube Shorts", app: "AppA", type: "social", status: "submitted", date: "2026-11-20")
+        let all = [emailPitch, nominationForm, directory, social]
+        let side = Outreach.Side()
+
+        #expect(OutreachSheet.filterItems(all, side: side, filter: .awaiting).map(\.id) == [emailPitch.id])
+        #expect(OutreachSheet.filterItems(all, side: side, filter: .listings).map(\.id).sorted() == [directory.id, nominationForm.id, social.id].sorted())
+        #expect(OutreachSheet.isDraftSuggestion(OSuggestion(id: "1", entry: "e1", outlet: "Podcast", app: "AppA", kind: "repitch", why: "new release", day: "2026-11-26", sure: true)))
+        #expect(!OutreachSheet.isDraftSuggestion(OSuggestion(id: "2", entry: "e2", outlet: "Blog", app: "AppA", kind: "bounced", why: "bounced", day: "2026-11-26", sure: true)))
     }
 }

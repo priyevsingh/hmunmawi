@@ -19,6 +19,7 @@ struct OItem: Identifiable, Hashable, Sendable {
     var subject: String?
 
     var isEmail: Bool { ["press pitch", "contact form"].contains(type.lowercased()) }
+    var expectsReply: Bool { isEmail && !(contact ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     var open: Bool { ReplyMatch.open.contains(status) }
 }
 
@@ -533,6 +534,11 @@ enum Outreach {
                 purgedIDs.insert(s.id)
             }
         }
+        if !purgedIDs.isEmpty, var drafted = side.draftedIDs {
+            let staleKeys = Set(purgedIDs.flatMap { ["sug|\($0)", "v2|sug|\($0)"] })
+            drafted.removeAll { staleKeys.contains($0) }
+            side.draftedIDs = drafted.isEmpty ? nil : drafted
+        }
         return purgedIDs
     }
 
@@ -796,6 +802,80 @@ enum Outreach {
             }
         }
         return (subject, body)
+    }
+
+    /// Pending offer codes already reserved in waiting `outreach.send` jobs so concurrent drafts never duplicate a code.
+    @MainActor
+    static func reservedOfferCodes(in waiting: [WaitingAction]) -> Set<String> {
+        Set(
+            waiting
+                .filter { $0.job.kind == "outreach.send" && $0.job.state == .waitingApproval }
+                .compactMap { $0.job.payload[path: "offer_code"]?.string }
+                .filter { !$0.isEmpty }
+        )
+    }
+
+    /// Builds an outreach draft (including App Store highlights and optional reply-only code) and queues it into Log → Waiting.
+    @MainActor
+    static func queueDraft(
+        item: OItem,
+        kind: String,
+        suggestionID: String? = nil,
+        version: String? = nil,
+        coverageURL: String? = nil,
+        events: [StoredEvent],
+        versions: [String: String],
+        reservedCodes: inout Set<String>,
+        model: AppModel,
+        store: Store
+    ) async -> (queued: Bool, reason: String?) {
+        guard let to = pinnedRecipient(for: item) else {
+            return (false, "No recipient email address is saved for \(item.outlet).")
+        }
+        let inReview = model.snapshots("release.check").contains {
+            $0.app?.localizedCaseInsensitiveContains(item.app) == true && ($0.payload[path: "state"]?.string ?? "").contains("REVIEW")
+        }
+        let currentSide = side()
+        guard canDraft(for: item, allItems: items(), side: currentSide, inReview: inReview, kind: kind) else {
+            return (false, "Skipped by outreach rules (do-not-contact, embargoed in review, or recently followed up).")
+        }
+        let appFirst = item.app.split(separator: "+").first.map(String.init) ?? item.app
+        let appID = OfferCodes.shared.appIDs.first { QuickName.of($0, model: model).caseInsensitiveCompare(appFirst) == .orderedSame }
+        let appLink = appID.map { campaignLink(appID: $0, outlet: item.outlet, app: item.app) }
+        let theirReply = kind == "answer" ? latestTheirReply(for: item, in: events) : nil
+        let wantsCode = kind == "answer" && (theirReply.map(AppStorePitchExtract.replyWantsPromoCode) ?? false)
+        let code = wantsCode ? appID.flatMap { OfferCodes.shared.codes(app: $0).first { $0.sharedAt == nil && !reservedCodes.contains($0.code) } } : nil
+        let highlights = currentSide.highlights?[appFirst] ?? currentSide.highlights?.first {
+            appFirst.localizedCaseInsensitiveContains($0.key) || $0.key.localizedCaseInsensitiveContains(appFirst)
+        }?.value
+        var itemForDraft = item
+        if let cov = coverageURL { itemForDraft.url = cov }
+        guard let built = await buildAutoDraft(
+            for: itemForDraft, kind: kind, theirReply: theirReply, version: version,
+            appLink: appLink, codeLink: code?.url, versions: versions,
+            highlights: highlights, wording: Wording.rules
+        ) else {
+            return (false, "Could not build a clean draft for \(item.outlet).")
+        }
+        var payloadFields: [String: JSONValue] = [
+            "entry": .string(item.id),
+            "outlet": .string(item.outlet),
+            "app": .string(item.app),
+            "kind": .string(kind),
+            "to": .string(to),
+            "subject": .string(built.subject),
+            "body": .string(built.body),
+            "has_code": .bool(code != nil),
+        ]
+        if let suggestionID { payloadFields["suggestion_id"] = .string(suggestionID) }
+        if let code { payloadFields["offer_code"] = .string(code.code) }
+        if let appID { payloadFields["app_id"] = .string(appID) }
+        guard (try? await store.enqueue(kind: "outreach.send", resource: "mail", priority: 3, maxAttempts: 1,
+                                       payload: .object(payloadFields), needsApproval: true)) != nil else {
+            return (false, "Could not save the draft to the Log queue.")
+        }
+        if let code { reservedCodes.insert(code.code) }
+        return (true, nil)
     }
 
     /// An AI draft of your answer to their message (pasted by you); shown for you to edit, never sent.

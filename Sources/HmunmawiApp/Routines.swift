@@ -1494,7 +1494,7 @@ final class Routines {
         var candidates: [DraftCandidate] = []
         var seenCandKeys = Set<String>()
         for s in Self.actionableDraftSuggestions(from: latestSide.suggestions) {
-            let candKey = "sug|\(s.id)"
+            let candKey = "v2|sug|\(s.id)"
             guard seenCandKeys.insert(candKey).inserted else { continue }
             guard let item = latestByID[s.entry] else { continue }
             let dKind = s.kind == "thread" ? "answer" : s.kind
@@ -1509,55 +1509,25 @@ final class Routines {
             candidates.append(DraftCandidate(key: candKey, item: item, kind: "follow-up", suggestionID: nil, version: nil, coverageURL: nil))
         }
 
-        var reservedCodes: Set<String> = Set(
-            model.waiting
-                .filter { $0.job.kind == "outreach.send" && $0.job.state == .waitingApproval }
-                .compactMap { $0.job.payload[path: "offer_code"]?.string }
-                .filter { !$0.isEmpty }
-        )
+        var reservedCodes = Outreach.reservedOfferCodes(in: model.waiting)
 
         for cand in candidates where !draftedKeys.contains(cand.key) {
-            let item = cand.item
-            guard let to = Outreach.pinnedRecipient(for: item) else { continue }
-            let inReview = model.snapshots("release.check").contains {
-                $0.app?.localizedCaseInsensitiveContains(item.app) == true && ($0.payload[path: "state"]?.string ?? "").contains("REVIEW")
-            }
-            guard Outreach.canDraft(for: item, allItems: latestItems, side: latestSide, inReview: inReview, kind: cand.kind) else { continue }
-            let appFirst = item.app.split(separator: "+").first.map(String.init) ?? item.app
-            let appID = OfferCodes.shared.appIDs.first { QuickName.of($0, model: model).caseInsensitiveCompare(appFirst) == .orderedSame }
-            let appLink = appID.map { Outreach.campaignLink(appID: $0, outlet: item.outlet, app: item.app) }
-            let theirReply = cand.kind == "answer" ? Outreach.latestTheirReply(for: item, in: events) : nil
-            let wantsCode = cand.kind == "answer" && (theirReply.map(AppStorePitchExtract.replyWantsPromoCode) ?? false)
-            let code = wantsCode ? appID.flatMap { OfferCodes.shared.codes(app: $0).first { $0.sharedAt == nil && !reservedCodes.contains($0.code) } } : nil
-            let highlights = latestSide.highlights?[appFirst] ?? latestSide.highlights?.first {
-                appFirst.localizedCaseInsensitiveContains($0.key) || $0.key.localizedCaseInsensitiveContains(appFirst)
-            }?.value
-            var itemForDraft = item
-            if let cov = cand.coverageURL { itemForDraft.url = cov }
-            guard let built = await Outreach.buildAutoDraft(
-                for: itemForDraft, kind: cand.kind, theirReply: theirReply, version: cand.version,
-                appLink: appLink, codeLink: code?.url, versions: versions,
-                highlights: highlights, wording: Wording.rules
-            ) else { continue }
-            var payloadFields: [String: JSONValue] = [
-                "entry": .string(item.id),
-                "outlet": .string(item.outlet),
-                "app": .string(item.app),
-                "kind": .string(cand.kind),
-                "to": .string(to),
-                "subject": .string(built.subject),
-                "body": .string(built.body),
-                "has_code": .bool(code != nil),
-            ]
-            if let sid = cand.suggestionID { payloadFields["suggestion_id"] = .string(sid) }
-            if let code { payloadFields["offer_code"] = .string(code.code) }
-            if let appID { payloadFields["app_id"] = .string(appID) }
-            if (try? await store.enqueue(kind: "outreach.send", resource: "mail", priority: 3, maxAttempts: 1,
-                                         payload: .object(payloadFields), needsApproval: true)) != nil {
-                if let code { reservedCodes.insert(code.code) }
+            let res = await Outreach.queueDraft(
+                item: cand.item,
+                kind: cand.kind,
+                suggestionID: cand.suggestionID,
+                version: cand.version,
+                coverageURL: cand.coverageURL,
+                events: events,
+                versions: versions,
+                reservedCodes: &reservedCodes,
+                model: model,
+                store: store
+            )
+            if res.queued {
                 draftedKeys.insert(cand.key)
                 newDraftKeys.append(cand.key)
-                parkedDraftLines.append("\(item.outlet) (\(item.app)): \(cand.kind) email ready to send")
+                parkedDraftLines.append("\(cand.item.outlet) (\(cand.item.app)): \(cand.kind) email ready to send")
             }
         }
         if !newDraftKeys.isEmpty {
