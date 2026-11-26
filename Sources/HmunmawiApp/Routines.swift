@@ -1366,9 +1366,26 @@ final class Routines {
         // Matching 60 days of mail is real work: off the main thread, so the window never stalls on the half hour.
         let day = Date.now.localDay
         let fixedVersions = versions
-        let (mail, suggested) = await Task.detached(priority: .utility) {
-            let mail = Outreach.mail(events)
-            return (mail, Outreach.suggest(items: items, mail: mail, apps: apps, today: day, versions: fixedVersions))
+        let mail = await Task.detached(priority: .utility) { Outreach.mail(events) }.value
+        let purgedSuggestionIDs = Outreach.purgeSelfAuthoredThreads(items: items, mail: mail)
+        for w in model.waiting where w.job.kind == "outreach.send" && w.job.state == .waitingApproval {
+            let sid = w.job.payload[path: "suggestion_id"]?.string
+            let kind = w.job.payload[path: "kind"]?.string ?? "follow-up"
+            let offerCode = w.job.payload[path: "offer_code"]?.string ?? ""
+            var hasCodeFlag = false
+            if case .bool(let b)? = w.job.payload[path: "has_code"] { hasCodeFlag = b }
+            let hasCode = hasCodeFlag || !offerCode.isEmpty
+            let body = w.job.payload[path: "body"]?.string ?? ""
+            let purged = sid.map { purgedSuggestionIDs.contains($0) } ?? false
+            let unwantedCode = kind != "answer" && !offerCode.isEmpty
+            let leakedCoupon = AppStorePitchExtract.couponLeakProblem(body, allowCode: kind == "answer" && hasCode) != nil
+            if purged || unwantedCode || leakedCoupon {
+                await model.skip(w.job)
+            }
+        }
+        await Outreach.refreshHighlights(model: model)
+        let suggested = await Task.detached(priority: .utility) {
+            Outreach.suggest(items: items, mail: mail, apps: apps, today: day, versions: fixedVersions)
         }.value
         var found = suggested
         let before = Outreach.side()
@@ -1492,6 +1509,13 @@ final class Routines {
             candidates.append(DraftCandidate(key: candKey, item: item, kind: "follow-up", suggestionID: nil, version: nil, coverageURL: nil))
         }
 
+        var reservedCodes: Set<String> = Set(
+            model.waiting
+                .filter { $0.job.kind == "outreach.send" && $0.job.state == .waitingApproval }
+                .compactMap { $0.job.payload[path: "offer_code"]?.string }
+                .filter { !$0.isEmpty }
+        )
+
         for cand in candidates where !draftedKeys.contains(cand.key) {
             let item = cand.item
             guard let to = Outreach.pinnedRecipient(for: item) else { continue }
@@ -1502,14 +1526,18 @@ final class Routines {
             let appFirst = item.app.split(separator: "+").first.map(String.init) ?? item.app
             let appID = OfferCodes.shared.appIDs.first { QuickName.of($0, model: model).caseInsensitiveCompare(appFirst) == .orderedSame }
             let appLink = appID.map { Outreach.campaignLink(appID: $0, outlet: item.outlet, app: item.app) }
-            let wantsCode = ["answer", "check in", "repitch", "follow-up"].contains(cand.kind)
-            let code = wantsCode ? appID.flatMap { OfferCodes.shared.codes(app: $0).first { $0.sharedAt == nil } } : nil
             let theirReply = cand.kind == "answer" ? Outreach.latestTheirReply(for: item, in: events) : nil
+            let wantsCode = cand.kind == "answer" && (theirReply.map(AppStorePitchExtract.replyWantsPromoCode) ?? false)
+            let code = wantsCode ? appID.flatMap { OfferCodes.shared.codes(app: $0).first { $0.sharedAt == nil && !reservedCodes.contains($0.code) } } : nil
+            let highlights = latestSide.highlights?[appFirst] ?? latestSide.highlights?.first {
+                appFirst.localizedCaseInsensitiveContains($0.key) || $0.key.localizedCaseInsensitiveContains(appFirst)
+            }?.value
             var itemForDraft = item
             if let cov = cand.coverageURL { itemForDraft.url = cov }
             guard let built = await Outreach.buildAutoDraft(
                 for: itemForDraft, kind: cand.kind, theirReply: theirReply, version: cand.version,
-                appLink: appLink, codeLink: code?.url, versions: versions
+                appLink: appLink, codeLink: code?.url, versions: versions,
+                highlights: highlights, wording: Wording.rules
             ) else { continue }
             var payloadFields: [String: JSONValue] = [
                 "entry": .string(item.id),
@@ -1519,12 +1547,14 @@ final class Routines {
                 "to": .string(to),
                 "subject": .string(built.subject),
                 "body": .string(built.body),
+                "has_code": .bool(code != nil),
             ]
             if let sid = cand.suggestionID { payloadFields["suggestion_id"] = .string(sid) }
             if let code { payloadFields["offer_code"] = .string(code.code) }
             if let appID { payloadFields["app_id"] = .string(appID) }
             if (try? await store.enqueue(kind: "outreach.send", resource: "mail", priority: 3, maxAttempts: 1,
                                          payload: .object(payloadFields), needsApproval: true)) != nil {
+                if let code { reservedCodes.insert(code.code) }
                 draftedKeys.insert(cand.key)
                 newDraftKeys.append(cand.key)
                 parkedDraftLines.append("\(item.outlet) (\(item.app)): \(cand.kind) email ready to send")

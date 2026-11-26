@@ -330,7 +330,30 @@ struct AppStoreConnect: HmunmawiPlugin {
         let live = list.first { liveStates.contains(state($0)) }
         let next = list.first { !liveStates.contains(state($0)) && !doneStates.contains(state($0)) }
         var out: [String: JSONValue] = ["live": .bool(live != nil)]
-        if let live { out["live_version"] = live[path: "attributes.versionString"] ?? .null; out["live_version_id"] = live[path: "id"] ?? .null }
+        if let live {
+            out["live_version"] = live[path: "attributes.versionString"] ?? .null
+            out["live_version_id"] = live[path: "id"] ?? .null
+            if let liveID = live[path: "id"]?.string {
+                let cache = State.file("live-copy-\(appID)-\(liveID).json")
+                if let data = try? Data(contentsOf: cache),
+                   let cached = try? JSONDecoder().decode([String: String].self, from: data),
+                   !(cached["description"] ?? "").isEmpty || !(cached["whats_new"] ?? "").isEmpty {
+                    if let desc = cached["description"], !desc.isEmpty { out["live_description"] = .string(desc) }
+                    if let wn = cached["whats_new"], !wn.isEmpty { out["live_whats_new"] = .string(wn) }
+                } else if let body = try? await get("\(Self.base)/appStoreVersions/\(liveID)/appStoreVersionLocalizations?limit=20&fields%5BappStoreVersionLocalizations%5D=locale,description,whatsNew", core: core) {
+                    let locs = body[path: "data"]?.array ?? []
+                    let picked = locs.first { $0[path: "attributes.locale"]?.string == "en-US" }
+                        ?? locs.first { ($0[path: "attributes.locale"]?.string ?? "").hasPrefix("en") }
+                        ?? locs.first { !($0[path: "attributes.description"]?.string ?? "").isEmpty }
+                    let desc = String((picked?[path: "attributes.description"]?.string ?? "").prefix(4000))
+                    let wn = String((picked?[path: "attributes.whatsNew"]?.string ?? "").prefix(2000))
+                    var copy: [String: String] = [:]
+                    if !desc.isEmpty { copy["description"] = desc; out["live_description"] = .string(desc) }
+                    if !wn.isEmpty { copy["whats_new"] = wn; out["live_whats_new"] = .string(wn) }
+                    if !copy.isEmpty, let data = try? JSONEncoder().encode(copy) { StateFile.write(data, to: cache) }
+                }
+            }
+        }
         if let next {
             out["version_id"] = next[path: "id"] ?? .null
             out["version"] = next[path: "attributes.versionString"] ?? .null

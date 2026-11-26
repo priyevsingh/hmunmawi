@@ -5,11 +5,18 @@ import SwiftUI
 /// Outreach: what the reply watch found (each change waits for your tap), and every pitch or listing with what
 /// Hmunmawi keeps for it (notes, do-not-contact, coverage, launch date) and drafts you edit and send yourself.
 struct OutreachSheet: View {
+    enum Filter: String, CaseIterable {
+        case awaiting = "Awaiting reply"
+        case replied = "Replied"
+        case noReply = "No reply"
+        case all = "All"
+    }
+
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var items: [OItem] = []
     @State private var side = Outreach.Side()
-    @State private var showAll = false
+    @State private var filter: Filter = .awaiting
     @Environment(\.openSheet) private var openSheet
     @State private var busy: String?
     @State private var note: String?
@@ -71,20 +78,22 @@ struct OutreachSheet: View {
                 .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
             }
             if let note { Text(note).font(.callout).foregroundStyle(.secondary) }
+            let shown = filteredItems
             HStack {
-                Text(showAll ? "Everything (\(items.count))" : "Waiting on them (\(items.filter(\.open).count))").font(.headline)
+                Text("\(filter.rawValue) (\(shown.count))").font(.headline)
                 Spacer()
-                Picker("Show", selection: $showAll) { Text("Waiting").tag(false); Text("All").tag(true) }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                Picker("Show", selection: $filter) {
+                    ForEach(Filter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
             ScrollView {
                 VStack(spacing: 0) {
-                    let shown = (showAll ? items : items.filter(\.open)).sorted { ($0.followUp ?? "9999") < ($1.followUp ?? "9999") }
                     ForEach(Array(shown.enumerated()), id: \.element.id) { n, i in
                         Button { let m = model; openSheet?({ AnyView(OutreachDetail(model: m, item: i).buttonStyle(.pill)) }) } label: { itemRow(i) }.buttonStyle(.plain)
                         if n < shown.count - 1 { Divider() }
                     }
-                    if shown.isEmpty { Text(items.isEmpty ? "No outreach list yet. Open Setup." : "Nothing waiting.").foregroundStyle(.secondary).padding(.vertical, 8) }
+                    if shown.isEmpty { Text(items.isEmpty ? "No outreach list yet. Open Setup." : "Nothing in \(filter.rawValue.lowercased()).").foregroundStyle(.secondary).padding(.vertical, 8) }
                 }
             }
             .frame(minHeight: 160, maxHeight: 360)
@@ -95,7 +104,26 @@ struct OutreachSheet: View {
         .onAppear(perform: reload)
     }
 
-    private func reload() { items = Outreach.items(); side = Outreach.side() }
+    private var filteredItems: [OItem] {
+        let matches: [OItem] = switch filter {
+        case .awaiting:
+            items.filter { ["submitted", "pending review"].contains($0.status) }
+        case .replied:
+            items.filter { ["replied", "approved", "live"].contains($0.status) || side.extras[$0.id]?.coverage?.isEmpty == false }
+        case .noReply:
+            items.filter { ["no reply", "rejected", "bounced"].contains($0.status) }
+        case .all:
+            items
+        }
+        return matches.sorted { ($0.followUp ?? "9999", $1.date) < ($1.followUp ?? "9999", $0.date) }
+    }
+
+    private func reload() {
+        let loaded = Outreach.items()
+        Outreach.purgeSelfAuthoredThreads(items: loaded, mail: Outreach.mail(model.events))
+        items = loaded
+        side = Outreach.side()
+    }
 
     private static let words: [String: String] = [
         "replied": "answered", "approved": "approved the listing", "live": "listing is live", "rejected": "declined",
@@ -188,6 +216,7 @@ struct OutreachSheet: View {
 
     @ViewBuilder private func itemRow(_ i: OItem) -> some View {
         let x = side.extras[i.id]
+        let hasReply = i.status == "replied" || side.threads?[i.id] != nil
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -198,7 +227,15 @@ struct OutreachSheet: View {
                 Text("\(i.app.replacingOccurrences(of: "+", with: " & ")) · \(i.type) · sent \(Outreach.prettyDay(i.date))").font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(i.status).font(.callout)
+            if i.status == "replied" {
+                Text("Replied").font(.callout.weight(.medium)).foregroundStyle(Brand.good)
+            } else if i.status == "no reply" {
+                Text(i.followedUpOn != nil ? "No reply · followed up" : "No reply received").font(.callout).foregroundStyle(.secondary)
+            } else if i.status == "submitted" && i.isEmail && !hasReply {
+                Text(i.followedUpOn != nil ? "Followed up · 0 replies" : "Awaiting reply").font(.callout).foregroundStyle(.secondary)
+            } else {
+                Text(i.status).font(.callout)
+            }
             if let f = i.followUp {
                 let late = (DayNumber.of(f) ?? 0) < (DayNumber.of(Date.now.localDay) ?? 0)
                 Text("follow up \(Outreach.prettyDay(f))").font(.callout).foregroundStyle(late ? Brand.caution : Brand.secondaryText)
@@ -221,7 +258,7 @@ struct OutreachDetail: View {
     @State private var draftSubject = ""
     @State private var draft = ""
     @State private var theirMessage = ""
-    @State private var withCode = true
+    @State private var withCode = false
     @State private var busy = false
     @State private var confirmSend = false
     @State private var note: String?
@@ -300,7 +337,14 @@ struct OutreachDetail: View {
                 HStack {
                     Text("Draft").font(.headline)
                     Spacer()
-                    if item.isEmail { Button("Follow-up") { setDraft(Outreach.followUpDraft(item, appLink: appID.map { Outreach.campaignLink(appID: $0, outlet: item.outlet, app: item.app) })) } }
+                    if item.isEmail {
+                        Button("Follow-up") {
+                            let side = Outreach.side()
+                            let appFirst = String(item.app.split(separator: "+").first ?? Substring(item.app))
+                            let hl = side.highlights?[appFirst] ?? side.highlights?.first { appFirst.localizedCaseInsensitiveContains($0.key) || $0.key.localizedCaseInsensitiveContains(appFirst) }?.value
+                            setDraft(Outreach.followUpDraft(item, appLink: appID.map { Outreach.campaignLink(appID: $0, outlet: item.outlet, app: item.app) }, highlights: hl))
+                        }
+                    }
                     if let c = extra.coverage?.last { Button("Thank you") { setDraft(Outreach.thankDraft(item, coverage: c.url)) } }
                 }
                 DisclosureGroup("Answer their reply with AI") {
@@ -342,6 +386,7 @@ struct OutreachDetail: View {
             if let l = extra.launch, let n = DayNumber.of(l) { hasLaunch = true; launch = Date(timeIntervalSince1970: Double(n) * 86_400 + 43_200) }
             if theirMessage.isEmpty, let latest = Outreach.latestTheirReply(for: item, in: model.events) {
                 theirMessage = latest
+                withCode = AppStorePitchExtract.replyWantsPromoCode(latest)
             }
         }
         .confirmationDialog("Send this email to \(Outreach.pinnedRecipient(for: item) ?? item.outlet)?", isPresented: $confirmSend) {

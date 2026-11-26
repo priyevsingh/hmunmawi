@@ -212,4 +212,30 @@ import Testing
         #expect(ctx.subscribers.book.mailActions?.first?.undone == true)
         #expect(!ctx.subscribers.undoMailAction(record))
     }
+
+    @Test func fetchWhatsNewReadsLiveWhatsNewFromReleaseSnapshot() async throws {
+        let ctx = try await makeContext()
+        defer { try? FileManager.default.removeItem(at: ctx.dir) }
+
+        let nowMs = Millis(Date.now.timeIntervalSince1970 * 1000)
+        _ = try await ctx.store.ingest(
+            Event(
+                source: "appstoreconnect",
+                kind: "release.snapshot",
+                app: "ExampleApp",
+                payload: .object([
+                    "live": .bool(true),
+                    "live_version": .string("2.0.0"),
+                    "live_whats_new": .string("Added live_whats_new correlation summary."),
+                ]),
+                occurredAt: nowMs,
+                dedupeKey: "rel-live-wn"
+            ),
+            rules: []
+        )
+        await ctx.model.refresh()
+
+        let notes = await ctx.subscribers.fetchWhatsNew(app: "ExampleApp", appID: nil, model: ctx.model)
+        #expect(notes == "Added live_whats_new correlation summary.")
+    }
 }

@@ -166,9 +166,12 @@ final class ReleaseSubscribers {
                 for snap in model.snapshots(kind).sorted(by: { $0.occurredAt > $1.occurredAt }) {
                     guard let snapApp = snap.app,
                           ComingSoon.shortName(snapApp).caseInsensitiveCompare(target) == .orderedSame else { continue }
-                    let raw = snap.payload[path: "whats_new"]?.string
-                        ?? snap.payload[path: "whatsNew"]?.string
-                        ?? snap.payload[path: "releaseNotes"]?.string
+                    let raw = [
+                        snap.payload[path: "live_whats_new"]?.string,
+                        snap.payload[path: "whats_new"]?.string,
+                        snap.payload[path: "whatsNew"]?.string,
+                        snap.payload[path: "releaseNotes"]?.string,
+                    ].compactMap { $0?.trimmedNilIfEmpty }.first
                     if let cleaned = ReleaseNotifyTemplate.cleanWhatsNew(raw) {
                         return cleaned
                     }
@@ -484,7 +487,7 @@ final class ReleaseSubscribers {
     }
 }
 
-private extension String {
+extension String {
     var trimmedNilIfEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

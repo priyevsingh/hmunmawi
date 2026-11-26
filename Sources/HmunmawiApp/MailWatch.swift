@@ -218,8 +218,18 @@ enum ZohoSafariReader {
         raw.wholeMatch(of: /^t?\d{6,25}$/) != nil
     }
 
-    static func read(host: String, matching: @escaping @Sendable (MailRow) -> Bool = { _ in false }) async -> Result<[MailRow], Error> {
+    /// Normalizes Zoho folder labels and reclassifies own-authored INBOX conversation rows as `SENT`.
+    nonisolated static func normalizeFolder(_ rawFolder: String, from: String, ownList: [String] = []) -> String {
+        let lower = rawFolder.lowercased()
+        if lower.contains("sent") { return "SENT" }
+        if lower.contains("draft") { return "DRAFT" }
+        if ReplyMatch.isOwn(from, own: ownList) { return "SENT" }
+        return "INBOX"
+    }
+
+    static func read(host: String, matching: @escaping @Sendable (MailRow) -> Bool = { _ in false }, ownList: [String] = []) async -> Result<[MailRow], Error> {
         guard hosts.contains(host) else { return .failure(WireError("mail", "Pick the Zoho address you sign in at.")) }
+        let ownList = ownList.isEmpty ? await MainActor.run { Outreach.own } : ownList
         return await Task.detached(priority: .utility) { () -> Result<[MailRow], Error> in
             let js = "(function(){var rows=document.querySelectorAll('.zmList');if(!rows.length)return '';return JSON.stringify(Array.prototype.slice.call(rows,0,60).map(function(r){function q(s){var e=r.querySelector(s);return e?((e.getAttribute('title')||e.innerText||'').trim()):'';}return {id:r.id,msgid:(r.getAttribute('data-msgid')||r.id||''),from:q('.zmLSenderName'),subject:q('.zmLSub'),folder:q('.zmLFolder')};}));})()"
             // Its own tagged tab through SafariAuto: the shared Safari lock, found by tag, closed on every path.
@@ -251,13 +261,15 @@ enum ZohoSafariReader {
                     var fetched = 0
                     for m in list where fetched < 15 {
                         guard let rawID = m["id"] as? String, !rawID.isEmpty else { continue }
-                        let folder = (m["folder"] as? String ?? "").lowercased().contains("sent") ? "SENT" : "INBOX"
+                        let from = String((m["from"] as? String ?? "").prefix(200))
+                        let folder = Self.normalizeFolder(m["folder"] as? String ?? "", from: from, ownList: ownList)
                         guard folder == "INBOX" else { continue }
                         let row = MailRow(id: "zoho-\(rawID.prefix(80))",
-                                          from: String((m["from"] as? String ?? "").prefix(200)),
+                                          from: from,
                                           subject: String((m["subject"] as? String ?? "").prefix(300)),
                                           folder: folder, sentMs: nil,
                                           messageID: "zoho-\(rawID.prefix(80))", inReplyTo: nil)
+                        guard !ReplyMatch.isOwn(row.from, own: ownList) else { continue }
                         guard matching(row) else { continue }
                         let msgID = ((m["msgid"] as? String) ?? rawID).trimmingCharacters(in: .whitespacesAndNewlines)
                         guard Self.isValidMessageID(msgID) else { continue }
@@ -282,8 +294,9 @@ enum ZohoSafariReader {
             }
             let rows: [MailRow] = rawList.compactMap { m in
                 guard let id = m["id"] as? String, !id.isEmpty else { return nil }
-                let folder = (m["folder"] as? String ?? "").lowercased().contains("sent") ? "SENT" : "INBOX"
-                return MailRow(id: "zoho-\(id.prefix(80))", from: String((m["from"] as? String ?? "").prefix(200)),
+                let from = String((m["from"] as? String ?? "").prefix(200))
+                let folder = Self.normalizeFolder(m["folder"] as? String ?? "", from: from, ownList: ownList)
+                return MailRow(id: "zoho-\(id.prefix(80))", from: from,
                                subject: String((m["subject"] as? String ?? "").prefix(300)), folder: folder, sentMs: nil,
                                messageID: "zoho-\(id.prefix(80))", inReplyTo: nil, text: bodiesByID[id])
             }

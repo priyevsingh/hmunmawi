@@ -1291,7 +1291,17 @@ final class AppModel {
             events += ExpiryWatch.shared.statusEvents(self)
                 await UsageWatch.shared.refresh()
             events += UsageWatch.shared.statusEvents()
-            if !isDemo { Task { _ = await ReleaseSubscribers.shared.checkNewReleases(model: self) } }
+            if !isDemo {
+                Task {
+                    await Outreach.refreshHighlights(model: self)
+                    if tick == 0, let liveStore {
+                        let since = Millis(Date.now.addingTimeInterval(-60 * 86_400).timeIntervalSince1970 * 1000)
+                        let recentMail = Outreach.mail((try? await liveStore.events(kind: "mail.seen", since: since)) ?? [])
+                        Outreach.purgeSelfAuthoredThreads(items: Outreach.items(), mail: recentMail)
+                    }
+                    _ = await ReleaseSubscribers.shared.checkNewReleases(model: self)
+                }
+            }
             }
         if tick % 15 == 0, UserDefaults.standard.string(forKey: "HMLiveMode") == "history" { events += await AppleHistory.shared.check() }
         await ingestLocal(events)
@@ -1715,7 +1725,7 @@ final class AppModel {
 /// beside the trust key, not in preferences: any program can `defaults delete` a preference and so make the app sign
 /// whatever is on disk again (security re-check, Nov 2026). An old preference that says "done" is carried over once.
 enum TrustFlags {
-    nonisolated(unsafe) private static let store = KeychainSecretStore()
+    private static let store = KeychainSecretStore()
 
     static func isSet(_ name: String, legacyDefaultsKey: String? = nil) -> Bool {
         // Fail closed: a Keychain that can't be read (locked, or the mark belongs to a differently signed copy) counts
