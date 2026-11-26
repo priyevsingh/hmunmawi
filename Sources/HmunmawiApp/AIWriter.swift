@@ -97,6 +97,10 @@ final class AISettings {
     /// Price per million tokens (in, out) for providers whose prices the app doesn't know. 0 = unknown.
     var priceIn: Double { didSet { defaults.set(priceIn, forKey: "HMAIPriceIn.\(provider.rawValue)") } }
     var priceOut: Double { didSet { defaults.set(priceOut, forKey: "HMAIPriceOut.\(provider.rawValue)") } }
+    /// Explicit opt-in so non-Claude models without a built-in/custom price aren't blocked (USD spend stays uncounted).
+    var allowUnpricedModels: Bool { didSet { defaults.set(allowUnpricedModels, forKey: "HMAIAllowUnpriced") } }
+    /// Opt-in: polish Sunday's `story.weekly` digest with AI (linted against Words I never use).
+    var polishWeeklyDigest: Bool { didSet { defaults.set(polishWeeklyDigest, forKey: "HMAIPolishWeeklyDigest") } }
     /// Models the provider lists for this key (filled right after the key is saved; also proves the key works).
     private(set) var models: [String] = []
     private(set) var checking = false
@@ -111,16 +115,40 @@ final class AISettings {
         "claude-opus-5-5": (4, 20), "claude-sonnet-5-5": (2, 10), "claude-haiku-5-5": (0.10, 0.50),
         "claude-fable-5-1": (10, 50), "claude-opus-5": (5, 25), "claude-sonnet-5": (2, 10),
     ]
+    /// Built-in prices for common OpenAI, Gemini and Groq models (USD per million tokens, in / out).
+    static let builtInPrices: [AIProvider: [String: (Double, Double)]] = [
+        .openai: [
+            "gpt-5": (1.25, 10.0), "gpt-5-mini": (0.25, 2.0), "gpt-5-nano": (0.05, 0.40),
+            "gpt-4.1": (2.0, 8.0), "gpt-4.1-mini": (0.40, 1.60), "gpt-4.1-nano": (0.10, 0.40),
+            "gpt-4o": (2.50, 10.0), "gpt-4o-mini": (0.15, 0.60),
+            "o3": (2.0, 8.0), "o4-mini": (1.10, 4.40),
+        ],
+        .gemini: [
+            "gemini-2.5-pro": (1.25, 10.0), "gemini-2.5-flash": (0.30, 2.50),
+            "gemini-2.5-flash-lite": (0.10, 0.40), "gemini-2.0-flash": (0.10, 0.40),
+        ],
+        .groq: [
+            "llama-3.3-70b-versatile": (0.59, 0.79), "llama-3.1-8b-instant": (0.05, 0.08),
+            "openai/gpt-oss-120b": (0.15, 0.60), "openai/gpt-oss-20b": (0.075, 0.30),
+            "qwen/qwen3-32b": (0.29, 0.59),
+        ],
+    ]
+    static func matchPrice(_ table: [String: (Double, Double)], model: String) -> (Double, Double)? {
+        table[model] ?? table.filter { model.hasPrefix($0.key) }.max { $0.key.count < $1.key.count }?.value
+    }
     var prices: (Double, Double)? {
         // A dated or new Claude model id matches its family; an unknown one is counted at the highest known
         // price, so the monthly budget always stops it (never counted as free).
         if provider == .claude {
-            return Self.claudePrices[model]
-                ?? Self.claudePrices.filter { model.hasPrefix($0.key) }.max { $0.key.count < $1.key.count }?.value
+            return Self.matchPrice(Self.claudePrices, model: model)
                 ?? Self.claudePrices.values.max { $0.1 < $1.1 }
         }
         if provider == .ollama { return (0, 0) }   // runs on this Mac
-        return priceIn > 0 || priceOut > 0 ? (priceIn, priceOut) : nil
+        if priceIn > 0 || priceOut > 0 { return (priceIn, priceOut) }
+        if let table = Self.builtInPrices[provider] {
+            return Self.matchPrice(table, model: model)
+        }
+        return nil
     }
     static func monthKey() -> String { Date.now.formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month()) }
     /// This month's AI spend: the stored tally belongs to an earlier month until the next AI call resets it.
@@ -160,6 +188,8 @@ final class AISettings {
         monthlyBudget = defaults.object(forKey: "HMAIBudget") as? Double ?? 1.0
         priceIn = defaults.double(forKey: "HMAIPriceIn.\(p.rawValue)")
         priceOut = defaults.double(forKey: "HMAIPriceOut.\(p.rawValue)")
+        allowUnpricedModels = defaults.bool(forKey: "HMAIAllowUnpriced")
+        polishWeeklyDigest = defaults.bool(forKey: "HMAIPolishWeeklyDigest")
         if let data = defaults.data(forKey: "HMAIUsage"), let u = try? JSONDecoder().decode(Usage.self, from: data) { usage = u }
         refreshKeyState()
     }
@@ -174,13 +204,41 @@ final class AISettings {
         Task { await checkKey() }
     }
 
-    func refreshKeyState() { hasKey = !provider.needsKey || ((try? keychain.secret(plugin: "ai", name: provider.rawValue)) ?? nil)?.isEmpty == false }
+    func refreshKeyState() {
+        if !provider.needsKey { hasKey = true; return }
+        let name = provider.rawValue
+        let account = "ai/\(name)"
+        do {
+            if let v = try keychain.peekSecret(plugin: "ai", name: name), !v.isEmpty {
+                hasKey = true; lastError = nil; return
+            }
+            // Key not yet in v2 Keychain: if legacy Keychain had an unreadable item or a file source exists, surface/recover.
+            let catalog = SecretSourceCatalog(url: URL.hmSupport.appending(path: SecretSourceCatalog.fileName))
+            if SecretRebinder.rebind(store: keychain, catalog: catalog, plugin: "ai", name: name) {
+                hasKey = true; lastError = nil
+            } else if LegacySecretMigrator.lastReport.needsOK[account] != nil {
+                hasKey = false
+                lastError = "Your AI key is in an older Keychain item from a differently signed copy. Use Find my key or re-enter it here."
+            } else {
+                hasKey = false
+            }
+        } catch {
+            let catalog = SecretSourceCatalog(url: URL.hmSupport.appending(path: SecretSourceCatalog.fileName))
+            if SecretRebinder.rebind(store: keychain, catalog: catalog, plugin: "ai", name: name) {
+                hasKey = true; lastError = nil
+            } else {
+                hasKey = false
+                lastError = "Your AI key is in the Keychain but was saved by a differently signed copy. Use Find my key or re-enter it here."
+            }
+        }
+    }
 
     func saveKey(_ key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         do { try keychain.setSecret(trimmed, plugin: "ai", name: provider.rawValue); lastError = nil }
         catch { lastError = "Couldn't save the key in the Keychain." }
+        SecretSourceDefaults.mirrorTypedKey(trimmed, plugin: "ai", name: provider.rawValue)
         refreshKeyState()
         Task { await checkKey() }
     }
@@ -265,9 +323,9 @@ enum AIWriter {
         let settings = AISettings.shared
         guard settings.hasKey, !settings.model.isEmpty else { throw WireError("ai_key", "Add an AI key in Settings → General first.") }
         guard settings.budgetLeft else { throw WireError("ai_budget", "This month's AI budget is used up.") }
-        // Without a price the budget can't be tracked, so nothing is sent until one is entered.
-        guard settings.prices != nil else {
-            throw WireError("ai_no_price", "Enter this model's prices in Settings → General first, so the monthly budget can stop it.")
+        // Without a price the budget can't be tracked, unless the user explicitly opted into unpriced models.
+        guard settings.prices != nil || settings.allowUnpricedModels else {
+            throw WireError("ai_no_price", "Enter this model's prices in Settings → General first (or allow unpriced models), so the monthly budget can stop it.")
         }
         return try await send(prompt, settings: settings)
     }

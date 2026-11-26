@@ -12,7 +12,7 @@ private final class ReadCounter: @unchecked Sendable {
     func hit(_ p: String) { lock.lock(); counts[p, default: 0] += 1; lock.unlock() }
 }
 
-@Suite struct SecretRebindPassTests {
+@Suite(.serialized) struct SecretRebindPassTests {
     @Test func importsKeysAndReadsEachFileOnce() {
         let id = "rb\(UUID().uuidString.prefix(6).lowercased())"
         let catalog = tempCatalog()
@@ -83,5 +83,39 @@ private final class ReadCounter: @unchecked Sendable {
         let store = KeychainSecretStore()
         #expect(SecretRebinder.rebindAll(store: store, catalog: catalog) == 1)
         #expect((try? store.peekSecret(plugin: id, name: "apiKey")) == "real-value-1")
+    }
+
+    @Test func vercelAndAIClaudeDefaultSourcesAndRebind() throws {
+        #expect(SecretRebinder.connectionSecretNames.contains("vercel/apiToken"))
+        #expect(SecretRebinder.connectionSecretNames.contains("ai/claude"))
+
+        let dir = FileManager.default.temporaryDirectory.appending(path: "rbf-va-\(UUID().uuidString)")
+        let keyFolder = dir.appending(path: "keys", directoryHint: .isDirectory)
+        let typedFolder = dir.appending(path: "typed", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: keyFolder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        try "VERCEL_TOKEN=example-vercel-token-123\n".write(to: keyFolder.appending(path: "vercel.env"), atomically: true, encoding: .utf8)
+        try "ANTHROPIC_API_KEY=example-claude-key-456\n".write(to: keyFolder.appending(path: "anthropic_hmunmawi.env"), atomically: true, encoding: .utf8)
+
+        let vRef = try #require(SecretSourceDefaults.ref(plugin: "vercel", name: "apiToken", keyFolder: keyFolder, typedFolder: typedFolder))
+        let aRef = try #require(SecretSourceDefaults.ref(plugin: "ai", name: "claude", keyFolder: keyFolder, typedFolder: typedFolder))
+        #expect(SecretFileReader.value(ref: vRef) == "example-vercel-token-123")
+        #expect(SecretFileReader.value(ref: aRef) == "example-claude-key-456")
+
+        // Mirror typed key into typedFolder and rebind from catalog.
+        #expect(SecretSourceDefaults.mirrorTypedKey("mirrored-ai-key-789", plugin: "ai", name: "openai", in: typedFolder))
+        let mRef = try #require(SecretSourceDefaults.ref(plugin: "ai", name: "openai", keyFolder: keyFolder, typedFolder: typedFolder))
+        #expect(SecretFileReader.value(ref: mRef) == "mirrored-ai-key-789")
+
+        let catalog = tempCatalog()
+        catalog.record(plugin: "vercel", name: "apiToken", ref: vRef)
+        catalog.record(plugin: "ai", name: "claude", ref: aRef)
+        let store = KeychainSecretStore()
+        defer { store.deleteSecret(plugin: "vercel", name: "apiToken"); store.deleteSecret(plugin: "ai", name: "claude") }
+        #expect(SecretRebinder.rebind(store: store, catalog: catalog, plugin: "vercel", name: "apiToken"))
+        #expect(SecretRebinder.rebind(store: store, catalog: catalog, plugin: "ai", name: "claude"))
+        #expect((try? store.peekSecret(plugin: "vercel", name: "apiToken")) == "example-vercel-token-123")
+        #expect((try? store.peekSecret(plugin: "ai", name: "claude")) == "example-claude-key-456")
     }
 }

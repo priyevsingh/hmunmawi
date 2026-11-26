@@ -202,6 +202,15 @@ public enum SecretSourceDefaults {
         "live/hookCloudflareToken": ("cloudflare_analytics.env", .envLine, "CF_ANALYTICS_TOKEN"),
         // The YouTube sign-in the hub's upload and stats scripts already use (client id/secret + refresh token).
         "youtube/signIn": ("youtube_token.json", .wholeFile, ""),
+        // Vercel deploy token (1.6.0).
+        "vercel/apiToken": ("vercel.env", .envLine, "VERCEL_TOKEN"),
+        // AI provider keys (1.6.0): one .env file per provider, standard env var names.
+        "ai/claude": ("anthropic_hmunmawi.env", .envLine, "ANTHROPIC_API_KEY"),
+        "ai/openai": ("openai.env", .envLine, "OPENAI_API_KEY"),
+        "ai/gemini": ("gemini.env", .envLine, "GEMINI_API_KEY"),
+        "ai/openrouter": ("openrouter.env", .envLine, "OPENROUTER_API_KEY"),
+        "ai/groq": ("groq.env", .envLine, "GROQ_API_KEY"),
+        "ai/mistral": ("mistral.env", .envLine, "MISTRAL_API_KEY"),
     ]
 
     /// Where a key typed in Settings is also kept, so a changed app signature (an old Keychain item no longer
@@ -340,6 +349,8 @@ public enum SecretRebinder {
             ("cloudflare", "apiToken"), ("searchconsole", "serviceAccount"),
             ("live", "hookRelayKey"), ("live", "hookCloudflareToken"),
             ("youtube", "apiKey"), ("youtube", "signIn"),
+            ("vercel", "apiToken"),
+            ("ai", "claude"), ("ai", "openai"), ("ai", "gemini"), ("ai", "openrouter"), ("ai", "groq"), ("ai", "mistral"),
         ] + SecretSourceDefaults.typedKeyPairs()
     }
 

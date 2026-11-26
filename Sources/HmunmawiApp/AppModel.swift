@@ -812,7 +812,10 @@ final class AppModel {
                                                 : "A saved key file couldn't be read. Choose the key again in Settings.")]))
         }
         await refreshAddOns()
-        if report.rebound > 0 { await engine?.pollEverything() }
+        if report.rebound > 0 {
+            AISettings.shared.refreshKeyState()
+            await engine?.pollEverything()
+        }
         await refresh()
     }
 
@@ -1160,7 +1163,13 @@ final class AppModel {
         // Insights across every app (once a week, off the main thread).
         let rows = Self.oneSourcePerDay(insightWindow.rows)
         let all = await Task.detached(priority: .utility) { InsightEngine.run(MetricExtractor.extract(rows)) }.value
-        guard let text = weeklyDigestText(now: now, allFindings: all) else { return }
+        guard let plain = weeklyDigestText(now: now, allFindings: all) else { return }
+        let text: String
+        if AISettings.shared.polishWeeklyDigest, let polished = await WeeklyStory.polishDigest(facts: WeeklyStory.facts(self)) {
+            text = polished
+        } else {
+            text = plain
+        }
         lastDigestText = text
         let event = Event(source: "story", kind: "story.weekly", payload: .object(["text": .string(text)]),
                           occurredAt: Millis(now.timeIntervalSince1970 * 1000), dedupeKey: "story-weekly-\(key)")
