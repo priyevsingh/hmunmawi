@@ -97,6 +97,14 @@ enum MailWatch {
         let emails: Set<String>
         let domains: Set<String>
         let subjects: Set<String>
+        let hasReleaseSubscribers: Bool
+
+        init(emails: Set<String>, domains: Set<String>, subjects: Set<String>, hasReleaseSubscribers: Bool = false) {
+            self.emails = emails
+            self.domains = domains
+            self.subjects = subjects
+            self.hasReleaseSubscribers = hasReleaseSubscribers
+        }
     }
 
     static func outreachMatchers() -> OutreachMatchers {
@@ -113,7 +121,17 @@ enum MailWatch {
                 if t.count >= 4 { subjects.insert(t) }
             }
         }
-        return OutreachMatchers(emails: emails, domains: domains, subjects: subjects)
+        let activeSubscriberEmails = ReleaseSubscribers.shared.book.subscribers
+            .filter(\.isActive)
+            .map { $0.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        emails.formUnion(activeSubscriberEmails)
+        return OutreachMatchers(
+            emails: emails,
+            domains: domains,
+            subjects: subjects,
+            hasReleaseSubscribers: !activeSubscriberEmails.isEmpty
+        )
     }
 
     nonisolated static func matchesOutreach(from: String, subject: String, matchers: OutreachMatchers) -> Bool {
@@ -122,7 +140,19 @@ enum MailWatch {
         if let d = ReplyMatch.domain(from), !ReplyMatch.sharedDomains.contains(d), matchers.domains.contains(d) { return true }
         let t = ReplyMatch.thread(subject)
         if !t.isEmpty, matchers.subjects.contains(t) { return true }
+        if matchers.hasReleaseSubscribers, isSystemSender(from), isBounceSubject(subject) { return true }
         return false
+    }
+
+    private nonisolated static func isSystemSender(_ from: String) -> Bool {
+        let a = ReplyMatch.address(from)
+        return ["mailer-daemon", "postmaster", "mail-daemon", "bounce", "no-reply@accounts."].contains(where: a.contains)
+    }
+
+    private nonisolated static func isBounceSubject(_ subject: String) -> Bool {
+        let s = subject.lowercased()
+        return ["undeliver", "returned to sender", "delivery status notification", "delivery failure", "failure notice",
+                "mail delivery failed", "could not be delivered", "delivery has failed"].contains(where: s.contains)
     }
 }
 

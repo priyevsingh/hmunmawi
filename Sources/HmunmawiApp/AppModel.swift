@@ -149,6 +149,13 @@ final class AppModel {
         KeychainSecretStore.catalogURL = supportDirectory.appending(path: SecretSourceCatalog.fileName)
     }
 
+    /// Attaches an in-memory or custom live store for unit tests (leaves demo mode and refreshes).
+    func attachTestStore(_ store: Store) async {
+        liveStore = store
+        isDemo = false
+        await refresh()
+    }
+
     static func defaultSupportDirectory() -> URL {
         URL.applicationSupportDirectory.appending(path: "Hmunmawi" + (TestProfile.name.map { "-Test-" + $0 } ?? ""), directoryHint: .isDirectory)
     }
@@ -1284,6 +1291,7 @@ final class AppModel {
             events += ExpiryWatch.shared.statusEvents(self)
                 await UsageWatch.shared.refresh()
             events += UsageWatch.shared.statusEvents()
+            if !isDemo { Task { _ = await ReleaseSubscribers.shared.checkNewReleases(model: self) } }
             }
         if tick % 15 == 0, UserDefaults.standard.string(forKey: "HMLiveMode") == "history" { events += await AppleHistory.shared.check() }
         await ingestLocal(events)
@@ -1471,6 +1479,21 @@ final class AppModel {
                 "ok": .bool(true), "via": .string(sendRes.via), "note": .string(sendRes.note)])) }
             return
         }
+        // Customer release update batch approved by the owner: send individually with per-recipient checkpointing.
+        if job.kind == "release.notify" {
+            let res = await ReleaseSubscribers.shared.sendBatchJob(job, model: self)
+            if !res.ok {
+                errorText = res.note
+                return
+            }
+            await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
+                "ok": .bool(true), "sent": .number(Double(res.sent)), "skipped": .number(Double(res.skipped)),
+                "failed": .number(Double(res.failed)), "note": .string(String(res.note.prefix(500)))])) }
+            if res.failed > 0 {
+                errorText = res.note
+            }
+            return
+        }
         // Proactive review reply approved by the owner: post publicly on App Store Connect.
         if job.kind == "review.reply", case .object(let p) = job.payload {
             let rid = p["review_id"]?.string ?? ""
@@ -1501,14 +1524,14 @@ final class AppModel {
 
     /// Critical actions that are NEVER approved by "Approve all non-critical" and always wait for individual owner review.
     nonisolated static func isCriticalWaiting(_ job: Job) -> Bool {
-        if job.kind == "outreach.send" || job.kind == "review.reply" { return true }
+        if job.kind == "outreach.send" || job.kind == "review.reply" || job.kind == "release.notify" { return true }
         if job.kind == "asc.fix" {
             let fix = job.payload[path: "params.fix"]?.string ?? job.payload[path: "fix"]?.string ?? ""
             if fix == "submit" || fix == "review_reply" { return true }
         }
         if job.kind == "agent.request" {
             let cmd = job.payload[path: "command"]?.string ?? ""
-            if ["deploy-redeploy", "python-repair", "outreach-send", "review-reply", "set-key", "publish",
+            if ["deploy-redeploy", "python-repair", "outreach-send", "release-notify-draft", "review-reply", "set-key", "publish",
                 "remove-connection", "routine-remove", "change-remove", "plan-remove"].contains(cmd) {
                 return true
             }
@@ -1543,6 +1566,14 @@ final class AppModel {
     /// Saves edits to a waiting `outreach.send` draft before sending.
     func updateOutreachDraft(_ job: Job, subject: String, body: String) async {
         guard job.kind == "outreach.send", case .object(var p) = job.payload else { return }
+        p["subject"] = .string(String(subject.prefix(300)))
+        p["body"] = .string(String(body.prefix(10_000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
+    }
+
+    /// Saves edits to a waiting `release.notify` draft before sending.
+    func updateReleaseNotifyDraft(_ job: Job, subject: String, body: String) async {
+        guard job.kind == "release.notify", case .object(var p) = job.payload else { return }
         p["subject"] = .string(String(subject.prefix(300)))
         p["body"] = .string(String(body.prefix(10_000)))
         await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }

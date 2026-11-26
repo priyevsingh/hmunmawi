@@ -135,6 +135,7 @@ struct AppsPager: View {
                                 }
                                 ForEach(parts) { AppPartView(part: $0, snapshot: snapshot, model: model, onOpen: {}) }
                                 if let name = snapshot.app { AppDiscovery(model: model, app: name) }
+                                if let name = snapshot.app { ReleaseSubscribersSection(model: model, app: ComingSoon.shortName(name)) }
                                 CompetitorsCard(model: model)
                             }
                             .padding(24)

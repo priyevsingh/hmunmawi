@@ -69,6 +69,15 @@ public enum JobText {
             let stars = p["stars"]?.number.map { " (\(Int(safe: $0))★)" } ?? ""
             return "Post review reply: \(app)\(stars)"
         }
+        if job.kind == "release.notify", case .object(let p) = job.payload {
+            let app = p["app"]?.string ?? "App"
+            let version = p["version"]?.string ?? ""
+            let count = Int(safe: p["recipient_count"]?.number ?? 0)
+            let target = version.isEmpty ? app : "\(app) \(version)"
+            return count > 0
+                ? "Release update ready: \(target) · \(count) subscriber\(count == 1 ? "" : "s")"
+                : "Release update ready: \(target)"
+        }
         let channel = channels[job.resource] ?? job.resource
         return job.kind == "notify" ? "Send an alert by \(channel)" : "Run “\(job.kind)” with \(channel)"
     }

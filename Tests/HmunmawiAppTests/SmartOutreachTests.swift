@@ -58,4 +58,20 @@ import Testing
         #expect(lit?.contains("\\n") == true)
         #expect(lit?.contains("\\\"world\\\"") == true)
     }
+
+    @Test func actionableDraftSuggestionsPicksNewDraftKindsAndSkipsDoneOrDismissed() {
+        let suggestions: [OSuggestion] = [
+            OSuggestion(id: "1", entry: "e1", outlet: "Blog A", app: "AppA", kind: "repitch", why: "new release", day: "2026-11-26", sure: true, state: "new"),
+            OSuggestion(id: "2", entry: "e2", outlet: "Blog B", app: "AppA", kind: "answer", why: "question", day: "2026-11-26", sure: true, state: "new"),
+            OSuggestion(id: "3", entry: "e3", outlet: "Blog C", app: "AppA", kind: "thank", why: "covered", day: "2026-11-26", sure: true, state: "new"),
+            OSuggestion(id: "4", entry: "e4", outlet: "Blog D", app: "AppA", kind: "check in", why: "stale thread", day: "2026-11-26", sure: true, state: "new"),
+            OSuggestion(id: "5", entry: "e5", outlet: "Blog E", app: "AppA", kind: "thread", why: "your turn", day: "2026-11-26", sure: true, state: "new", thread: "your turn"),
+            OSuggestion(id: "6", entry: "e6", outlet: "Blog F", app: "AppA", kind: "repitch", why: "already drafted", day: "2026-11-26", sure: true, state: "done"),
+            OSuggestion(id: "7", entry: "e7", outlet: "Blog G", app: "AppA", kind: "thank", why: "skipped", day: "2026-11-26", sure: true, state: "dismissed"),
+            OSuggestion(id: "8", entry: "e8", outlet: "Blog H", app: "AppA", kind: "thread", why: "waiting", day: "2026-11-26", sure: true, state: "new", thread: "waiting"),
+            OSuggestion(id: "9", entry: "e9", outlet: "Blog I", app: "AppA", kind: "replied", why: "bookkeeping", day: "2026-11-26", sure: true, state: "new"),
+        ]
+        let picked = Routines.actionableDraftSuggestions(from: suggestions)
+        #expect(picked.map(\.id) == ["1", "2", "3", "4", "5"])
+    }
 }

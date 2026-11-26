@@ -216,6 +216,15 @@ Every version, when it started and went live, and what changed in the week after
 
 </details>
 
+#### 📬 Customer release notifications
+**Email customers who asked for updates when a new version goes live.**
+
+<details><summary>How it works</summary>
+
+Keep per-app customer subscriber lists (imported from CSV or added by hand) locally on your Mac. When a new App Store version goes live (patch releases off by default), Hmunmawi automatically prepares a plain-text release update email draft—checked with anti-spam rules and your **Words I never use**—and waits for your explicit approval in **Log → Needs your OK** (`release.notify`). Approved emails go out individually through your configured TLS/STARTTLS SMTP or Zoho Mail (Safari), and incoming unsubscribe replies and bounces mark subscribers inactive automatically with **1-click Undo**.
+
+</details>
+
 #### 🩺 Stability
 **Spot a crash or freeze problem before the reviews do.**
 
@@ -352,7 +361,7 @@ Everything that came in, and what's waiting on you.
 
 <details><summary>How it works</summary>
 
-Every action waiting for approval (yours, a routine's or an agent's), with Approve or Skip. Multi-field `set-key` requests group into one card (showing non-secret fields inline while masking secrets, and superseded requests prune automatically when you save a connection manually), outreach and review drafts are editable before you approve, and **Approve all non-critical** lets you clear routine approvals in one tap while leaving critical owner-only items (`submit`, `vercel.redeploy`, `python-repair`, `outreach.send`, `review.reply`, `set-key`, `remove-*`, `publish`) for individual review.
+Every action waiting for approval (yours, a routine's or an agent's), with Approve or Skip. Multi-field `set-key` requests group into one card (showing non-secret fields inline while masking secrets, and superseded requests prune automatically when you save a connection manually), outreach and review drafts are editable before you approve, and **Approve all non-critical** lets you clear routine approvals in one tap while leaving critical owner-only items (`submit`, `vercel.redeploy`, `python-repair`, `outreach.send`, `release.notify`, `review.reply`, `set-key`, `remove-*`, `publish`) for individual review.
 
 </details>
 

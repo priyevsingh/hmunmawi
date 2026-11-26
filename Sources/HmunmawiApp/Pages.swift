@@ -363,6 +363,8 @@ struct InboxPage: View {
                         case .single(let action):
                             if action.job.kind == "outreach.send" {
                                 OutreachWaitingRow(action: action, model: model)
+                            } else if action.job.kind == "release.notify" {
+                                ReleaseNotifyWaitingRow(action: action, model: model)
                             } else if action.job.kind == "review.reply" {
                                 ReviewReplyWaitingRow(action: action, model: model)
                             } else {
@@ -639,6 +641,134 @@ private struct OutreachWaitingRow: View {
                 mailCheck = await Outreach.mailCheck(domain: domain)
             }
         }
+    }
+}
+
+/// Editable outbound release notification batch in Log → Waiting with spam/wording lint, test send, and MailCheck DNS status.
+private struct ReleaseNotifyWaitingRow: View {
+    let action: WaitingAction
+    let model: AppModel
+    @State private var editing = false
+    @State private var subject = ""
+    @State private var bodyText = ""
+    @State private var mailCheck: Outreach.MailCheck?
+    @State private var sendingTest = false
+    @State private var testNote: String?
+
+    private var recipientCount: Int {
+        Int(safe: action.job.payload[path: "recipient_count"]?.number ?? 0)
+    }
+
+    private var selfTestAddress: String? {
+        let candidates = [
+            UserDefaults.standard.string(forKey: Outreach.ownKey) ?? "",
+            MailSender.smtpConfig.from,
+        ]
+        for candidate in candidates {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if SMTPConfig.isSingleEmail(trimmed) { return trimmed }
+        }
+        return nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title).font(.body.weight(.medium))
+                    Text("\(recipientCount) recipient\(recipientCount == 1 ? "" : "s") · via \(MailSender.modeDescription)")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if !editing {
+                        if !subject.isEmpty {
+                            Text(subject)
+                                .font(.callout.weight(.medium))
+                                .lineLimit(1)
+                        }
+                        if !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(bodyText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
+                    }
+                    if let mc = mailCheck, !mc.ok {
+                        Label("Mail DNS warning: \(mc.advice.first ?? "SPF/DKIM/DMARC incomplete")", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(Brand.caution)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
+                Button(sendingTest ? "Sending…" : "Send test") {
+                    Task { await sendTest() }
+                }
+                .buttonStyle(.pill)
+                .disabled(sendingTest || selfTestAddress == nil)
+                .help(selfTestAddress.map { "Send a test copy to \($0)" } ?? "Set your sending email in Outreach → Setup first")
+                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
+                Button("Send batch") {
+                    Task {
+                        if editing { await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText) }
+                        await model.approve(action.job)
+                    }
+                }.buttonStyle(.pillProminent)
+            }
+            if let testNote {
+                Text(testNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if editing {
+                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder)
+                TextEditor(text: $bodyText).font(.callout).frame(minHeight: 110, maxHeight: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                if let lintProblem = ReleaseNotifySpamLint.problem(bodyText, subject: subject, wording: Wording.rules) {
+                    Label(lintProblem, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(Brand.caution)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack {
+                    Spacer()
+                    Button("Save draft") {
+                        Task { await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText) }
+                    }.buttonStyle(.pill)
+                }
+            }
+        }
+        .onAppear {
+            subject = action.job.payload[path: "subject"]?.string ?? ""
+            bodyText = action.job.payload[path: "body"]?.string ?? ""
+        }
+        .task {
+            let own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? ""
+            let fallback = own.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? MailSender.smtpConfig.from : own
+            if let domain = ReplyMatch.domain(fallback), mailCheck == nil {
+                mailCheck = await Outreach.mailCheck(domain: domain)
+            }
+        }
+    }
+
+    private func sendTest() async {
+        guard let to = selfTestAddress else {
+            testNote = "Set your sending email in Outreach → Setup first."
+            return
+        }
+        let testSubject = subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? (action.job.payload[path: "subject"]?.string ?? "Release update test")
+            : subject
+        let testBody = bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? (action.job.payload[path: "body"]?.string ?? "")
+            : bodyText
+        sendingTest = true; defer { sendingTest = false }
+        let personalBody = ReleaseNotifyTemplate.personalizeBody(testBody, subscriberName: nil)
+        let res = await MailSender.send(
+            to: to,
+            subject: "[Test] \(testSubject)",
+            body: personalBody
+        )
+        testNote = "Test to \(to): \(res.note)"
     }
 }
 
