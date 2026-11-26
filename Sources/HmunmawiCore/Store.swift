@@ -287,6 +287,13 @@ public actor Store {
         }
     }
 
+    /// Replaces the payload of a job that is still waiting for owner approval (for example, editing an outreach draft).
+    public func updateWaitingPayload(_ jobID: Int64, payload: JSONValue) throws {
+        try db.execute("""
+            UPDATE jobs SET payload = ?, updated_at = ? WHERE id = ? AND state = 'waiting_approval'
+            """, [.text(try payload.canonicalText()), .integer(now()), .integer(jobID)])
+    }
+
     /// An approved request the app ran itself (an agent's request): straight from waiting to done or failed,
     /// with the result in the audit log, so it never sits under "waiting" after it ran.
     public func resolveApproved(_ jobID: Int64, ok: Bool, by person: String, detail: JSONValue) throws {

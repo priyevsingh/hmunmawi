@@ -1394,7 +1394,63 @@ final class AppModel {
             if !ok { errorText = "The agent's request ran but didn't work: \(message)" }
             return
         }
+        // Outbound outreach email approved by the owner: send via SMTP or Zoho Safari, then update outreach & offer code.
+        if job.kind == "outreach.send", case .object(let p) = job.payload {
+            let entryID = p["entry"]?.string ?? ""
+            let subject = p["subject"]?.string ?? ""
+            let body = p["body"]?.string ?? ""
+            let kind = p["kind"]?.string ?? "follow-up"
+            let inReplyTo = p["in_reply_to"]?.string
+            let offerCode = p["offer_code"]?.string
+            let suggestionID = p["suggestion_id"]?.string
+            let items = Outreach.items()
+            let item = items.first(where: { $0.id == entryID })
+            // Pin recipient strictly from stored outreach entry (never from reply bodies or payload tampering if entry exists).
+            let recipient = item.flatMap(Outreach.pinnedRecipient(for:)) ?? (p["to"]?.string ?? "")
+            guard let itemForCheck = item, Outreach.pinnedRecipient(for: itemForCheck) != nil else {
+                errorText = "Outreach entry or stored contact email is missing; nothing was sent."
+                return
+            }
+            let sendRes = await MailSender.send(to: recipient, subject: subject, body: body, inReplyTo: inReplyTo)
+            if !sendRes.ok {
+                errorText = sendRes.note
+                return
+            }
+            // Update outreach status/marks and mark any attached offer code as shared only after successful send.
+            if kind == "follow-up" {
+                _ = await Outreach.apply(itemForCheck, status: nil, followUp: nil, markFollowedUp: true)
+            }
+            Outreach.changeSide { side in
+                if kind == "thank" {
+                    side.extras[entryID, default: OutreachExtra()].thankedOn = Date.now.localDay
+                }
+                if ["answer", "check in"].contains(kind), var th = side.threads?[entryID] {
+                    th.checkedIn = true
+                    side.threads?[entryID] = th
+                }
+                if let sid = suggestionID, let idx = side.suggestions.firstIndex(where: { $0.id == sid }) {
+                    side.suggestions[idx].state = "done"
+                }
+            }
+            if let code = offerCode, !code.isEmpty {
+                _ = OfferCodes.shared.markShared(code: code, by: "outreach", campaign: itemForCheck.outlet)
+            }
+            try? await liveStore?.appendAudit(
+                actor: "you", action: "outreach.sent", subject: "\(itemForCheck.outlet) · \(kind)",
+                detail: .object(["via": .string(sendRes.via), "to": .string(recipient), "subject": .string(String(subject.prefix(200)))]))
+            await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
+                "ok": .bool(true), "via": .string(sendRes.via), "note": .string(sendRes.note)])) }
+            return
+        }
         await act { try await $0.approve(job.id, by: "you") }
+    }
+
+    /// Saves edits to a waiting `outreach.send` draft before sending.
+    func updateOutreachDraft(_ job: Job, subject: String, body: String) async {
+        guard job.kind == "outreach.send", case .object(var p) = job.payload else { return }
+        p["subject"] = .string(String(subject.prefix(300)))
+        p["body"] = .string(String(body.prefix(10_000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
     }
 
     /// Parks an agent's request in "Waiting for your OK". Secrets are never stored in the request.
@@ -1493,8 +1549,10 @@ final class AppModel {
             if let ms = r.sentMs { p["sent_ms"] = .number(Double(ms)) }
             if let m = r.messageID { p["message_id"] = .string(String(m.prefix(300))) }
             if let m = r.inReplyTo { p["in_reply_to"] = .string(String(m.prefix(300))) }
+            if let t = r.text, !t.isEmpty { p["text"] = .string(String(t.prefix(MailBodyText.maxCleanChars))) }
+            let dedupe = r.text?.isEmpty == false ? "mail-seen-text-\(r.id)" : "mail-seen-\(r.id)"
             let event = Event(source: "mail", kind: "mail.seen", app: nil, payload: .object(p), occurredAt: min(now, r.sentMs ?? now),
-                              dedupeKey: "mail-seen-\(r.id)")
+                              dedupeKey: dedupe)
             if let result = try? await liveStore.ingest(event, rules: await rules(for: event)), !result.duplicate { added += 1 }
         }
         return added

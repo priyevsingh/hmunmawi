@@ -59,6 +59,16 @@ public enum JobText {
             let reason = p["reason"]?.string ?? ""
             return reason.isEmpty ? s : "\(s) · \(reason)"
         }
+        if job.kind == "outreach.send", case .object(let p) = job.payload {
+            let outlet = p["outlet"]?.string ?? "outreach"
+            let subject = p["subject"]?.string ?? ""
+            return "Outreach email ready to send: \(outlet)" + (subject.isEmpty ? "" : " · \(subject)")
+        }
+        if job.kind == "review.reply", case .object(let p) = job.payload {
+            let app = p["app"]?.string ?? "App"
+            let stars = p["stars"]?.number.map { " (\(Int(safe: $0))★)" } ?? ""
+            return "Post review reply: \(app)\(stars)"
+        }
         let channel = channels[job.resource] ?? job.resource
         return job.kind == "notify" ? "Send an alert by \(channel)" : "Run “\(job.kind)” with \(channel)"
     }

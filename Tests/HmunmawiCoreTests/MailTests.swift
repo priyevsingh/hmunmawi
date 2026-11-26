@@ -384,3 +384,108 @@ final class ScriptedIMAP: IMAPTransport, @unchecked Sendable {
         #expect(s.read().isEmpty)
     }
 }
+
+final class ScriptedSMTP: SMTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var queue: [Data] = [Data("220 smtp.example.com ESMTP ready\r\n".utf8)]
+    var sent: [String] = []
+    var upgraded = false
+    let offerStartTLS: Bool
+    private var readingData = false
+
+    init(offerStartTLS: Bool = true) { self.offerStartTLS = offerStartTLS }
+
+    func send(_ data: Data) async throws {
+        let text = String(decoding: data, as: UTF8.self)
+        lock.withLock {
+            sent.append(text)
+            if readingData {
+                if text.hasSuffix("\r\n.\r\n") {
+                    readingData = false
+                    queue.append(Data("250 2.0.0 Ok: queued\r\n".utf8))
+                }
+                return
+            }
+            let cmd = text.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            if cmd.hasPrefix("EHLO") {
+                let tls = offerStartTLS ? "250-STARTTLS\r\n" : ""
+                queue.append(Data("250-smtp.example.com\r\n\(tls)250 AUTH PLAIN LOGIN\r\n".utf8))
+            } else if cmd == "STARTTLS" {
+                queue.append(Data("220 2.0.0 Ready to start TLS\r\n".utf8))
+            } else if cmd.hasPrefix("AUTH ") {
+                queue.append(Data("235 2.7.0 Authentication successful\r\n".utf8))
+            } else if cmd.hasPrefix("MAIL FROM:") || cmd.hasPrefix("RCPT TO:") {
+                queue.append(Data("250 2.1.0 Ok\r\n".utf8))
+            } else if cmd == "DATA" {
+                readingData = true
+                queue.append(Data("354 End data with <CR><LF>.<CR><LF>\r\n".utf8))
+            } else if cmd == "QUIT" {
+                queue.append(Data("221 2.0.0 Bye\r\n".utf8))
+            }
+        }
+    }
+
+    func receive() async throws -> Data {
+        lock.withLock { queue.isEmpty ? Data() : queue.removeFirst() }
+    }
+
+    func upgradeToTLS() async throws { lock.withLock { upgraded = true } }
+    func close() {}
+}
+
+@Suite struct MailBodyAndSMTPTests {
+    @Test func bodyCleanerStripsHTMLQuotesAndSignature() {
+        let raw = "<div>Hi there,<br>We'd love to feature your app.<br><br>Best,<br>Jane</div>\n-- \nSignature\n> Old quoted text\nOn Nov 1, Me wrote:\n> Hello"
+        let clean = MailBodyText.clean(raw)
+        #expect(clean.contains("Hi there,"))
+        #expect(clean.contains("We'd love to feature your app."))
+        #expect(!clean.contains("<div>") && !clean.contains("Signature") && !clean.contains("Old quoted text"))
+    }
+
+    @Test func imapSecondPassFetchesBodyOnlyForMatchedOutreach() async throws {
+        let cfg = IMAPConfig(host: "imap.example.com", username: "me@example.com", password: "app-password")
+        let hdrMatched = "From: Jane <jane@press.example>\r\nSubject: Re: Lift Crew\r\nDate: Thu, 5 Nov 2026 09:30:00 +0530\r\nMessage-ID: <m1@press.example>\r\n\r\n"
+        let hdrOther = "From: Bob <bob@other.example>\r\nSubject: Newsletter\r\nDate: Thu, 5 Nov 2026 09:31:00 +0530\r\nMessage-ID: <m2@other.example>\r\n\r\n"
+        let bodyText = "Can you send a promo code?\r\n> On Nov 1 wrote:"
+        let s = ScriptedIMAP([
+            ("LIST", "* LIST (\\HasNoChildren) \"/\" \"INBOX\"\r\n"),
+            ("EXAMINE", "* OK [UIDVALIDITY 10] ok\r\n"),
+            ("UID SEARCH", "* SEARCH 1 2\r\n"),
+            ("UID FETCH 1,2", "* 1 FETCH (UID 1 BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID IN-REPLY-TO)] {\(hdrMatched.utf8.count)}\r\n\(hdrMatched))\r\n* 2 FETCH (UID 2 BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID IN-REPLY-TO)] {\(hdrOther.utf8.count)}\r\n\(hdrOther))\r\n"),
+            ("UID FETCH 1 BODY.PEEK[TEXT]", "* 1 FETCH (UID 1 BODY[TEXT]<0> {\(bodyText.utf8.count)}\r\n\(bodyText))\r\n"),
+        ])
+        let rows = try await IMAPMail.fetch(cfg, transport: s, now: Date(timeIntervalSince1970: 1_793_900_000)) {
+            $0.from.contains("jane@press.example")
+        }
+        #expect(rows.count == 2)
+        #expect(rows[0].text == "Can you send a promo code?")
+        #expect(rows[1].text == nil)
+        #expect(s.sent.contains { $0.contains("UID FETCH 1 BODY.PEEK[TEXT]<0.32768>") })
+        #expect(!s.sent.contains { $0.contains("UID FETCH 2 BODY.PEEK[TEXT]") })
+    }
+
+    @Test func smtpRejectsPlaintextPort25AndInvalidAddresses() {
+        #expect(SMTPConfig(host: "smtp.example.com", port: 25, username: "a@example.com", password: "pw").problem?.contains("25") == true)
+        #expect(SMTPConfig(host: "smtp.example.com", port: 465, username: "a@example.com", password: "pw").problem == nil)
+        #expect(SMTPConfig(host: "smtp.example.com", port: 587, username: "a@example.com", password: "pw").problem == nil)
+        #expect(SMTPMessage(to: "a@b.com, evil@c.com", subject: "Hi", body: "Text").problem != nil)
+        #expect(SMTPMessage(to: "a@b.com", subject: "Hi\r\nBcc: x@y.com", body: "Text").problem != nil)
+    }
+
+    @Test func smtpStartTLSAndSMTPSend() async throws {
+        let t587 = ScriptedSMTP(offerStartTLS: true)
+        let cfg587 = SMTPConfig(host: "smtp.example.com", port: 587, username: "me@example.com", password: "pw")
+        let msg = SMTPMessage(to: "jane@press.example", subject: "Re: App", body: "Here is a note.\n.dot line", inReplyTo: "abc@press.example")
+        try await SMTPClient.send(msg, config: cfg587, transport: t587)
+        #expect(t587.upgraded)
+        let joined = t587.sent.joined()
+        #expect(joined.contains("STARTTLS") && joined.contains("AUTH PLAIN") && joined.contains("..dot line"))
+        #expect(joined.contains("In-Reply-To: <abc@press.example>"))
+
+        let t465 = ScriptedSMTP(offerStartTLS: false)
+        let cfg465 = SMTPConfig(host: "smtp.example.com", port: 465, username: "me@example.com", password: "pw")
+        try await SMTPClient.send(msg, config: cfg465, transport: t465)
+        #expect(!t465.upgraded)
+        #expect(t465.sent.joined().contains("RCPT TO:<jane@press.example>"))
+    }
+}

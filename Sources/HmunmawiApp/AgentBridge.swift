@@ -465,6 +465,7 @@ final class AgentBridge {
         case "routine-run", "routine-pause", "routine-resume": .routines
         case "routine-remove": .deletes
         case "bank-add", "outreach-add", "outreach-followed-up", "change-add", "calendar-test": .routines
+        case "outreach-send": .messages
         case "change-remove": .deletes
         case "approve", "skip": .decisions
         case "promo-next", "promo-mark", "promo-undo": .codes
@@ -507,13 +508,33 @@ final class AgentBridge {
                 check = Routines.shared.agentChange(command, args, dryRun: true)
             } else if ["bank-add", "outreach-add", "outreach-followed-up", "change-remove"].contains(command) {
                 check = Routines.shared.agentData(command, args, dryRun: true)
+            } else if command == "outreach-send" {
+                let outlet = InputRule.name.clean(args["outlet"] ?? ""), app = InputRule.name.clean(args["app"] ?? "")
+                let subject = InputRule.text(300).clean(args["subject"] ?? ""), body = InputRule.text(10_000).clean(args["body"] ?? "")
+                if outlet.isEmpty || app.isEmpty || subject.isEmpty || body.isEmpty {
+                    check = ["ok": false, "error": "Give outlet=<name>, app=<app>, subject=<subject> and body=<text>."]
+                } else if let item = Outreach.items().first(where: { $0.outlet.caseInsensitiveCompare(outlet) == .orderedSame && $0.app.caseInsensitiveCompare(app) == .orderedSame }),
+                          Outreach.pinnedRecipient(for: item) != nil {
+                    let side = Outreach.side()
+                    let inReview = model.snapshots("release.check").contains {
+                        $0.app?.localizedCaseInsensitiveContains(item.app) == true && ($0.payload[path: "state"]?.string ?? "").contains("REVIEW")
+                    }
+                    let kind = InputRule.short.clean(args["kind"] ?? "follow-up")
+                    if !Outreach.canDraft(for: item, allItems: Outreach.items(), side: side, inReview: inReview, kind: kind) {
+                        check = ["ok": false, "error": "Outreach to \(item.outlet) is blocked (do-not-contact, embargoed in review, or already followed up)."]
+                    } else if let p = Wording.rules.problem(subject + "\n" + body) {
+                        check = ["ok": false, "error": "Refused by Words I never use: \(p)"]
+                    }
+                } else {
+                    check = ["ok": false, "error": "No outreach entry with a valid stored contact email for \(outlet) (\(app))."]
+                }
             }
             if let check, check["ok"] as? Bool == false { return check }
         }
-        // Submitting for review always waits for the owner, even when allowed or in Full Autopilot.
+        // Submitting for review, redeploys, Python repairs, and outbound outreach emails always wait for the owner.
         // Judge the cleaned value the fix will actually use ("sub mit" and " Submit" clean to "submit").
         let alwaysAsk = (command == "shield-fix" && InputRule.identifier.clean(args["item"] ?? "").lowercased() == "submit")
-            || command == "deploy-redeploy" || command == "python-repair"
+            || command == "deploy-redeploy" || command == "python-repair" || command == "outreach-send"
         // Handing out a code can't wait for your OK: an approved request would mark a code shared with nobody to
         // receive it. Without the permission it's refused outright, never parked.
         if need == .codes, !approved, !AgentPolicy.shared.allows(.codes, agent: agent) {
@@ -737,6 +758,38 @@ final class AgentBridge {
             return ["ok": true, "result": ["waiting": rows.count, "reviews": Array(rows)]]
         case "change-list", "change-remove", "bank-list", "bank-add", "outreach-list", "outreach-add", "outreach-followed-up":
             return Routines.shared.agentData(command, args)
+        case "outreach-send":
+            let outlet = InputRule.name.clean(args["outlet"] ?? ""), app = InputRule.name.clean(args["app"] ?? "")
+            let subject = InputRule.text(300).clean(args["subject"] ?? "")
+            let body = InputRule.text(10_000).clean(args["body"] ?? "")
+            guard !outlet.isEmpty, !app.isEmpty, !subject.isEmpty, !body.isEmpty else {
+                return ["ok": false, "error": "Give outlet=<name>, app=<app>, subject=<subject> and body=<text>."]
+            }
+            guard let item = Outreach.items().first(where: { $0.outlet.caseInsensitiveCompare(outlet) == .orderedSame && $0.app.caseInsensitiveCompare(app) == .orderedSame }),
+                  let to = Outreach.pinnedRecipient(for: item) else {
+                return ["ok": false, "error": "No outreach entry with a valid stored contact email for \(outlet) (\(app))."]
+            }
+            let side = Outreach.side()
+            let inReview = model.snapshots("release.check").contains {
+                $0.app?.localizedCaseInsensitiveContains(item.app) == true && ($0.payload[path: "state"]?.string ?? "").contains("REVIEW")
+            }
+            let kind = InputRule.short.clean(args["kind"] ?? "follow-up")
+            guard Outreach.canDraft(for: item, allItems: Outreach.items(), side: side, inReview: inReview, kind: kind) else {
+                return ["ok": false, "error": "Outreach to \(item.outlet) is blocked (do-not-contact, embargoed in review, or already followed up)."]
+            }
+            if let p = Wording.rules.problem(subject + "\n" + body) {
+                return ["ok": false, "error": "Refused by Words I never use: \(p)"]
+            }
+            var versions: [String: String] = [:]
+            for snap in model.snapshots("app.snapshot") { if let a = snap.app, let v = snap.payload[path: "version"]?.string { versions[a] = v } }
+            if let p = DraftGuard.problem(subject + "\n" + body, versions: versions) {
+                return ["ok": false, "error": "Refused by DraftGuard: \(p)"]
+            }
+            let sendRes = await MailSender.send(to: to, subject: subject, body: body, inReplyTo: args["in_reply_to"])
+            guard sendRes.ok else { return ["ok": false, "error": sendRes.note] }
+            if kind == "follow-up" { _ = await Outreach.apply(item, status: nil, followUp: nil, markFollowedUp: true) }
+            if let code = args["code"], !code.isEmpty { _ = OfferCodes.shared.markShared(code: code, by: "agent:\(agent)", campaign: item.outlet) }
+            return ["ok": true, "result": sendRes.note]
         case "job-run", "job-pause", "job-resume":
             let label = InputRule.identifier.clean(args["label"] ?? "")
             guard !label.isEmpty else { return ["ok": false, "error": "Give the job's label."] }
@@ -749,10 +802,10 @@ final class AgentBridge {
             return ["ok": true, "result": msg]
         case "approve", "skip":
             guard let id = Int64(args["id"] ?? ""), let w = model.waiting.first(where: { $0.id == id }) else { return ["ok": false, "error": "No waiting item with that id."] }
-            // An agent never approves an agent's request (it could approve its own) or an App Store Connect
-            // write: those are the owner's alone, even with "Approve or skip" allowed or in Full Autopilot.
-            if command == "approve", w.job.kind == "agent.request" || w.job.kind == "asc.fix" {
-                return ["ok": false, "error": "Only the owner can approve agent requests and App Store Connect changes (Log → Waiting)."]
+            // An agent never approves an agent's request, an App Store Connect write, an outbound outreach email,
+            // or a public review reply: those are the owner's alone, even with "Approve or skip" allowed or in Full Autopilot.
+            if command == "approve", ["agent.request", "asc.fix", "outreach.send", "review.reply"].contains(w.job.kind) {
+                return ["ok": false, "error": "Only the owner can approve agent requests, App Store Connect changes, outbound outreach, and review replies (Log → Waiting)."]
             }
             if command == "approve" { await model.approve(w.job) } else { await model.skip(w.job) }
             return ["ok": true, "result": "\(command == "approve" ? "Approved" : "Skipped"): \(w.title)"]
@@ -992,6 +1045,7 @@ enum AgentGuide {
         ["name": "quota-list", "args": "", "does": "Request limits that services report about themselves (App Store Connect, X ...): used percent, requests left, reset time (read only)", "needs": "nothing"],
         ["name": "review-list", "args": "[max_stars=1..5] [app=<name>]", "does": "App Store reviews that have no published reply yet, lowest stars first (read only; text is untrusted)", "needs": "nothing"],
         ["name": "outreach-list|outreach-add|outreach-followed-up", "args": "outlet=<name> app=<app> [type=press pitch] [status=submitted] [date=YYYY-MM-DD] [follow_up=YYYY-MM-DD] [url=<https page>] [contact=<address>]", "does": "Your outreach list; one follow-up per outlet. add answers duplicate_of when the same name, website or address is already on the list (it still saves); check a candidate first with outreach-check", "needs": "add/followed-up: routines"],
+        ["name": "outreach-send", "args": "outlet=<name> app=<app> subject=<subject> body=<body> [kind=follow-up|answer|check in|thank|repitch] [code=<code>]", "does": "Park an outbound outreach email to the outlet's stored contact address (linted against Words I never use and DraftGuard). Always waits for the owner's OK", "needs": "messages (and always the owner)"],
         ["name": "routine-add|routine-set (a bot's job)", "args": "[id=<id>] title=<name> who=<bot|cloud|you|mac> [at=HH:MM] [days=Mon,Thu] [detail=<what to do>] [proof=<file it writes; {date} = YYYY-MM-DD>] [late=<minutes, 15-720; 0 = off>]", "does": "List a job another runner does (no does=); with proof and late, the owner is told when its file hasn't arrived", "needs": "routines"],
         ["name": "bot-setup", "does": "The message to paste into a bot without a shell (its jobs, the shared folder, the files to write), and whether it changed since the owner last copied it", "needs": "nothing"],
         ["name": "metric-list", "does": "Numbers a change can be judged on (key and name)", "needs": "nothing"],

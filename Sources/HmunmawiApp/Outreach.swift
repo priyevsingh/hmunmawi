@@ -67,9 +67,12 @@ enum Outreach {
     static let ownKey = "HMOwnEmail"
     /// Apple's provider token for campaign links (App Store Connect → Analytics → Campaign links).
     static let providerKey = "HMProviderToken"
+    /// Opt-in: also suggest repitches for patch releases (`x.y.z` with `z > 0`). Off by default.
+    static let allowPatchRepitchKey = "HMOutreachPatchRepitch"
 
     static var file: String? { UserDefaults.standard.string(forKey: fileKey).flatMap { $0.isEmpty ? nil : ($0 as NSString).expandingTildeInPath } }
     static var tool: String? { UserDefaults.standard.string(forKey: toolKey).flatMap { $0.isEmpty ? nil : $0 } }
+    static var allowPatchRepitch: Bool { UserDefaults.standard.bool(forKey: allowPatchRepitchKey) }
     static var own: [String] {
         let e = UserDefaults.standard.string(forKey: ownKey) ?? ""
         return e.isEmpty ? [] : [e.lowercased()] + (ReplyMatch.domain(e).map { [$0] } ?? [])
@@ -139,6 +142,24 @@ enum Outreach {
         var versions: [String: String] = [:]
         var threads: [String: Thread]? = nil       // where each conversation stands (set when you accept a suggestion)
         var feeds: [String: Feed]? = nil           // coverage watch: the outlet's episode or article feed
+        var autoApplied: [AutoApplied]? = nil      // sure bookkeeping applied automatically, with 1-click Undo
+        var draftedIDs: [String]? = nil            // draft keys already parked in Log → Waiting
+    }
+
+    struct AutoApplied: Codable, Hashable, Identifiable {
+        var id: String
+        var entry: String
+        var outlet: String
+        var app: String
+        var kind: String
+        var why: String
+        var day: String
+        var at: Double
+        var previousStatus: String
+        var previousFollowUp: String?
+        var previousFollowedUp: Bool?
+        var previousFollowedUpOn: String?
+        var undone: Bool? = nil
     }
 
     /// A conversation's state after their latest message you accepted.
@@ -168,9 +189,60 @@ enum Outreach {
         var s = side()
         edit(&s)
         s.suggestions = Array(s.suggestions.suffix(2000))
+        if let a = s.autoApplied { s.autoApplied = Array(a.suffix(100)) }
+        if let d = s.draftedIDs { s.draftedIDs = Array(d.suffix(500)) }
         let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? FileManager.default.createDirectory(at: sideURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? enc.encode(s).write(to: sideURL, options: .atomic)
+    }
+
+    // MARK: Sure bookkeeping & 1-click Undo
+
+    nonisolated static let autoBookkeepingKinds: Set<String> = [
+        "followed up", "auto-reply", "approved", "live", "rejected", "bounced", "launch", "no reply", "replied"
+    ]
+
+    nonisolated static func isAutoBookkeeping(_ s: OSuggestion) -> Bool {
+        s.sure && autoBookkeepingKinds.contains(s.kind)
+    }
+
+    /// Restores an auto-applied bookkeeping change in 1 click.
+    static func undoAutoApplied(_ rec: AutoApplied) async -> (ok: Bool, note: String) {
+        if file != nil {
+            guard let item = items().first(where: { $0.id == rec.entry }) else {
+                return (false, "That entry isn't in the list any more.")
+            }
+            let r = await apply(item, status: rec.previousStatus, followUp: rec.previousFollowUp, markFollowedUp: false)
+            if r.ok {
+                changeSide { side in
+                    if let idx = side.autoApplied?.firstIndex(where: { $0.id == rec.id }) {
+                        side.autoApplied?[idx].undone = true
+                    }
+                    if let sidx = side.suggestions.firstIndex(where: { $0.id == rec.id }) {
+                        side.suggestions[sidx].state = "dismissed"
+                    }
+                }
+            }
+            return r
+        }
+        var list = Outreachfile.read()
+        guard let i = list.firstIndex(where: { "\($0.outlet)|\($0.app)|\($0.type)" == rec.entry }) else {
+            return (false, "That entry isn't in the list any more.")
+        }
+        list[i].status = rec.previousStatus
+        list[i].follow_up = rec.previousFollowUp
+        list[i].followed_up = rec.previousFollowedUp
+        list[i].followed_up_on = rec.previousFollowedUpOn
+        Outreachfile.write(list)
+        changeSide { side in
+            if let idx = side.autoApplied?.firstIndex(where: { $0.id == rec.id }) {
+                side.autoApplied?[idx].undone = true
+            }
+            if let sidx = side.suggestions.firstIndex(where: { $0.id == rec.id }) {
+                side.suggestions[sidx].state = "dismissed"
+            }
+        }
+        return (true, "Undid \(rec.kind) for \(rec.outlet).")
     }
 
     // MARK: Mail (list level: sender, subject, folder, time)
@@ -260,8 +332,11 @@ enum Outreach {
             }
         }
         // A new version: tell the outlets that answered or covered you (once per version).
+        // Patch releases (x.y.z with z > 0) do not trigger mass repitches unless explicitly opted in.
+        let allowPatch = allowPatchRepitch
         for (app, version) in versions where !app.isEmpty {
             guard let before = side.versions[app], before != version else { continue }
+            if !allowPatch && isPatchUpdate(from: before, to: version) { continue }
             for i in items where (i.status == "replied" || side.extras[i.id]?.coverage?.isEmpty == false)
                 && i.app.localizedCaseInsensitiveContains(app) && side.extras[i.id]?.dnc != true {
                 out.append(OSuggestion(id: "\(i.id)|repitch|\(version)", entry: i.id, outlet: i.outlet, app: i.app, kind: "repitch",
@@ -269,6 +344,57 @@ enum Outreach {
             }
         }
         return out
+    }
+
+    /// True when `after` is a patch release (`x.y.z` with `z > 0`) on the same `x.y` minor line as `before`.
+    nonisolated static func isPatchUpdate(from before: String, to after: String) -> Bool {
+        func parts(_ v: String) -> [Int]? {
+            let clean = v.trimmingCharacters(in: .whitespacesAndNewlines)
+            let p = clean.split(separator: ".").compactMap { Int($0) }
+            return p.count == 3 ? p : nil
+        }
+        guard let b = parts(before), let a = parts(after) else {
+            // Also treat `1.5` -> `1.5.1` (adding a non-zero patch component to same major.minor) as a patch update.
+            let bp = before.split(separator: ".").compactMap { Int($0) }
+            let ap = after.split(separator: ".").compactMap { Int($0) }
+            if bp.count == 2, ap.count == 3, bp[0] == ap[0], bp[1] == ap[1], ap[2] > 0 { return true }
+            return false
+        }
+        return b[0] == a[0] && b[1] == a[1] && a[2] > 0 && a[2] != b[2]
+    }
+
+    /// Returns the newest reply text from `mail.seen` events that belongs to `item`'s thread.
+    nonisolated static func latestTheirReply(for item: OItem, in events: [StoredEvent]) -> String? {
+        let mList = mail(events)
+        var sentThreads: [String: String] = [:]
+        for m in mList where m.sent {
+            if let id = m.messageID, !id.isEmpty { sentThreads[id] = ReplyMatch.thread(m.subject) }
+        }
+        return mList
+            .filter { !$0.sent && ($0.text?.isEmpty == false) && !ThreadState.isRobot($0.from) && $0.day >= item.date && belongs($0, to: item, sentThreads: sentThreads) }
+            .sorted { ($0.at ?? 0, $0.day) < ($1.at ?? 0, $1.day) }
+            .last?.text
+    }
+
+    /// Strictly pins the recipient to the outreach entry's stored `contact` address (never extracted from reply bodies).
+    nonisolated static func pinnedRecipient(for item: OItem) -> String? {
+        guard let c = item.contact?.trimmingCharacters(in: .whitespacesAndNewlines),
+              SMTPConfig.isSingleEmail(c) else { return nil }
+        return c
+    }
+
+    /// Enforces `dnc != true`, `!(embargo && inReview)`, and 1-follow-up-per-outlet before drafting.
+    nonisolated static func canDraft(for item: OItem, allItems: [OItem], side: Side, inReview: Bool, kind: String) -> Bool {
+        let extra = side.extras[item.id]
+        if extra?.dnc == true { return false }
+        if extra?.embargo == true && inReview { return false }
+        if kind == "follow-up" {
+            if item.followedUpOn != nil { return false }
+            if allItems.contains(where: { $0.outlet.caseInsensitiveCompare(item.outlet) == .orderedSame && $0.followedUpOn != nil }) {
+                return false
+            }
+        }
+        return true
     }
 
     // MARK: Conversations (after the first reply)
@@ -395,6 +521,76 @@ enum Outreach {
 
     static func thankDraft(_ i: OItem, coverage: String) -> (subject: String, body: String) {
         ("Thank you for covering \(i.app)", "Hi,\n\nThank you for writing about \(i.app): \(coverage)\n\nIt means a lot to a solo developer. If you ever want to try something new from me, I'm happy to send a free code.\n\nThanks again")
+    }
+
+    static func checkInDraft(_ i: OItem, appLink: String?, codeLink: String?) -> (subject: String, body: String) {
+        let subject = i.subject.map { $0.lowercased().hasPrefix("re:") ? $0 : "Re: \($0)" } ?? "Checking in: \(i.app)"
+        var body = "Hi,\n\nJust a friendly check-in on \(i.app) in case you haven't had a chance to look yet."
+        if let codeLink { body += " Here's a free code if helpful: \(codeLink)" }
+        if let appLink { body += "\n\n\(appLink)" }
+        body += "\n\nNo rush at all — thanks for your time!\n\n\(optOut)"
+        return (subject, body)
+    }
+
+    static func repitchDraft(_ i: OItem, version: String, appLink: String?, codeLink: String?) -> (subject: String, body: String) {
+        let subject = "\(i.app) \(version) is out"
+        var body = "Hi,\n\nSince we spoke earlier about \(i.app), I just shipped version \(version)."
+        if let codeLink { body += " Happy to share a fresh code if you'd like to try it: \(codeLink)" }
+        if let appLink { body += "\n\n\(appLink)" }
+        body += "\n\nThanks as always,\n\n\(optOut)"
+        return (subject, body)
+    }
+
+    static func answerTemplateDraft(_ i: OItem, appLink: String?, codeLink: String?) -> (subject: String, body: String) {
+        let subject = i.subject.map { $0.lowercased().hasPrefix("re:") ? $0 : "Re: \($0)" } ?? "Re: \(i.app)"
+        var body = "Hi,\n\nThanks for getting back to me about \(i.app)!"
+        if let codeLink { body += " Here is a free code link: \(codeLink)" }
+        if let appLink { body += "\n\n\(appLink)" }
+        body += "\n\nLet me know if you need anything else."
+        return (subject, body)
+    }
+
+    /// Generates an outreach draft (AI if ready, else template fallback), linting against Wording.rules and DraftGuard.
+    static func buildAutoDraft(for item: OItem, kind: String, theirReply: String?, version: String?,
+                               appLink: String?, codeLink: String?, versions: [String: String],
+                               wording: WordingRules = Wording.rules) async -> (subject: String, body: String)? {
+        let fallback: (subject: String, body: String) = switch kind {
+        case "thank": thankDraft(item, coverage: item.url ?? "")
+        case "check in": checkInDraft(item, appLink: appLink, codeLink: codeLink)
+        case "repitch": repitchDraft(item, version: version ?? "update", appLink: appLink, codeLink: codeLink)
+        case "answer": answerTemplateDraft(item, appLink: appLink, codeLink: codeLink)
+        default: followUpDraft(item, appLink: appLink)
+        }
+        var subject = fallback.subject
+        var body = fallback.body
+        if await AISettings.shared.ready {
+            if kind == "answer", let reply = theirReply, !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let aiBody = try? await aiReply(item, theirMessage: reply, codeLink: codeLink) {
+                var full = aiBody
+                if let appLink, !full.contains(appLink) { full += "\n\n\(appLink)" }
+                body = full
+            } else if kind != "follow-up" {
+                let prompt = """
+                Write a short, friendly, plain email body (no subject line, under 120 words) from a solo indie developer to \(item.outlet) \
+                about the app \(item.app) (purpose: \(kind)\(version.map { ", version \($0)" } ?? "")). \
+                \(codeLink.map { "Include this free code link once: \($0)." } ?? "") \
+                \(appLink.map { "Include this App Store link once: \($0)." } ?? "") \
+                Never mention the developer's city, state, or country. Keep every number and app name exact. End with: \(optOut)
+                """
+                if let aiBody = try? await AIWriter.draft(prompt).trimmingCharacters(in: .whitespacesAndNewlines), !aiBody.isEmpty {
+                    body = aiBody
+                }
+            }
+        }
+        // Lint AI output against Wording.rules + DraftGuard; fall back to plain template if AI hit a rule.
+        if wording.problem(subject + "\n" + body) != nil || DraftGuard.problem(subject + "\n" + body, versions: versions) != nil {
+            subject = fallback.subject
+            body = fallback.body
+            if wording.problem(subject + "\n" + body) != nil || DraftGuard.problem(subject + "\n" + body, versions: versions) != nil {
+                return nil
+            }
+        }
+        return (subject, body)
     }
 
     /// An AI draft of your answer to their message (pasted by you); shown for you to edit, never sent.

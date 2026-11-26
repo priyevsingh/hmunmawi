@@ -21,8 +21,34 @@ struct OutreachSheet: View {
                 Spacer()
                 Button { openSheet?({ AnyView(OutreachSetup().buttonStyle(.pill)) }) } label: { Label("Setup", systemImage: "slider.horizontal.3") }
             }
-            Text("Replies, listing decisions, bounces and follow-ups found in your mail. Nothing changes until you tap, and nothing is ever sent for you.")
+            Text("Replies, listing decisions, bounces and follow-ups found in your mail. Clear bookkeeping updates automatically with 1-click Undo; uncertain matches and drafts wait for your OK.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            let recentAuto = (side.autoApplied ?? []).filter { $0.undone != true }.suffix(8).reversed()
+            if !recentAuto.isEmpty {
+                DisclosureGroup("Auto-updated recently (\(recentAuto.count))") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(recentAuto)) { rec in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("\(rec.outlet) · \(rec.kind)").font(.callout.weight(.medium))
+                                    Text(rec.why).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button("Undo") {
+                                    Task {
+                                        busy = rec.id
+                                        let r = await Outreach.undoAutoApplied(rec)
+                                        busy = nil
+                                        note = r.note
+                                        reload()
+                                    }
+                                }.buttonStyle(.pill).disabled(busy != nil)
+                            }
+                        }
+                    }.padding(.top, 4)
+                }
+                .font(.callout)
+            }
             let open = side.suggestions.filter { $0.state == "new" }
             if !open.isEmpty {
                 HStack {
@@ -197,6 +223,7 @@ struct OutreachDetail: View {
     @State private var theirMessage = ""
     @State private var withCode = true
     @State private var busy = false
+    @State private var confirmSend = false
     @State private var note: String?
 
     private var appID: String? {
@@ -294,10 +321,15 @@ struct OutreachDetail: View {
                 TextEditor(text: $draft).font(.body).frame(minHeight: 140, maxHeight: 220)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
                 HStack {
-                    Text("You send it yourself. Check every line first.").font(.callout).foregroundStyle(.secondary)
+                    Text("Never sent without your confirmation. Check every line first.").font(.callout).foregroundStyle(.secondary)
                     Spacer()
                     Button("Copy") { copy(draft) }.disabled(draft.isEmpty)
-                    Button("Open in Mail") { openMail() }.disabled(draft.isEmpty || item.contact?.contains("@") != true)
+                    Button("Open in Mail") { openMail() }.disabled(draft.isEmpty || Outreach.pinnedRecipient(for: item) == nil)
+                    if MailSender.isConfigured {
+                        Button("Send via \(MailSender.modeDescription)") { confirmSend = true }
+                            .buttonStyle(.pillProminent)
+                            .disabled(busy || draft.isEmpty || draftSubject.trimmingCharacters(in: .whitespaces).isEmpty || Outreach.pinnedRecipient(for: item) == nil)
+                    }
                 }
             }
             if let note { Text(note).font(.callout).foregroundStyle(.secondary) }
@@ -308,7 +340,25 @@ struct OutreachDetail: View {
         .onAppear {
             extra = Outreach.side().extras[item.id] ?? OutreachExtra()
             if let l = extra.launch, let n = DayNumber.of(l) { hasLaunch = true; launch = Date(timeIntervalSince1970: Double(n) * 86_400 + 43_200) }
+            if theirMessage.isEmpty, let latest = Outreach.latestTheirReply(for: item, in: model.events) {
+                theirMessage = latest
+            }
         }
+        .confirmationDialog("Send this email to \(Outreach.pinnedRecipient(for: item) ?? item.outlet)?", isPresented: $confirmSend) {
+            Button("Send email") { Task { await sendNow() } }
+        } message: {
+            Text("Sends via \(MailSender.modeDescription) to \(Outreach.pinnedRecipient(for: item) ?? "").")
+        }
+    }
+
+    private func sendNow() async {
+        guard let to = Outreach.pinnedRecipient(for: item) else { note = "No valid stored contact email."; return }
+        if let p = Wording.rules.problem(draftSubject + "\n" + draft) {
+            note = "Blocked by Words I never use: \(p)"; return
+        }
+        busy = true; defer { busy = false }
+        let r = await MailSender.send(to: to, subject: draftSubject, body: draft)
+        note = r.note
     }
 
     private func setDraft(_ d: (subject: String, body: String)) { draftSubject = d.subject; draft = d.body }
@@ -348,6 +398,14 @@ struct OutreachSetup: View {
     @AppStorage(Outreach.toolKey) private var tool = ""
     @AppStorage(Outreach.ownKey) private var own = ""
     @AppStorage(Outreach.providerKey) private var provider = ""
+    @AppStorage(Outreach.allowPatchRepitchKey) private var allowPatchRepitch = false
+    @AppStorage(MailSender.transportKey) private var sendTransport = MailSendTransport.auto.rawValue
+    @AppStorage(MailSender.smtpHostKey) private var smtpHost = ""
+    @AppStorage(MailSender.smtpPortKey) private var smtpPort = 465
+    @AppStorage(MailSender.smtpUserKey) private var smtpUser = ""
+    @AppStorage(MailSender.smtpFromKey) private var smtpFrom = ""
+    @State private var smtpPassword = ""
+    @State private var smtpNote: String?
     @State private var check: Outreach.MailCheck?
     @State private var checking = false
 
@@ -371,15 +429,62 @@ struct OutreachSetup: View {
                         Task { check = await Outreach.mailCheck(domain: d); checking = false }
                     }.disabled(checking || ReplyMatch.domain(own) == nil)
                 }
-                TextField("Outreach list kept by another tool (optional)", text: $file, prompt: Text("~/tools/outreach_log.json")).input(.path, $file)
-                TextField("Its command to change an entry", text: $tool, prompt: Text("/path/to/python /path/to/outreach_add.py")).input(.text(500), $tool)
-                Text("Empty: Hmunmawi keeps the list itself. With a file: Hmunmawi reads it and changes it only through that command, one tap at a time.")
-                    .font(.callout).foregroundStyle(.secondary)
-                TextField("Provider token for campaign links", text: $provider, prompt: Text("App Store Connect → Analytics → Campaign links")).input(.short, $provider)
+                Section("Outbound sending (on your OK in Log → Waiting)") {
+                    Picker("Send via", selection: $sendTransport) {
+                        ForEach(MailSendTransport.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    if sendTransport == MailSendTransport.auto.rawValue || sendTransport == MailSendTransport.smtp.rawValue {
+                        HStack {
+                            TextField("SMTP server", text: $smtpHost, prompt: Text("smtp.zoho.in or smtp.gmail.com")).input(.identifier, $smtpHost)
+                            if !UserDefaults.standard.string(forKey: MailWatch.hostKey).isNilOrEmpty {
+                                Button("Fill from IMAP") {
+                                    let imap = UserDefaults.standard.string(forKey: MailWatch.hostKey) ?? ""
+                                    smtpHost = imap.replacingOccurrences(of: "imappro.", with: "smtp.").replacingOccurrences(of: "imap.", with: "smtp.")
+                                    if smtpUser.isEmpty { smtpUser = UserDefaults.standard.string(forKey: MailWatch.userKey) ?? "" }
+                                    if smtpFrom.isEmpty { smtpFrom = own.isEmpty ? smtpUser : own }
+                                }
+                            }
+                        }
+                        Picker("SMTP port", selection: $smtpPort) {
+                            Text("465 (SMTPS)").tag(465)
+                            Text("587 (STARTTLS)").tag(587)
+                        }.pickerStyle(.segmented)
+                        TextField("SMTP username", text: $smtpUser, prompt: Text("you@yourdomain.com")).input(.text(254), $smtpUser)
+                        TextField("From address (optional)", text: $smtpFrom, prompt: Text("Same as sending address")).input(.text(254), $smtpFrom)
+                        HStack {
+                            SecureField("SMTP app password", text: $smtpPassword).input(.secret, $smtpPassword)
+                            Button("Save password") {
+                                do { try MailSender.setSMTPPassword(smtpPassword); smtpNote = "SMTP password saved in Keychain." }
+                                catch { smtpNote = "Couldn't save password: \(error.localizedDescription)" }
+                            }
+                        }
+                        if let p = MailSender.smtpConfig.problem, !smtpHost.isEmpty {
+                            Text(p).font(.callout).foregroundStyle(Brand.caution)
+                        }
+                        if let smtpNote { Text(smtpNote).font(.callout).foregroundStyle(.secondary) }
+                    }
+                }
+                Section("List & rules") {
+                    Toggle("Repitch contacts on patch releases (x.y.z)", isOn: $allowPatchRepitch)
+                    TextField("Outreach list kept by another tool (optional)", text: $file, prompt: Text("~/tools/outreach_log.json")).input(.path, $file)
+                    TextField("Its command to change an entry", text: $tool, prompt: Text("/path/to/python /path/to/outreach_add.py")).input(.text(500), $tool)
+                    Text("Empty: Hmunmawi keeps the list itself. With a file: Hmunmawi reads it and changes it only through that command, one tap at a time.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    TextField("Provider token for campaign links", text: $provider, prompt: Text("App Store Connect → Analytics → Campaign links")).input(.short, $provider)
+                }
             }
             .formStyle(.grouped)
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(.pillProminent) }
         }
-        .padding(22).frame(width: 600)
+        .padding(22).frame(width: 640)
+        .onAppear {
+            MailWatch.syncOwnEmailIfEmpty()
+            own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? own
+            smtpPassword = MailSender.smtpPassword()
+        }
     }
+}
+
+private extension Optional where Wrapped == String {
+    var isNilOrEmpty: Bool { self?.isEmpty ?? true }
 }

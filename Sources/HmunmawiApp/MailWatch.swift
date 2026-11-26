@@ -37,9 +37,21 @@ enum MailWatch {
                           username: d.string(forKey: userKey) ?? "", password: password())
     }
 
+    /// Auto-fills `HMOwnEmail` from the configured mail username if empty so users don't enter it twice.
+    static func syncOwnEmailIfEmpty() {
+        let d = UserDefaults.standard
+        let own = (d.string(forKey: Outreach.ownKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard own.isEmpty else { return }
+        let user = (d.string(forKey: userKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if SMTPConfig.isSingleEmail(user) {
+            d.set(user, forKey: Outreach.ownKey)
+        }
+    }
+
     /// Reads the chosen source (at most every 10 minutes unless `force`) and hands new rows to the store. Returns a
     /// plain-words note for the log. Never throws: a failing mailbox must not stop the routine around it.
     static func refresh(model: AppModel, force: Bool = false) async -> String {
+        syncOwnEmailIfEmpty()
         let source = kind
         guard source != .off else { return "" }
         let last = UserDefaults.standard.double(forKey: lastKey)
@@ -52,15 +64,20 @@ enum MailWatch {
             if let note = Permissions.shared.deferIfNeeded([.safari]) { return note }
         default: break
         }
+        let matchers = outreachMatchers()
         switch source {
         case .imap:
             let config = imapConfig
-            do { result = .success(try await IMAPMail.fetch(config, transport: IMAPTLSTransport(host: config.host.trimmingCharacters(in: .whitespaces), port: config.port))) }
+            do {
+                result = .success(try await IMAPMail.fetch(config, transport: IMAPTLSTransport(host: config.host.trimmingCharacters(in: .whitespaces), port: config.port),
+                                                           matchOutreach: { Self.matchesOutreach(from: $0.from, subject: $0.subject, matchers: matchers) }))
+            }
             catch { result = .failure(error) }
         case .appleMail:
             result = await AppleMailReader.read()
         case .zohoSafari:
-            result = await ZohoSafariReader.read(host: UserDefaults.standard.string(forKey: zohoHostKey) ?? "mail.zoho.com")
+            result = await ZohoSafariReader.read(host: UserDefaults.standard.string(forKey: zohoHostKey) ?? "mail.zoho.com",
+                                                 matching: { Self.matchesOutreach(from: $0.from, subject: $0.subject, matchers: matchers) })
         case .off: return ""
         }
         UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: lastKey)
@@ -74,6 +91,38 @@ enum MailWatch {
         }
         UserDefaults.standard.set(message, forKey: noteKey)
         return message
+    }
+
+    struct OutreachMatchers: Sendable {
+        let emails: Set<String>
+        let domains: Set<String>
+        let subjects: Set<String>
+    }
+
+    static func outreachMatchers() -> OutreachMatchers {
+        var emails = Set<String>()
+        var domains = Set<String>()
+        var subjects = Set<String>()
+        for item in Outreach.items() {
+            if let c = item.contact?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines), !c.isEmpty {
+                if c.contains("@") { emails.insert(c) }
+                if let d = ReplyMatch.domain(c), !ReplyMatch.sharedDomains.contains(d) { domains.insert(d) }
+            }
+            if let s = item.subject, !s.isEmpty {
+                let t = ReplyMatch.thread(s)
+                if t.count >= 4 { subjects.insert(t) }
+            }
+        }
+        return OutreachMatchers(emails: emails, domains: domains, subjects: subjects)
+    }
+
+    nonisolated static func matchesOutreach(from: String, subject: String, matchers: OutreachMatchers) -> Bool {
+        let addr = ReplyMatch.address(from)
+        if !addr.isEmpty, matchers.emails.contains(addr) { return true }
+        if let d = ReplyMatch.domain(from), !ReplyMatch.sharedDomains.contains(d), matchers.domains.contains(d) { return true }
+        let t = ReplyMatch.thread(subject)
+        if !t.isEmpty, matchers.subjects.contains(t) { return true }
+        return false
     }
 }
 
@@ -134,10 +183,15 @@ enum AppleMailReader {
 enum ZohoSafariReader {
     static let hosts = ["mail.zoho.com", "mail.zoho.in", "mail.zoho.eu", "mail.zoho.com.au", "mail.zoho.jp"]
 
-    static func read(host: String) async -> Result<[MailRow], Error> {
+    /// Validates Zoho message/thread IDs (`/^t?\d{6,25}$/`) before passing them to `md.do`.
+    nonisolated static func isValidMessageID(_ raw: String) -> Bool {
+        raw.wholeMatch(of: /^t?\d{6,25}$/) != nil
+    }
+
+    static func read(host: String, matching: @escaping @Sendable (MailRow) -> Bool = { _ in false }) async -> Result<[MailRow], Error> {
         guard hosts.contains(host) else { return .failure(WireError("mail", "Pick the Zoho address you sign in at.")) }
         return await Task.detached(priority: .utility) { () -> Result<[MailRow], Error> in
-            let js = "(function(){var rows=document.querySelectorAll('.zmList');if(!rows.length)return '';return JSON.stringify(Array.prototype.slice.call(rows,0,60).map(function(r){function q(s){var e=r.querySelector(s);return e?((e.getAttribute('title')||e.innerText||'').trim()):'';}return {id:r.id,from:q('.zmLSenderName'),subject:q('.zmLSub'),folder:q('.zmLFolder')};}));})()"
+            let js = "(function(){var rows=document.querySelectorAll('.zmList');if(!rows.length)return '';return JSON.stringify(Array.prototype.slice.call(rows,0,60).map(function(r){function q(s){var e=r.querySelector(s);return e?((e.getAttribute('title')||e.innerText||'').trim()):'';}return {id:r.id,msgid:(r.getAttribute('data-msgid')||r.id||''),from:q('.zmLSenderName'),subject:q('.zmLSub'),folder:q('.zmLFolder')};}));})()"
             // Its own tagged tab through SafariAuto: the shared Safari lock, found by tag, closed on every path.
             let session = SafariAuto.Session(job: "zoho_mail")
             func fail(_ e: Error) -> Result<[MailRow], Error> {
@@ -151,29 +205,69 @@ enum ZohoSafariReader {
             }
             do { try await session.enter(timeout: 240) } catch { return fail(error) }
             var found = ""
+            var rawList: [[String: Any]] = []
+            var bodiesByID: [String: String] = [:]
             do {
                 let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "mail.zoho", seconds: 30)
                 for _ in 0..<20 {
                     try? await Task.sleep(for: .seconds(1.5))
                     if let r = try? await tab.js(js), !r.isEmpty, r != "[]", r != "missing value" { found = r; break }
                 }
+                if !found.isEmpty, let data = found.data(using: .utf8),
+                   let list = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] {
+                    rawList = list
+                    // Read-only md.do body fetch ONLY for INBOX rows matching outreach contacts/domains/threads,
+                    // keeping unread status untouched and validating message ids strictly.
+                    var fetched = 0
+                    for m in list where fetched < 15 {
+                        guard let rawID = m["id"] as? String, !rawID.isEmpty else { continue }
+                        let folder = (m["folder"] as? String ?? "").lowercased().contains("sent") ? "SENT" : "INBOX"
+                        guard folder == "INBOX" else { continue }
+                        let row = MailRow(id: "zoho-\(rawID.prefix(80))",
+                                          from: String((m["from"] as? String ?? "").prefix(200)),
+                                          subject: String((m["subject"] as? String ?? "").prefix(300)),
+                                          folder: folder, sentMs: nil,
+                                          messageID: "zoho-\(rawID.prefix(80))", inReplyTo: nil)
+                        guard matching(row) else { continue }
+                        let msgID = ((m["msgid"] as? String) ?? rawID).trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard Self.isValidMessageID(msgID) else { continue }
+                        fetched += 1
+                        let readJS = """
+                        (function(){var x=new XMLHttpRequest();x.open('GET','/zm/md.do?msgId=\(msgID)&isMsgRead=false&mode=view',false);x.send(null);if(x.status!==200)return '';return (x.responseText||'').slice(0,32768);})()
+                        """
+                        if let rawBody = try? await tab.js(readJS), !rawBody.isEmpty, rawBody != "missing value" {
+                            let extracted = Self.extractZohoBody(rawBody)
+                            let clean = MailBodyText.clean(extracted)
+                            if !clean.isEmpty { bodiesByID[rawID] = clean }
+                        }
+                    }
+                }
             } catch {
                 await session.exit()
                 return fail(error)
             }
             await session.exit()
-            guard !found.isEmpty, let data = found.data(using: .utf8),
-                  let list = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else {
+            guard !found.isEmpty, !rawList.isEmpty else {
                 return .failure(WireError("mail", "Zoho's list didn't load. Are you signed in to \(host) in Safari? (If you are, Zoho may have changed its page.)"))
             }
-            let rows: [MailRow] = list.compactMap { m in
+            let rows: [MailRow] = rawList.compactMap { m in
                 guard let id = m["id"] as? String, !id.isEmpty else { return nil }
                 let folder = (m["folder"] as? String ?? "").lowercased().contains("sent") ? "SENT" : "INBOX"
                 return MailRow(id: "zoho-\(id.prefix(80))", from: String((m["from"] as? String ?? "").prefix(200)),
                                subject: String((m["subject"] as? String ?? "").prefix(300)), folder: folder, sentMs: nil,
-                               messageID: "zoho-\(id.prefix(80))", inReplyTo: nil)
+                               messageID: "zoho-\(id.prefix(80))", inReplyTo: nil, text: bodiesByID[id])
             }
             return .success(rows)
         }.value
+    }
+
+    /// Extracts message text from Zoho `md.do` JSON or HTML responses.
+    nonisolated static func extractZohoBody(_ raw: String) -> String {
+        if let d = raw.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+            if let c = obj["CONTENT"] as? String { return c }
+            if let body = (obj["DATA"] as? [String: Any])?["CONTENT"] as? String { return body }
+        }
+        return raw
     }
 }

@@ -347,10 +347,14 @@ struct InboxPage: View {
                 KitCard {
                     CardHeader(symbol: "hand.raised.fill", title: "Needs your OK", tint: Brand.caution, caption: "\(model.waiting.count)")
                     ForEach(model.waiting) { action in
-                        HStack(alignment: .top) {
-                            LogRow(title: action.title, detail: action.detail)
-                            Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
-                            Button("Approve") { Task { await model.approve(action.job) } }.buttonStyle(.pillProminent)
+                        if action.job.kind == "outreach.send" {
+                            OutreachWaitingRow(action: action, model: model)
+                        } else {
+                            HStack(alignment: .top) {
+                                LogRow(title: action.title, detail: action.detail)
+                                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
+                                Button("Approve") { Task { await model.approve(action.job) } }.buttonStyle(.pillProminent)
+                            }
                         }
                     }
                 }
@@ -560,6 +564,63 @@ struct EqualRowsGrid: Layout {
                                   proposal: .init(width: row.cell, height: row.height))
             }
             y += row.height + spacing
+        }
+    }
+}
+
+/// Editable outbound outreach draft in Log → Waiting with pinned recipient and MailCheck DNS status.
+private struct OutreachWaitingRow: View {
+    let action: WaitingAction
+    let model: AppModel
+    @State private var editing = false
+    @State private var subject = ""
+    @State private var bodyText = ""
+    @State private var mailCheck: Outreach.MailCheck?
+
+    private var toAddress: String { action.job.payload[path: "to"]?.string ?? "" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title).font(.body.weight(.medium))
+                    Text("To: \(toAddress) · via \(MailSender.modeDescription)")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if let mc = mailCheck, !mc.ok {
+                        Label("Mail DNS warning: \(mc.advice.first ?? "SPF/DKIM/DMARC incomplete")", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(Brand.caution)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
+                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
+                Button("Send") {
+                    Task {
+                        if editing { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) }
+                        await model.approve(action.job)
+                    }
+                }.buttonStyle(.pillProminent)
+            }
+            if editing {
+                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder)
+                TextEditor(text: $bodyText).font(.callout).frame(minHeight: 110, maxHeight: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                HStack {
+                    Spacer()
+                    Button("Save draft") { Task { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) } }.buttonStyle(.pill)
+                }
+            }
+        }
+        .onAppear {
+            subject = action.job.payload[path: "subject"]?.string ?? ""
+            bodyText = action.job.payload[path: "body"]?.string ?? ""
+        }
+        .task {
+            let own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? ""
+            if let domain = ReplyMatch.domain(own), mailCheck == nil {
+                mailCheck = await Outreach.mailCheck(domain: domain)
+            }
         }
     }
 }

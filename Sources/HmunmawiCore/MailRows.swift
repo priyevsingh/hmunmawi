@@ -1,6 +1,6 @@
 import Foundation
 
-/// One message as a mail source lists it (headers only, no body): what the outreach reply watch needs.
+/// One message as a mail source lists it (headers, plus optional body text for matched outreach threads).
 public struct MailRow: Sendable, Equatable {
     public var id: String
     public var from: String
@@ -9,9 +9,121 @@ public struct MailRow: Sendable, Equatable {
     public var sentMs: Int64?
     public var messageID: String?
     public var inReplyTo: String?
-    public init(id: String, from: String, subject: String, folder: String, sentMs: Int64?, messageID: String?, inReplyTo: String?) {
+    public var text: String?
+    public init(id: String, from: String, subject: String, folder: String, sentMs: Int64?, messageID: String?, inReplyTo: String?, text: String? = nil) {
         self.id = id; self.from = from; self.subject = subject; self.folder = folder
-        self.sentMs = sentMs; self.messageID = messageID; self.inReplyTo = inReplyTo
+        self.sentMs = sentMs; self.messageID = messageID; self.inReplyTo = inReplyTo; self.text = text
+    }
+}
+
+/// Cleans raw email bodies (MIME parts, quoted-printable, HTML, quoted reply history) into short plain text.
+public enum MailBodyText {
+    public static let maxRawBytes = 32_768
+    public static let maxCleanChars = 8_000
+
+    public static func clean(_ raw: String) -> String {
+        let capped = String(raw.prefix(maxRawBytes))
+        var body = extractBestPart(capped)
+        body = decodeQuotedPrintableIfNeeded(body)
+        if body.contains("<") && body.contains(">") {
+            body = stripHTML(body)
+        }
+        body = stripQuotedHistory(body)
+        let lines = body.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        var collapsed: [String] = []
+        var blankRun = 0
+        for line in lines {
+            if line.isEmpty {
+                blankRun += 1
+                if blankRun <= 1 && !collapsed.isEmpty { collapsed.append("") }
+            } else {
+                blankRun = 0
+                collapsed.append(line)
+            }
+        }
+        while collapsed.last == "" { collapsed.removeLast() }
+        return String(collapsed.joined(separator: "\n").prefix(maxCleanChars))
+    }
+
+    private static func extractBestPart(_ raw: String) -> String {
+        let normalized = raw.replacingOccurrences(of: "\r\n", with: "\n")
+        // Look for MIME boundary headers like Content-Type: text/plain or --boundary
+        let lower = normalized.lowercased()
+        if let plainRange = lower.range(of: "content-type: text/plain") {
+            let afterHeader = normalized[plainRange.upperBound...]
+            if let blank = afterHeader.range(of: "\n\n") {
+                let start = afterHeader[blank.upperBound...]
+                // Stop at next MIME boundary if one appears
+                let bodyLines = start.split(separator: "\n", omittingEmptySubsequences: false)
+                var out: [Substring] = []
+                for line in bodyLines {
+                    if line.hasPrefix("--") && line.count >= 10 && !line.hasPrefix("-- ") { break }
+                    out.append(line)
+                }
+                let text = out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { return text }
+            }
+        }
+        if let htmlRange = lower.range(of: "content-type: text/html") {
+            let afterHeader = normalized[htmlRange.upperBound...]
+            if let blank = afterHeader.range(of: "\n\n") {
+                let start = afterHeader[blank.upperBound...]
+                let bodyLines = start.split(separator: "\n", omittingEmptySubsequences: false)
+                var out: [Substring] = []
+                for line in bodyLines {
+                    if line.hasPrefix("--") && line.count >= 10 && !line.hasPrefix("-- ") { break }
+                    out.append(line)
+                }
+                let text = out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { return text }
+            }
+        }
+        return normalized
+    }
+
+    private static func decodeQuotedPrintableIfNeeded(_ s: String) -> String {
+        guard s.contains("=\n") || s.contains("=3D") || s.contains("=20") else { return s }
+        let joined = s.replacingOccurrences(of: "=\n", with: "")
+        var bytes: [UInt8] = []
+        let utf8 = Array(joined.utf8)
+        var i = 0
+        while i < utf8.count {
+            if utf8[i] == UInt8(ascii: "="), i + 2 < utf8.count,
+               let b = UInt8(String(decoding: utf8[(i + 1)...(i + 2)], as: UTF8.self), radix: 16) {
+                bytes.append(b)
+                i += 3
+            } else {
+                bytes.append(utf8[i])
+                i += 1
+            }
+        }
+        return String(data: Data(bytes), encoding: .utf8) ?? joined
+    }
+
+    private static func stripHTML(_ html: String) -> String {
+        var s = html
+        s = s.replacingOccurrences(of: #"(?is)<(script|style)[^>]*>.*?</\1>"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"(?i)<br\s*/?>"#, with: "\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"(?i)</(p|div|li|tr|h[1-6])>"#, with: "\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+        let entities = ["&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&apos;": "'"]
+        for (k, v) in entities { s = s.replacingOccurrences(of: k, with: v) }
+        return s
+    }
+
+    private static func stripQuotedHistory(_ s: String) -> String {
+        var out: [String] = []
+        for raw in s.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = String(raw)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix(">") { continue }
+            if trimmed.range(of: #"^(On .{5,200} wrote:|From:\s|-----Original Message-----)"#, options: .regularExpression) != nil { break }
+            if trimmed == "--" || trimmed.hasPrefix("-- ") { break }
+            out.append(line)
+        }
+        return out.joined(separator: "\n")
     }
 }
 

@@ -1375,7 +1375,140 @@ final class Routines {
             side.feeds = feeds
             for (a, v) in versions { side.versions[a] = v }   // the first run only remembers today's versions
         }
-        guard !fresh.isEmpty else { return (true, mail.isEmpty ? "No mail list yet (it comes from your mail watch)." : "Nothing new in \(mail.count) messages.") }
+
+        // 1. Auto-apply sure == true bookkeeping and record each change in the signed audit log with 1-click Undo.
+        var autoAppliedCount = 0
+        var autoRecords: [Outreach.AutoApplied] = []
+        var autoDoneIDs: Set<String> = []
+        var autoThreads: [(entry: String, thread: Outreach.Thread)] = []
+        let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for s in fresh {
+            if s.kind == "thread", s.sure, let st = s.thread {
+                let mailID = String(s.id.split(separator: "|").last ?? "")
+                autoThreads.append((s.entry, Outreach.Thread(state: st, promise: s.promise, since: s.day, mail: mailID, evidence: s.why)))
+                autoDoneIDs.insert(s.id)
+                if let stStatus = s.status, let item = byID[s.entry], item.status != stStatus {
+                    let res = await Outreach.apply(item, status: stStatus, followUp: nil, markFollowedUp: false)
+                    if res.ok {
+                        autoAppliedCount += 1
+                        autoRecords.append(Outreach.AutoApplied(
+                            id: s.id, entry: item.id, outlet: item.outlet, app: item.app, kind: "replied",
+                            why: s.why, day: today, at: Date.now.timeIntervalSince1970,
+                            previousStatus: item.status, previousFollowUp: item.followUp,
+                            previousFollowedUp: item.followedUpOn != nil, previousFollowedUpOn: item.followedUpOn))
+                    }
+                }
+                continue
+            }
+            guard Outreach.isAutoBookkeeping(s), let item = byID[s.entry] else { continue }
+            guard s.status != nil || s.followUp != nil || s.markFollowedUp == true else { continue }
+            let res = await Outreach.apply(item, status: s.status, followUp: s.followUp, markFollowedUp: s.markFollowedUp == true)
+            guard res.ok else { continue }
+            autoDoneIDs.insert(s.id)
+            autoAppliedCount += 1
+            let rec = Outreach.AutoApplied(
+                id: s.id, entry: item.id, outlet: item.outlet, app: item.app, kind: s.kind,
+                why: s.why, day: today, at: Date.now.timeIntervalSince1970,
+                previousStatus: item.status, previousFollowUp: item.followUp,
+                previousFollowedUp: item.followedUpOn != nil, previousFollowedUpOn: item.followedUpOn)
+            autoRecords.append(rec)
+            try? await store.appendAudit(
+                actor: "routine:outreach", action: "outreach.auto_apply", subject: "\(item.outlet) · \(s.kind)",
+                detail: .object(["entry": .string(item.id), "kind": .string(s.kind), "why": .string(s.why)]))
+        }
+        if !autoDoneIDs.isEmpty || !autoRecords.isEmpty || !autoThreads.isEmpty {
+            Outreach.changeSide { side in
+                for i in side.suggestions.indices where autoDoneIDs.contains(side.suggestions[i].id) {
+                    side.suggestions[i].state = "done"
+                }
+                for (entry, th) in autoThreads {
+                    side.threads = (side.threads ?? [:]).merging([entry: th]) { _, b in b }
+                }
+                if !autoRecords.isEmpty {
+                    side.autoApplied = (side.autoApplied ?? []) + autoRecords
+                }
+            }
+        }
+
+        // 2. Automatically pre-draft outbound emails for actionable items and due follow-ups -> park in Log → Waiting.
+        let latestSide = Outreach.side()
+        let latestItems = Outreach.items()
+        let latestByID = Dictionary(latestItems.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var draftedKeys = Set(latestSide.draftedIDs ?? [])
+        var newDraftKeys: [String] = []
+        var parkedDraftLines: [String] = []
+
+        struct DraftCandidate {
+            let key: String
+            let item: OItem
+            let kind: String
+            let suggestionID: String?
+            let version: String?
+            let coverageURL: String?
+        }
+        var candidates: [DraftCandidate] = []
+        for s in fresh where ["answer", "check in", "thank", "repitch"].contains(s.kind) || (s.kind == "thread" && s.thread == "your turn") {
+            guard let item = latestByID[s.entry] else { continue }
+            let dKind = s.kind == "thread" ? "answer" : s.kind
+            let ver = s.kind == "repitch" ? versions.first(where: { item.app.localizedCaseInsensitiveContains($0.key) })?.value : nil
+            let cov = s.kind == "thank" ? latestSide.extras[item.id]?.coverage?.last?.url : nil
+            candidates.append(DraftCandidate(key: "sug|\(s.id)", item: item, kind: dKind, suggestionID: s.id, version: ver, coverageURL: cov))
+        }
+        for item in latestItems where item.isEmail && item.open && item.followedUpOn == nil {
+            guard let fu = item.followUp, let fuDay = DayNumber.of(fu), let todayNum = DayNumber.of(today), fuDay <= todayNum else { continue }
+            candidates.append(DraftCandidate(key: "fu|\(item.id)|\(fu)", item: item, kind: "follow-up", suggestionID: nil, version: nil, coverageURL: nil))
+        }
+
+        for cand in candidates where !draftedKeys.contains(cand.key) {
+            let item = cand.item
+            guard let to = Outreach.pinnedRecipient(for: item) else { continue }
+            let inReview = model.snapshots("release.check").contains {
+                $0.app?.localizedCaseInsensitiveContains(item.app) == true && ($0.payload[path: "state"]?.string ?? "").contains("REVIEW")
+            }
+            guard Outreach.canDraft(for: item, allItems: latestItems, side: latestSide, inReview: inReview, kind: cand.kind) else { continue }
+            let appFirst = item.app.split(separator: "+").first.map(String.init) ?? item.app
+            let appID = OfferCodes.shared.appIDs.first { QuickName.of($0, model: model).caseInsensitiveCompare(appFirst) == .orderedSame }
+            let appLink = appID.map { Outreach.campaignLink(appID: $0, outlet: item.outlet, app: item.app) }
+            let wantsCode = ["answer", "check in", "repitch", "follow-up"].contains(cand.kind)
+            let code = wantsCode ? appID.flatMap { OfferCodes.shared.codes(app: $0).first { $0.sharedAt == nil } } : nil
+            let theirReply = cand.kind == "answer" ? Outreach.latestTheirReply(for: item, in: events) : nil
+            var itemForDraft = item
+            if let cov = cand.coverageURL { itemForDraft.url = cov }
+            guard let built = await Outreach.buildAutoDraft(
+                for: itemForDraft, kind: cand.kind, theirReply: theirReply, version: cand.version,
+                appLink: appLink, codeLink: code?.url, versions: versions
+            ) else { continue }
+            var payloadFields: [String: JSONValue] = [
+                "entry": .string(item.id),
+                "outlet": .string(item.outlet),
+                "app": .string(item.app),
+                "kind": .string(cand.kind),
+                "to": .string(to),
+                "subject": .string(built.subject),
+                "body": .string(built.body),
+            ]
+            if let sid = cand.suggestionID { payloadFields["suggestion_id"] = .string(sid) }
+            if let code { payloadFields["offer_code"] = .string(code.code) }
+            if let appID { payloadFields["app_id"] = .string(appID) }
+            if (try? await store.enqueue(kind: "outreach.send", resource: "mail", priority: 3, maxAttempts: 1,
+                                         payload: .object(payloadFields), needsApproval: true)) != nil {
+                draftedKeys.insert(cand.key)
+                newDraftKeys.append(cand.key)
+                parkedDraftLines.append("\(item.outlet) (\(item.app)): \(cand.kind) email ready to send")
+            }
+        }
+        if !newDraftKeys.isEmpty {
+            Outreach.changeSide { side in side.draftedIDs = (side.draftedIDs ?? []) + newDraftKeys }
+            await model.refresh()
+        }
+
+        let remainingFresh = fresh.filter { !autoDoneIDs.contains($0.id) }
+        guard !remainingFresh.isEmpty || !parkedDraftLines.isEmpty else {
+            if autoAppliedCount > 0 {
+                return (true, "Auto-updated \(autoAppliedCount) outreach item\(autoAppliedCount == 1 ? "" : "s") (with 1-click Undo in Outreach).")
+            }
+            return (true, mail.isEmpty ? "No mail list yet (it comes from your mail watch)." : "Nothing new in \(mail.count) messages.")
+        }
         let words: [String: String] = ["replied": "answered", "approved": "approved", "live": "is live", "rejected": "declined",
                                        "bounced": "bounced (address failed)", "verify": "wants you to confirm your email",
                                        "followed up": "your follow-up went out", "auto-reply": "is away (auto-reply)",
@@ -1383,9 +1516,10 @@ final class Routines {
                                        "thank": "covered you: say thanks", "repitch": "worth telling about the new version",
                                        "thread": "wrote again", "answer": "waiting for your answer", "check in": "time for one friendly check-in",
                                        "covered": "may have covered you"]
-        let lines = fresh.prefix(4).map { "\($0.outlet) (\($0.app)): \(words[$0.kind] ?? $0.kind)\($0.sure ? "" : "?")" }
-        let more = fresh.count > 4 ? "\n…and \(fresh.count - 4) more" : ""
-        return await tell(r, text: "Outreach:\n" + lines.joined(separator: "\n") + more + "\nApply or dismiss in Hmunmawi → Log → Outreach.", key: key, urgent: false)
+        let lines = parkedDraftLines.prefix(3) + remainingFresh.prefix(4).map { "\($0.outlet) (\($0.app)): \(words[$0.kind] ?? $0.kind)\($0.sure ? "" : "?")" }
+        let extraCount = max(0, (parkedDraftLines.count - 3)) + max(0, (remainingFresh.count - 4))
+        let more = extraCount > 0 ? "\n…and \(extraCount) more" : ""
+        return await tell(r, text: "Outreach:\n" + lines.joined(separator: "\n") + more + "\nReview in Hmunmawi → Log.", key: key, urgent: false)
     }
 
     // MARK: Run my script

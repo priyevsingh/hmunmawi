@@ -134,8 +134,10 @@ public enum IMAPMail {
         return f.string(from: d)
     }
 
-    /// Mail from the last `days` days in the Inbox and the Sent folder (headers only), newest `limit` per folder.
-    public static func fetch(_ config: IMAPConfig, transport: IMAPTransport, days: Int = 30, limit: Int = 300, now: Date = .now) async throws -> [MailRow] {
+    /// Mail from the last `days` days in the Inbox and the Sent folder (headers, plus read-only PEEK body text
+    /// for inbox messages matching `matchOutreach`), newest `limit` per folder.
+    public static func fetch(_ config: IMAPConfig, transport: IMAPTransport, days: Int = 30, limit: Int = 300,
+                             now: Date = .now, matchOutreach: @Sendable (MailRow) -> Bool = { _ in false }) async throws -> [MailRow] {
         if let p = config.problem { throw IMAPError(p) }
         let session = IMAPSession(transport: transport)
         defer { Task { await session.close() } }
@@ -163,6 +165,7 @@ public enum IMAPMail {
                 guard case .line(let l) = item, l.hasPrefix("* SEARCH") else { return nil }
                 return l.dropFirst(8).split(separator: " ").map(String.init)
             }.flatMap { $0 }.compactMap(Int.init)
+            var matchedUIDs: [(uid: String, index: Int)] = []
             for chunk in stride(from: max(0, uids.count - limit), to: uids.count, by: 50).map({ Array(uids[$0..<min($0 + 50, uids.count)]) }) {
                 let set = chunk.map(String.init).joined(separator: ",")
                 let items = try await session.command("UID FETCH \(set) (UID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID IN-REPLY-TO)])")
@@ -172,13 +175,29 @@ public enum IMAPMail {
                     case .line(let l):
                         if let r = l.range(of: "UID ") { uid = String(l[r.upperBound...].prefix { $0.isNumber }) }
                     case .literal(let block):
-                        if let u = uid { rows.append(MailHeaders.row(id: "imap-\(account)-\(tag)-\(validity)-\(u)", folder: tag, block: block)) }
+                        if let u = uid {
+                            let row = MailHeaders.row(id: "imap-\(account)-\(tag)-\(validity)-\(u)", folder: tag, block: block)
+                            let idx = rows.count
+                            rows.append(row)
+                            if tag == "INBOX", matchOutreach(row) {
+                                matchedUIDs.append((u, idx))
+                            }
+                        }
                         uid = nil
                     }
                 }
             }
+            // Second pass (read-only EXAMINE + BODY.PEEK[TEXT], capped at 32 KB) ONLY for matching outreach messages.
+            for (u, idx) in matchedUIDs.suffix(25) {
+                guard let items = try? await session.command("UID FETCH \(u) BODY.PEEK[TEXT]<0.\(MailBodyText.maxRawBytes)>") else { continue }
+                for case .literal(let raw) in items {
+                    let clean = MailBodyText.clean(raw)
+                    if !clean.isEmpty { rows[idx].text = clean }
+                    break
+                }
+            }
         }
-        try? await session.command("LOGOUT")
+        _ = try? await session.command("LOGOUT")
         return rows
     }
 }
