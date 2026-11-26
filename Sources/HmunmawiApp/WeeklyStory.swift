@@ -80,12 +80,33 @@ struct WeeklyStoryCard: View {
     private func polish() async {
         busy = true; defer { busy = false }
         do {
-            text = try await AIWriter.draft("""
-            Turn these weekly facts from a solo indie iOS developer into a short, friendly build-in-public update (under 900 \
-            characters). Keep every number and app name exact; no hype, no hashtags, at most one emoji. Facts:
-            \(WeeklyStory.facts(model).joined(separator: "\n"))
-            """).trimmingCharacters(in: .whitespacesAndNewlines)
+            let drafted = try await AIWriter.draft(WeeklyStory.polishPrompt(facts: WeeklyStory.facts(model)))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let problem = Wording.rules.problem(drafted) {
+                note = "Couldn't polish it: AI draft \(problem)."
+                return
+            }
+            text = drafted
             note = "Polished. Copy it to share."
         } catch { note = "Couldn't polish it: " + ((error as? WireError)?.message ?? "\(error)") }
+    }
+}
+
+extension WeeklyStory {
+    static func polishPrompt(facts: [String]) -> String {
+        """
+        Turn these weekly facts from a solo indie iOS developer into a short, friendly build-in-public update (under 900 \
+        characters). Keep every number and app name exact; no hype, no hashtags, at most one emoji. Never mention the \
+        developer's city, state, country, or location. Facts:
+        \(facts.joined(separator: "\n"))
+        """
+    }
+
+    /// Used by Sunday's `story.weekly` digest when opted in; returns nil if AI is off, fails, or hits Words I never use.
+    static func polishDigest(facts: [String]) async -> String? {
+        guard !facts.isEmpty, let drafted = try? await AIWriter.draft(polishPrompt(facts: facts)) else { return nil }
+        let clean = String(drafted.trimmingCharacters(in: .whitespacesAndNewlines).prefix(900))
+        guard !clean.isEmpty, Wording.rules.problem(clean) == nil else { return nil }
+        return clean
     }
 }

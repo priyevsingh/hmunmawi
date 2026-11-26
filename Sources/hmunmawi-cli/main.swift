@@ -85,10 +85,10 @@ let changeCommands: Set<String> = ["remove-connection", "routine-remove", "chang
 /// Everyday commands that add or run things (hm_act). Listed so the tool's description names every one.
 let actCommands: [String] = ["refresh", "check", "set", "send-test", "publish", "mail-source", "calendar-test",
                              "job-run", "job-pause", "job-resume", "routine-run", "routine-pause", "routine-resume", "routine-add", "routine-set",
-                             "bank-add", "outreach-add", "outreach-followed-up", "change-add", "plan-add", "approve", "skip",
-                             "shield-fix", "promo-next", "promo-mark", "ai-pause-set", "ai-pause-clear", "deploy-redeploy", "python-repair"]
-/// Always wait for the owner's OK, even when allowed or in Full Autopilot.
-let alwaysAskCommands = ["deploy-redeploy", "python-repair", "shield-fix item=submit"]
+                             "bank-add", "outreach-add", "outreach-followed-up", "outreach-send", "change-add", "plan-add", "approve", "skip",
+                             "shield-fix", "review-reply", "promo-next", "promo-mark", "ai-pause-set", "ai-pause-clear", "deploy-redeploy", "python-repair"]
+/// Always wait for the owner's OK, even when allowed, in Smart Autopilot, or in Full Autopilot.
+let alwaysAskCommands = ["deploy-redeploy", "python-repair", "shield-fix item=submit", "outreach-send", "review-reply", "set-key", "publish", "remove-connection", "routine-remove", "change-remove", "plan-remove"]
 
 let tools: [[String: Any]] = [
     ["name": "hm_status",

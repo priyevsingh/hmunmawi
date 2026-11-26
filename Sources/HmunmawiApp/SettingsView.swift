@@ -342,6 +342,10 @@ private struct AISection: View {
                     HStack {
                         SecureField("", text: $newKey, prompt: Text(ai.hasKey ? "Saved in Keychain" : "Paste your key"))
                             .accessibilityLabel("\(ai.provider.name) API key").input(.secret, $newKey)
+                        FindKeyButton(addOn: "ai", field: ai.provider.rawValue, label: "\(ai.provider.name) API key",
+                                      onSource: { SecretSourceCatalog(url: URL.hmSupport.appending(path: SecretSourceCatalog.fileName)).record(plugin: "ai", name: ai.provider.rawValue, ref: $0) }) {
+                            ai.saveKey($0); newKey = ""
+                        }
                         if !newKey.isEmpty { Button("Save") { ai.saveKey(newKey); newKey = "" }.buttonStyle(.pillProminent) }
                         if ai.hasKey && newKey.isEmpty { ConfirmButton(title: "Remove key", question: "Remove your AI key?", detail: "AI features stop until you paste a key again.") { ai.removeKey(); ai.enabled = false } }
                     }
@@ -363,7 +367,19 @@ private struct AISection: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Price per million tokens, USD")
-                        Text("In / out, from your provider's pricing page; used to keep within your budget").font(.callout).foregroundStyle(.secondary)
+                        Text(ai.prices != nil && ai.priceIn == 0 && ai.priceOut == 0
+                             ? "Built-in estimate active for \(ai.model); enter 0 / 0 to keep it, or your own prices"
+                             : "In / out, from your provider's pricing page; used to keep within your budget")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+                if ai.prices == nil || ai.allowUnpricedModels {
+                    Toggle(isOn: $ai.allowUnpricedModels) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Allow unpriced models without USD cap")
+                            Text("Lets AI drafts run when this model has no known token price (monthly dollar cap won't stop it)")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -411,6 +427,14 @@ private struct AISection: View {
             }
             .disabled(!(ai.hasKey && !ai.model.isEmpty && ai.endpoint != nil))
             .accessibilityLabel("Word Next steps with AI")
+            Toggle(isOn: $ai.polishWeeklyDigest) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Polish weekly digest with AI")
+                    Text("Rewrites Sunday's weekly digest with AI before sending (checked against Words I never use)").font(.callout).foregroundStyle(.secondary)
+                }
+            }
+            .disabled(!(ai.hasKey && !ai.model.isEmpty && ai.endpoint != nil))
+            .accessibilityLabel("Polish weekly digest with AI")
             if let error = ai.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Brand.caution)
             }
@@ -470,7 +494,7 @@ extension ConnectionsForm {
         Group(title: "Your apps", why: "Sales, subscriptions, crashes and reviews.",
               ids: ["appstoreconnect", "revenuecat", "sentry", "posthog"]),
         Group(title: "Getting found", why: "Search, video, social and your website.",
-              ids: ["searchconsole", "bing", "youtube", "x", "cloudflare"]),
+              ids: ["searchconsole", "bing", "youtube", "x", "cloudflare", "vercel"]),
         Group(title: "Alerts", why: "Where Hmunmawi tells you about sales and problems.", ids: ["imessage", "ntfy"]),
         Group(title: "Your Mac", why: "Scheduled jobs and your own scripts.", ids: ["macjobs", "scriptfeed"]),
         Group(title: "Other add-ons", why: "Added by you.", ids: []),
@@ -540,6 +564,11 @@ struct AddOnSection: View {
                             .transition(.opacity)
                     }
                     Spacer()
+                    if row.id == "vercel" {
+                        Button("Detect from repo…") { detectVercelRepo() }
+                            .buttonStyle(.pill)
+                            .help("Read project and team IDs from .vercel/project.json and GitHub repo/branch from .git/config")
+                    }
                     // Removes this connection's saved keys from the Keychain (it asks for them again).
                     if row.manifest.settings.contains(where: { $0.type.hasPrefix("secret") }) {
                         ConfirmButton(title: "Disconnect", question: "Disconnect \(row.manifest.name)?",
@@ -685,7 +714,7 @@ struct AddOnSection: View {
             } label: { fieldLabel(setting.label) }
         case "secret":
             HStack {
-                SecureField(text: binding, prompt: Text(saved ? "Saved in Keychain" : "Required")) { fieldLabel(setting.label) }
+                SecureField(text: binding, prompt: Text(saved ? "Saved in Keychain" : (setting.required == true ? "Required" : "Optional"))) { fieldLabel(setting.label) }
                     .input(InputRule.forSetting(key: setting.key, type: setting.type), binding)
                     .accessibilityLabel(setting.label)   // VoiceOver reads which key this field wants
                 FindKeyButton(addOn: row.id, field: setting.key, label: setting.label,
@@ -716,6 +745,17 @@ struct AddOnSection: View {
         }
     }
 
+    private func detectVercelRepo() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.showsHiddenFiles = true
+        panel.message = "Pick one or more local website repository folders (containing .vercel or .git)"
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        values = VercelDetector.merge(values: values, detected: panel.urls.map { VercelDetector.detect(in: $0) })
+    }
+
     private func chooseFile() -> String? {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
@@ -739,6 +779,10 @@ private struct PermissionsForm: View {
 }
 
 /// About, like a Mac app's About pane: icon, name, version, one line, and the story.
+enum SupportLinks {
+    static let sponsorURL = URL(string: "https://github.com/sponsors/priyevsingh")
+}
+
 private struct AboutPane: View {
     @Environment(\.openWindow) private var openWindow
 
@@ -762,9 +806,18 @@ private struct AboutPane: View {
             }
             .padding(.top, 6)
             .frame(maxWidth: 460)
-            Button("Watch the Story") { openWindow(id: "about") }
-                .buttonStyle(.pillProminent)
-                .padding(.top, 8)
+            HStack(spacing: 10) {
+                Button("Watch the Story") { openWindow(id: "about") }
+                    .buttonStyle(.pillProminent)
+                if let sponsorURL = SupportLinks.sponsorURL {
+                    Link(destination: sponsorURL) {
+                        Label("Sponsor on GitHub", systemImage: "heart")
+                    }
+                    .buttonStyle(.pill)
+                    .help("Open Hmunmawi's GitHub Sponsors page in your browser")
+                }
+            }
+            .padding(.top, 8)
             WallOfAppsBox().frame(maxWidth: 460).padding(.top, 14)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1178,7 +1231,7 @@ private struct MailSourceSection: View {
                     Spacer()
                     if permissions.safari != .granted { Button("Allow") { Task { await permissions.askSafari() } } }
                 }
-                Text("For Zoho's free plan (no IMAP). Hmunmawi opens Zoho's page in a background Safari tab, with the login Safari already has, and reads only the list of senders and subjects. It never opens a message, never sees your password and changes nothing. In Safari, turn on Develop → Allow JavaScript from Apple Events. Zoho doesn't publish this page's layout, so a Zoho redesign can stop it working; the note below tells you if so.")
+                Text("For Zoho's free plan (no IMAP). Hmunmawi opens Zoho's page in a background Safari tab, with the login Safari already has, reads senders and subjects, and reads message text only for threads matching your outreach list (leaving unread status untouched). It never sees your password, and sends only when you explicitly approve an email in Log → Waiting. In Safari, turn on Develop → Allow JavaScript from Apple Events. Zoho doesn't publish this page's layout, so a Zoho redesign can stop it working; the note below tells you if so.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if kind == .imap {
@@ -1216,7 +1269,7 @@ private struct MailSourceSection: View {
                 Text("Where Hmunmawi looks for answers to your pitches and follow-ups.").font(.callout).foregroundStyle(.secondary)
             }.padding(.top, 8)
         } footer: {
-            Label("Read-only: sender, subject and dates of recent messages. Hmunmawi never sends, moves, flags or deletes mail, and never reads message text. The app password stays in your Keychain.", systemImage: "lock.fill")
+            Label("Inbox scan reads sender, subject and dates only; message bodies are read read-only strictly for matched outreach threads (unread untouched). Outbound mail sends only when you explicitly approve an item in Log → Waiting. Passwords stay in your Keychain.", systemImage: "lock.fill")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .task { password = MailWatch.password(); await permissions.refreshIfStale(olderThan: 30) }

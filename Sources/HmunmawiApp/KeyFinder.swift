@@ -43,8 +43,62 @@ enum KeyFinder {
         }
         out += envFiles(hints: hints, envKeys: envKeys)
         out += wholeFileCandidates(addOn: addOn, field: field, wantsFile: wantsFile)
+        if addOn == "vercel" && field == "githubToken" {
+            out += ghCLIKeychain(rank: 1)
+        }
         out += keychain(hints: hints, rank: 3)
         return deduped(out)
+    }
+
+    /// Decodes a macOS Keychain secret blob, including `go-keyring-base64:` values written by tools like `gh`.
+    nonisolated static func decodeKeychainData(_ data: Data) -> String? {
+        guard let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        let prefix = "go-keyring-base64:"
+        if raw.hasPrefix(prefix) {
+            let b64 = String(raw.dropFirst(prefix.count))
+            guard let decoded = Data(base64Encoded: b64),
+                  let text = String(data: decoded, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty else { return nil }
+            return text
+        }
+        return raw
+    }
+
+    /// Surfaces the local `gh` CLI GitHub token (`gh:github.com`) when picking a GitHub token for Vercel.
+    nonisolated private static func ghCLIKeychain(rank: Int) -> [Match] {
+        if TestProfile.name != nil { return [] }
+        let ghPaths = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"]
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "gh:github.com",
+                                kSecMatchLimit as String: kSecMatchLimitOne, kSecReturnAttributes as String: true]
+        var result: CFTypeRef?
+        let hasKeychain = SecItemCopyMatching(q as CFDictionary, &result) == errSecSuccess
+        let ghExe = ghPaths.first { FileManager.default.isExecutableFile(atPath: $0) }
+        guard hasKeychain || ghExe != nil else { return [] }
+        let acct = ((result as? [String: Any])?[kSecAttrAccount as String] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let label = acct.map { "GitHub CLI (gh:github.com · \($0))" } ?? "GitHub CLI (gh:github.com)"
+        return [Match(label: label, source: "Keychain", sourceRef: nil, fetch: {
+            let fq: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "gh:github.com",
+                                     kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+            var data: CFTypeRef?
+            if SecItemCopyMatching(fq as CFDictionary, &data) == errSecSuccess, let d = data as? Data,
+               let decoded = decodeKeychainData(d) {
+                return decoded
+            }
+            if let ghExe {
+                let p = Process(); let out = Pipe()
+                p.executableURL = URL(filePath: ghExe); p.arguments = ["auth", "token"]
+                p.standardOutput = out; p.standardError = FileHandle.nullDevice
+                if (try? p.run()) != nil {
+                    let d = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+                    if p.terminationStatus == 0,
+                       let t = String(data: d, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty {
+                        return t
+                    }
+                }
+            }
+            return nil
+        }, rank: rank)]
     }
 
     /// Folders you chose for Find my key to look in too (Settings → Connections → Also look in).
@@ -125,9 +179,14 @@ enum KeyFinder {
             "searchconsole": ["GSC", "SEARCH_CONSOLE", "SERVICE_ACCOUNT"],
             "cloudflare": ["CLOUDFLARE", "CF_"],
             "ntfy": ["NTFY"],
+            "vercel": ["VERCEL"],
             "ai": ["ANTHROPIC", "OPENAI", "GEMINI", "OPENROUTER", "GROQ", "MISTRAL"],
             "usage": ["ANTHROPIC_ADMIN"],
         ]
+        // For vercel/githubToken, search for GitHub hints, not Vercel ones.
+        if addOn == "vercel" && field == "githubToken" {
+            return ["GITHUB", "GH_TOKEN"]
+        }
         var words = base[addOn] ?? [addOn.uppercased()]
         let f = field.uppercased()
         if f.contains("ISSUER") { words += ["ISSUER", "ISSUER_ID"] }
@@ -147,6 +206,14 @@ enum KeyFinder {
         case ("youtube", "apiKey"): return ["YOUTUBE_API_KEY", "GOOGLE_API_KEY", "GCP_API_KEY"]
         case ("appstoreconnect", "issuerID"): return ["ASC_ISSUER_ID", "ISSUER_ID"]
         case ("appstoreconnect", "keyID"): return ["ASC_KEY_ID", "KEY_ID"]
+        case ("vercel", "apiToken"): return ["VERCEL_TOKEN"]
+        case ("vercel", "githubToken"): return ["GITHUB_TOKEN", "GH_TOKEN"]
+        case ("ai", "claude"): return ["ANTHROPIC_API_KEY"]
+        case ("ai", "openai"): return ["OPENAI_API_KEY"]
+        case ("ai", "gemini"): return ["GEMINI_API_KEY"]
+        case ("ai", "openrouter"): return ["OPENROUTER_API_KEY"]
+        case ("ai", "groq"): return ["GROQ_API_KEY"]
+        case ("ai", "mistral"): return ["MISTRAL_API_KEY"]
         default: return []
         }
     }
@@ -320,7 +387,7 @@ enum KeyFinder {
                     q[(internet ? kSecAttrServer : kSecAttrService) as String] = svc
                     var data: CFTypeRef?
                     guard SecItemCopyMatching(q as CFDictionary, &data) == errSecSuccess, let d = data as? Data else { return nil }
-                    return String(data: d, encoding: .utf8)
+                    return decodeKeychainData(d)
                 }, rank: rank))
             }
         }
@@ -412,5 +479,126 @@ struct FindKeyButton: View {
             }
             .padding(14).frame(width: 440)
         }
+    }
+}
+
+/// Reads `.vercel/project.json` and `.git/config` from a local repo folder so Vercel settings fill in one click.
+enum VercelDetector {
+    struct Detected: Equatable {
+        var projectID: String?
+        var orgID: String?
+        var projectName: String?
+        var repo: String?
+        var branch: String?
+    }
+
+    static func detect(in folder: URL) -> Detected {
+        var out = Detected()
+        let vercelFile = folder.appending(path: ".vercel/project.json")
+        if let d = try? Data(contentsOf: vercelFile),
+           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+            if let pid = obj["projectId"] as? String, !pid.isEmpty { out.projectID = pid }
+            if let oid = obj["orgId"] as? String, oid.hasPrefix("team_") { out.orgID = oid }
+            if let name = obj["projectName"] as? String, !name.isEmpty { out.projectName = name }
+        }
+        let gitConfig = folder.appending(path: ".git/config")
+        if let text = try? String(contentsOf: gitConfig, encoding: .utf8) {
+            out.repo = parseGitHubRepo(fromGitConfig: text)
+        }
+        if let ref = (try? String(contentsOf: folder.appending(path: ".git/refs/remotes/origin/HEAD"), encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           let b = ref.split(separator: "/").last.map(String.init), !b.isEmpty {
+            out.branch = b
+        } else if let head = (try? String(contentsOf: folder.appending(path: ".git/HEAD"), encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            head.hasPrefix("ref: refs/heads/") {
+            let b = String(head.dropFirst("ref: refs/heads/".count))
+            if !b.isEmpty { out.branch = b }
+        }
+        return out
+    }
+
+    static func parseGitHubRepo(fromGitConfig text: String) -> String? {
+        var inOrigin = false
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inOrigin = line.lowercased().hasPrefix("[remote \"origin\"")
+                continue
+            }
+            guard inOrigin, line.lowercased().hasPrefix("url") else { continue }
+            guard let eq = line.firstIndex(of: "=") else { continue }
+            let url = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+            if let repo = extractGitHubSlug(url) { return repo }
+        }
+        return nil
+    }
+
+    static func extractGitHubSlug(_ raw: String) -> String? {
+        var s = raw.trimmingCharacters(in: .whitespaces)
+        if s.hasSuffix(".git") { s = String(s.dropLast(4)) }
+        if s.hasPrefix("git@github.com:") {
+            s = String(s.dropFirst("git@github.com:".count))
+        } else if let r = s.range(of: "github.com/", options: .caseInsensitive) {
+            s = String(s[r.upperBound...])
+        } else {
+            return nil
+        }
+        let parts = s.split(separator: "/").map(String.init)
+        guard parts.count == 2,
+              parts[0].wholeMatch(of: /[A-Za-z0-9_.-]{1,100}/) != nil,
+              parts[1].wholeMatch(of: /[A-Za-z0-9_.-]{1,100}/) != nil else { return nil }
+        return "\(parts[0])/\(parts[1])"
+    }
+
+    /// Merges one or more detected repositories into Vercel's comma-separated settings fields, keeping indices aligned.
+    static func merge(values: [String: String], detected: [Detected]) -> [String: String] {
+        var out = values
+        func splitList(_ key: String) -> [String] {
+            (out[key] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        }
+        var projects = splitList("project")
+        var repos = splitList("repo")
+        var branches = splitList("branch")
+        var sites = splitList("siteName")
+        for d in detected {
+            if let oid = d.orgID, (out["teamID"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+                out["teamID"] = oid
+            }
+            guard let pid = d.projectID, !projects.contains(pid) else {
+                if let r = d.repo, projects.count <= 1, !repos.contains(r) { repos.append(r) }
+                if let b = d.branch, (out["branch"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { branches = [b] }
+                if let s = d.projectName, (out["siteName"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { sites = [s] }
+                continue
+            }
+            let prevCount = projects.count
+            projects.append(pid)
+            if let r = d.repo, !r.isEmpty {
+                while repos.count < prevCount { repos.append("") }
+                repos.append(r)
+            } else if !repos.isEmpty {
+                repos.append("")
+            }
+            if let b = d.branch, !b.isEmpty {
+                while branches.count < prevCount { branches.append(branches.first ?? "main") }
+                branches.append(b)
+            } else if !branches.isEmpty {
+                branches.append(branches.first ?? "main")
+            }
+            if let s = d.projectName, !s.isEmpty {
+                while sites.count < prevCount { sites.append(projects[sites.count]) }
+                sites.append(s)
+            } else if !sites.isEmpty {
+                sites.append(pid)
+            }
+        }
+        if !projects.isEmpty { out["project"] = projects.joined(separator: ", ") }
+        if !repos.isEmpty && !repos.contains("") { out["repo"] = repos.joined(separator: ", ") }
+        else if repos.count == 1, !repos[0].isEmpty { out["repo"] = repos[0] }
+        if !branches.isEmpty {
+            out["branch"] = Set(branches).count == 1 ? (branches.first ?? "") : branches.joined(separator: ", ")
+        }
+        if !sites.isEmpty { out["siteName"] = sites.joined(separator: ", ") }
+        return out
     }
 }

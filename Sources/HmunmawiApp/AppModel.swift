@@ -642,7 +642,11 @@ final class AppModel {
             }
             updateTruth()
             MacNotifier.shared.consider(events: events, model: self)
-            if !isDemo, !TestProfile.runningUnitTests { Task { await PayoutBook.shared.autoFillIfDue() } }
+            if !isDemo, !TestProfile.runningUnitTests {
+                Task { await PayoutBook.shared.autoFillIfDue() }
+                Task { await ReviewDrafter.draftPendingReviews(model: self) }
+                Task { await ShieldPrep.prepareIfNeeded(model: self) }
+            }
             // Settings → Publish → "Publish again after each refresh". Quiet on failure; the tab shows the last time.
             if UserDefaults.standard.bool(forKey: PortalPublisher.autoKey), !isDemo, !TestProfile.runningUnitTests {
                 if (try? PortalPublisher.publish(self)) != nil { PortalUpload.afterPublish(manual: false) }
@@ -812,7 +816,10 @@ final class AppModel {
                                                 : "A saved key file couldn't be read. Choose the key again in Settings.")]))
         }
         await refreshAddOns()
-        if report.rebound > 0 { await engine?.pollEverything() }
+        if report.rebound > 0 {
+            AISettings.shared.refreshKeyState()
+            await engine?.pollEverything()
+        }
         await refresh()
     }
 
@@ -1160,7 +1167,13 @@ final class AppModel {
         // Insights across every app (once a week, off the main thread).
         let rows = Self.oneSourcePerDay(insightWindow.rows)
         let all = await Task.detached(priority: .utility) { InsightEngine.run(MetricExtractor.extract(rows)) }.value
-        guard let text = weeklyDigestText(now: now, allFindings: all) else { return }
+        guard let plain = weeklyDigestText(now: now, allFindings: all) else { return }
+        let text: String
+        if AISettings.shared.polishWeeklyDigest, let polished = await WeeklyStory.polishDigest(facts: WeeklyStory.facts(self)) {
+            text = polished
+        } else {
+            text = plain
+        }
         lastDigestText = text
         let event = Event(source: "story", kind: "story.weekly", payload: .object(["text": .string(text)]),
                           occurredAt: Millis(now.timeIntervalSince1970 * 1000), dedupeKey: "story-weekly-\(key)")
@@ -1205,9 +1218,24 @@ final class AppModel {
         await checkNowIfReady(id)
     }
 
+    /// Returns waiting `set-key` jobs superseded when the given fields are saved for `connection`.
+    static func supersededSetKeyJobs(waiting: [WaitingAction], connection: String, savedFields: Set<String>) -> [Job] {
+        guard !savedFields.isEmpty else { return [] }
+        return waiting.compactMap { action in
+            let p = action.job.payload
+            guard action.job.kind == "agent.request",
+                  p[path: "command"]?.string == "set-key",
+                  p[path: "args.connection"]?.string == connection,
+                  let field = p[path: "args.field"]?.string,
+                  savedFields.contains(field) else { return nil }
+            return action.job
+        }
+    }
+
     /// Plain values go to config.json; secrets go to the Keychain. Empty secret fields keep the saved value.
     func save(_ values: [String: String], for row: AddOnRow) async {
         guard let host else { return }
+        var savedNonEmpty: Set<String> = []
         do {
             var plain = config.plugins[row.id] ?? [:]
             // Only the fields given change: saving one field (an agent's set-key) must not blank the others.
@@ -1217,9 +1245,11 @@ final class AppModel {
                     if !value.isEmpty {
                         try secrets.replaceSecret(value, plugin: row.id, name: setting.key)
                         SecretSourceDefaults.mirrorTypedKey(value, plugin: row.id, name: setting.key)
+                        savedNonEmpty.insert(setting.key)
                     }
                 } else {
                     plain[setting.key] = value
+                    if !value.isEmpty { savedNonEmpty.insert(setting.key) }
                 }
             }
             config.plugins[row.id] = plain
@@ -1227,6 +1257,9 @@ final class AppModel {
             await host.setSettings(config.settingsJSON(for: row.id), for: row.id)
             await host.restart(row.id)
             try await liveStore?.appendAudit(actor: "you", action: "plugin.settings_saved", subject: "plugin:\(row.id)")
+            for stale in Self.supersededSetKeyJobs(waiting: waiting, connection: row.id, savedFields: savedNonEmpty) {
+                await skip(stale)
+            }
         } catch {
             errorText = "Couldn't save: \(plainError(error))"
         }
@@ -1382,10 +1415,137 @@ final class AppModel {
             let message = (answer["result"] as? String) ?? (answer["error"] as? String) ?? ""
             await act { try await $0.resolveApproved(job.id, ok: ok, by: "you", detail: .object([
                 "ok": .bool(ok), "approved_by": .string("you"), "result": .string(String(message.prefix(500)))])) }
+            if ok, p["command"]?.string == "set-key", let conn = args["connection"], let fld = args["field"] {
+                for stale in Self.supersededSetKeyJobs(waiting: waiting, connection: conn, savedFields: [fld]) {
+                    await skip(stale)
+                }
+            }
             if !ok { errorText = "The agent's request ran but didn't work: \(message)" }
             return
         }
+        // Outbound outreach email approved by the owner: send via SMTP or Zoho Safari, then update outreach & offer code.
+        if job.kind == "outreach.send", case .object(let p) = job.payload {
+            let entryID = p["entry"]?.string ?? ""
+            let subject = p["subject"]?.string ?? ""
+            let body = p["body"]?.string ?? ""
+            let kind = p["kind"]?.string ?? "follow-up"
+            let inReplyTo = p["in_reply_to"]?.string
+            let offerCode = p["offer_code"]?.string
+            let suggestionID = p["suggestion_id"]?.string
+            let items = Outreach.items()
+            let item = items.first(where: { $0.id == entryID })
+            // Pin recipient strictly from stored outreach entry (never from reply bodies or payload tampering if entry exists).
+            let recipient = item.flatMap(Outreach.pinnedRecipient(for:)) ?? (p["to"]?.string ?? "")
+            guard let itemForCheck = item, Outreach.pinnedRecipient(for: itemForCheck) != nil else {
+                errorText = "Outreach entry or stored contact email is missing; nothing was sent."
+                return
+            }
+            let sendRes = await MailSender.send(to: recipient, subject: subject, body: body, inReplyTo: inReplyTo)
+            if !sendRes.ok {
+                errorText = sendRes.note
+                return
+            }
+            // Update outreach status/marks and mark any attached offer code as shared only after successful send.
+            if kind == "follow-up" {
+                _ = await Outreach.apply(itemForCheck, status: nil, followUp: nil, markFollowedUp: true)
+            }
+            Outreach.changeSide { side in
+                if kind == "thank" {
+                    side.extras[entryID, default: OutreachExtra()].thankedOn = Date.now.localDay
+                }
+                if ["answer", "check in"].contains(kind), var th = side.threads?[entryID] {
+                    th.checkedIn = true
+                    side.threads?[entryID] = th
+                }
+                if let sid = suggestionID, let idx = side.suggestions.firstIndex(where: { $0.id == sid }) {
+                    side.suggestions[idx].state = "done"
+                }
+            }
+            if let code = offerCode, !code.isEmpty {
+                _ = OfferCodes.shared.markShared(code: code, by: "outreach", campaign: itemForCheck.outlet)
+            }
+            try? await liveStore?.appendAudit(
+                actor: "you", action: "outreach.sent", subject: "\(itemForCheck.outlet) · \(kind)",
+                detail: .object(["via": .string(sendRes.via), "to": .string(recipient), "subject": .string(String(subject.prefix(200)))]))
+            await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
+                "ok": .bool(true), "via": .string(sendRes.via), "note": .string(sendRes.note)])) }
+            return
+        }
+        // Proactive review reply approved by the owner: post publicly on App Store Connect.
+        if job.kind == "review.reply", case .object(let p) = job.payload {
+            let rid = p["review_id"]?.string ?? ""
+            let reply = p["reply"]?.string ?? ""
+            guard !rid.isEmpty, !reply.isEmpty else {
+                errorText = "Review reply is missing review_id or reply text."
+                return
+            }
+            if let problem = Wording.rules.problem(reply) {
+                errorText = "Blocked by Words I never use: \(problem)"
+                return
+            }
+            let r = await shieldFix(.object(["fix": .string("review_reply"), "review_id": .string(rid), "text": .string(reply)]), by: "you")
+            await act { try await $0.resolveApproved(job.id, ok: r.ok, by: "you", detail: .object([
+                "ok": .bool(r.ok), "message": .string(String(r.message.prefix(500)))])) }
+            if !r.ok { errorText = "Couldn't post review reply: \(r.message)" }
+            return
+        }
         await act { try await $0.approve(job.id, by: "you") }
+    }
+
+    /// Saves edits to a waiting `review.reply` draft before posting.
+    func updateReviewReplyDraft(_ job: Job, reply: String) async {
+        guard job.kind == "review.reply", case .object(var p) = job.payload else { return }
+        p["reply"] = .string(String(reply.prefix(5000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
+    }
+
+    /// Critical actions that are NEVER approved by "Approve all non-critical" and always wait for individual owner review.
+    nonisolated static func isCriticalWaiting(_ job: Job) -> Bool {
+        if job.kind == "outreach.send" || job.kind == "review.reply" { return true }
+        if job.kind == "asc.fix" {
+            let fix = job.payload[path: "params.fix"]?.string ?? job.payload[path: "fix"]?.string ?? ""
+            if fix == "submit" || fix == "review_reply" { return true }
+        }
+        if job.kind == "agent.request" {
+            let cmd = job.payload[path: "command"]?.string ?? ""
+            if ["deploy-redeploy", "python-repair", "outreach-send", "review-reply", "set-key", "publish",
+                "remove-connection", "routine-remove", "change-remove", "plan-remove"].contains(cmd) {
+                return true
+            }
+            if cmd == "shield-fix",
+               (job.payload[path: "args.item"]?.string ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "submit" {
+                return true
+            }
+            if ["routine-add", "routine-set"].contains(cmd),
+               (job.payload[path: "args.does"]?.string ?? "") == "run-script" {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Approves all currently waiting non-critical items, explicitly skipping all alwaysAsk critical actions.
+    func approveAllNonCritical() async {
+        let targets = waiting.filter { !Self.isCriticalWaiting($0.job) }.map(\.job)
+        for job in targets { await approve(job) }
+    }
+
+    /// Approves a grouped batch of waiting items (e.g. a multi-field connection setup card).
+    func approveBatch(_ jobs: [Job]) async {
+        for job in jobs { await approve(job) }
+    }
+
+    /// Skips a grouped batch of waiting items.
+    func skipBatch(_ jobs: [Job]) async {
+        for job in jobs { await skip(job) }
+    }
+
+    /// Saves edits to a waiting `outreach.send` draft before sending.
+    func updateOutreachDraft(_ job: Job, subject: String, body: String) async {
+        guard job.kind == "outreach.send", case .object(var p) = job.payload else { return }
+        p["subject"] = .string(String(subject.prefix(300)))
+        p["body"] = .string(String(body.prefix(10_000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
     }
 
     /// Parks an agent's request in "Waiting for your OK". Secrets are never stored in the request.
@@ -1484,8 +1644,10 @@ final class AppModel {
             if let ms = r.sentMs { p["sent_ms"] = .number(Double(ms)) }
             if let m = r.messageID { p["message_id"] = .string(String(m.prefix(300))) }
             if let m = r.inReplyTo { p["in_reply_to"] = .string(String(m.prefix(300))) }
+            if let t = r.text, !t.isEmpty { p["text"] = .string(String(t.prefix(MailBodyText.maxCleanChars))) }
+            let dedupe = r.text?.isEmpty == false ? "mail-seen-text-\(r.id)" : "mail-seen-\(r.id)"
             let event = Event(source: "mail", kind: "mail.seen", app: nil, payload: .object(p), occurredAt: min(now, r.sentMs ?? now),
-                              dedupeKey: "mail-seen-\(r.id)")
+                              dedupeKey: dedupe)
             if let result = try? await liveStore.ingest(event, rules: await rules(for: event)), !result.duplicate { added += 1 }
         }
         return added

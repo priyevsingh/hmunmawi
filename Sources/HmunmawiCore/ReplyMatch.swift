@@ -60,6 +60,7 @@ public enum ReplyMatch {
     public static let open: Set<String> = ["submitted", "pending review", "no reply"]
 
     /// Free mail providers: the same domain says nothing about who wrote.
+    public static let sharedDomains: Set<String> = shared
     static let shared: Set<String> = ["gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com",
                                       "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com", "protonmail.ch",
                                       "zoho.com", "zohomail.com", "aol.com", "gmx.com", "fastmail.com"]
@@ -190,7 +191,7 @@ public enum ReplyMatch {
     }
 
     /// The address inside "Name <a@b.c>", or the text itself, lowercased.
-    static func address(_ from: String) -> String {
+    public static func address(_ from: String) -> String {
         let f = from.lowercased()
         if let r = f.range(of: #"<[^>]+>"#, options: .regularExpression) { return String(f[r].dropFirst().dropLast()) }
         return f.trimmingCharacters(in: .whitespaces)

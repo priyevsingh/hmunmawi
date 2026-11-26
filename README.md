@@ -13,8 +13,10 @@
   <a href="../../releases/latest"><b>Download for Mac</b></a> ·
   <a href="#get-started-in-10-minutes">Get started</a> ·
   <a href="#documentation">Docs</a> ·
+  <a href="https://github.com/priyevsingh/hmunmawi/discussions">Discussions</a> ·
   <a href="AGENTS.md">For AI agents</a> ·
-  <a href="docs/WALL-OF-APPS.md">Wall of Apps</a>
+  <a href="docs/WALL-OF-APPS.md">Wall of Apps</a> ·
+  <a href="https://github.com/sponsors/priyevsingh">Sponsor</a>
 </p>
 
 <p align="center">
@@ -23,6 +25,7 @@
   <img alt="Free and open source" src="https://img.shields.io/badge/free-open%20source-2ea44f">
   <img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Notarized by Apple" src="https://img.shields.io/badge/notarized-Developer%20ID-555">
+  <a href="https://github.com/sponsors/priyevsingh"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=github"></a>
 </p>
 
 <p align="center">
@@ -32,7 +35,7 @@
 
 <br>
 
-## One Mac menu bar app. Your apps and everything else you run.
+## One Mac app. Your apps and everything else you run.
 
 Hmunmawi watches your Apple apps **and** the other things you run, then turns it all into one calm answer each morning.
 It runs on its own from your Mac's menu bar, and nothing is changed without your OK.
@@ -45,17 +48,17 @@ It runs on its own from your Mac's menu bar, and nothing is changed without your
 
 ### What it can run for you
 
-- **Your daily answer:** one sentence each morning (Win, Worry, Next), the Today page, a weekly story and the menu bar "H" with a health dot.
-- **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit (and fixes it, then submits, only after you confirm), TestFlight tidy-up, offer codes, featuring nominations, product page tests, and review replies posted only when you press Post.
+- **Your daily answer:** one sentence each morning (Win, Worry, Next), the Today page, a weekly story (with optional AI polish), **Copy brief** on Next steps for coding agents, and the menu bar "H" with a health dot.
+- **Apple apps:** sales, subscriptions, reviews, ratings, releases and TestFlight, with a Rejection Shield that catches what could get a version rejected before you submit (shows a **Ready to submit** checklist with 1-click reversible fixes, and submits only after you confirm), TestFlight tidy-up, offer codes, featuring nominations, product page tests, and proactive review reply drafts posted only when you approve or press Post.
 - **Live sales:** the next morning, within minutes, or within seconds through a free relay in your own Cloudflare account that takes only your own apps' notifications and that Hmunmawi keeps up to date.
-- **Websites and search:** visitors and AI-bot reads from Cloudflare, visitors and production deploy health from Vercel (a Redeploy waits for your OK), Google Search Console and Bing clicks, top searches and pages, a "website down" watch, a weekly check of every outside link on your site, next steps like searches that have no page yet and ranking pages nobody clicks, and a Search health card with Fix buttons fed by your own monitor script.
+- **Websites and search:** visitors and AI-bot reads from Cloudflare, multi-project visitors and production deploy health from Vercel (with **Detect from repo…** and project-matched Redeploy waiting for your OK), Google Search Console and Bing clicks, top searches and pages, a "website down" watch, a weekly check of every outside link on your site, next steps like searches that have no page yet and ranking pages nobody clicks, and a Search health card with Fix buttons fed by your own monitor script.
 - **Social and creative:** YouTube subscribers, views and newest videos; X numbers, post drafts at your best hours, reply ideas (kept to your topics and your "Words I never use", never naming an outdated app version), and unfollows by hand from a daily list or (opt-in) automatic, a few a day through your Safari login; plans and to-dos for Shorts, Reels, carousels, Reddit and Discord posts and articles from your own scripts; and one-tap switches (Settings → Jobs) that turn each channel, and each account's warm-up suggestions, on or off for your scripts. Hmunmawi tracks, plans, queues and reminds; it never posts for you.
 - **Content publishing:** articles and posts you produce show up as to-dos and as jobs on the Automations map, so you can see what is due, what ran and what failed.
-- **Outreach and mail:** an outreach list with follow-up reminders, a check before you add an outlet (page, contact, paid-only, language, already pitched), and replies matched from your mail for you to confirm.
-- **Crashes and health:** crash-free sessions and freezes from Sentry, Sentry's open problems in plain words, a Mac-alive heartbeat so Sentry tells you when this Mac stops, failed Mac jobs retried, amber "needs a look" items from your scripts, broken Python environments found and repaired on your tap, keys, certificates, domains, plans and trials watched for expiry, and your own fix scripts run when a problem appears.
-- **Money:** payday date, monthly forecast, profit after your costs, AI credits and plan limits, and an export for your accountant.
+- **Outreach and mail:** an outreach list with follow-up reminders, a check before you add an outlet (page, contact, paid-only, language, already pitched), automatic reply/bounce/opt-out bookkeeping with 1-click Undo, matched reply body reading, pre-drafted follow-ups and pitches parked in Log → Waiting (respecting do-not-contact, embargo and 1-follow-up-per-outlet rules), and approve-to-send over TLS/STARTTLS SMTP or Zoho Mail compose.
+- **Crashes and health:** crash-free sessions and freezes from Sentry, Sentry's open problems in plain words, a Mac-alive heartbeat so Sentry tells you when this Mac stops, failed Mac jobs retried, amber "needs a look" items from your scripts, broken Python environments found and repaired on your tap, Find my key discovery and Keychain recovery across rebuilds (connections, Vercel/GitHub tokens, AI providers), keys, certificates, domains, plans and trials watched for expiry, and your own fix scripts run when a problem appears.
+- **Money:** payday date, monthly forecast, profit after your costs, built-in AI pricing (Claude, OpenAI, Gemini, Groq) and plan limits, and an export for your accountant.
 - **Alerts:** iMessage, ntfy push and an iPhone and Watch calendar, with quiet hours.
-- **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs (pause or resume any of them), on/off switches for the jobs your scripts run and the ones Hmunmawi runs, an optional "keep this Mac awake" setting, and agents like Claude Code through `hm` and MCP. Anything that changes something waits for your OK (an agent without its badge always does), and the AI job pause stops your own AI scripts when you need them to wait.
+- **Autopilot with approval:** routines on a schedule, your own scripts and Mac jobs (pause or resume any of them), on/off switches for the jobs your scripts run and the ones Hmunmawi runs, 1-click Autopilot nudges on eligible rules, an optional "keep this Mac awake" setting, batched Waiting cards with **Approve all non-critical**, and agents like Claude Code through `hm` and MCP with **Smart Autopilot (recommended)**. Critical actions (`submit`, `vercel.redeploy`, `python-repair`, `outreach-send`, `review-reply`, `set-key`, `remove-*`, `publish`) always wait for your OK, and the AI job pause stops your own AI scripts when you need them to wait.
 - **Share and show:** share cards for posts and stories, your numbers as a web page you host yourself, and the Wall of Apps.
 - **Your extras:** Settings → General lists what your own setup switches on (a workspace folder and key folders for Find my key, the AI job pause card, the Zoho Mail reader, an X numbers file, a fixed time zone), set in the app, by agents or by a file in your private workspace.
 
@@ -130,8 +133,9 @@ everything else is exactly what the app shows.
 ## Get started in 10 minutes
 
 1. **Install:** download the latest `Hmunmawi-x.y.z.zip` from [Releases](../../releases), unzip it, move
-   Hmunmawi to Applications and open it. macOS asks once whether to open an app downloaded from the internet:
-   choose Open (Apple has checked it). You see sample data straight away, so you can look around first.
+   Hmunmawi to Applications and open it. You can verify the download's SHA-256 (`shasum -a 256 Hmunmawi-x.y.z.zip`)
+   against the digest on the GitHub release page; macOS asks once whether to open an app downloaded from the internet:
+   choose Open (Apple has checked and notarized it). You see sample data straight away, so you can look around first.
    Needs macOS 26 or later.
 2. **Connect App Store Connect.** You need an App Store Connect API key; only the Account Holder or an Admin of
    your developer team can make one.
@@ -140,12 +144,12 @@ everything else is exactly what the app shows.
      and offer codes. Hmunmawi only reads unless you approve a change.
    - Copy the **Issuer ID** and **Key ID**, and download the key file (a small `.p8` file). Apple lets you
      download it only once, so keep it somewhere safe.
-   - Paste both IDs and pick the `.p8` file in Hmunmawi's setup screen.
+   - Paste both IDs and pick the `.p8` file in Hmunmawi's setup screen (or press **Find my key**).
 3. **Allow the Mac permissions it asks for** (notifications, and only the others you use). It asks once, at
    setup, never in the middle of your day.
 4. **Optional:** add more sources in Settings → Connections (RevenueCat, PostHog, Sentry, Search Console, Bing,
-   YouTube, X, Cloudflare) and pick routines in Automations.
-5. **Stuck?** See *When something's wrong* (under Everything else), or open an issue on GitHub.
+   YouTube, X, Cloudflare, Vercel) and pick routines in Automations.
+5. **Stuck?** See *When something's wrong* (under Everything else), or ask in [Q&A & Setup Help](https://github.com/priyevsingh/hmunmawi/discussions/categories/q-a-setup-help).
 
 Your first real numbers appear within a few minutes of connecting; Apple's daily reports arrive the next morning.
 Hmunmawi updates itself: Hmunmawi → Check for Updates… The update window says what changed, and after the update Today shows a one-time **What's new** card with a button to each new screen (a fresh install gets a short **Start here** instead).
@@ -157,6 +161,7 @@ Hmunmawi updates itself: Hmunmawi → Check for Updates… The update window say
 |---|---|
 | [**The full guide**](docs/GUIDE.md) | Every page, card, setting and connection, with pictures from a real Mac |
 | [Set up X](docs/X-SETUP.md) | Your X numbers and glance, drafts at your best hours, reply ideas, and unfollows by hand or automatic, with or without Grok Bot (also for your agent) |
+| [GitHub Discussions](https://github.com/priyevsingh/hmunmawi/discussions) | Q&A & Setup Help, Add-ons, Scripts & MCP, Wall of Apps / Show & Tell, and Ideas & Feature Requests |
 | [hm commands](docs/HM-COMMANDS.md) | Every command an agent (or you) can run, and what needs approval |
 | [Routines](docs/ROUTINES.md) | Everything Hmunmawi can run on its own clock, and how to set each one up |
 | [AI credits, costs and profit](docs/AI-AND-COSTS.md) | Payday, what tools and AI cost you, free startup credits, plan limits and the AI job pause |
@@ -418,7 +423,7 @@ Hmunmawi is young. What has and has not been checked:
 
 - **Checked:** the automated test suite (`swift test`), a first launch of the release as a new user, and daily
   use against real App Store Connect, Apple Mail and Cloudflare data.
-- **Not yet checked:** reading mail over IMAP against a real mailbox (tested against a scripted server only), and
+- **Not yet checked:** reading/sending mail over IMAP/SMTP against every third-party mail provider (tested against a scripted TLS/stream transport suite), and
   smoothness when switching between very large pages.
 - **Builds from source are not notarized.** Releases are signed with Developer ID and notarized by Apple (see
   [docs/RELEASING.md](docs/RELEASING.md)).
@@ -427,8 +432,7 @@ Hmunmawi is young. What has and has not been checked:
 <details>
 <summary><b>Help and contributing</b></summary>
 
-- **Questions, ideas and bugs:** open an issue on GitHub ([new issue](../../issues/new/choose)) and pick *Bug report* or *Idea or question*. Hmunmawi is maintained by one person at their own pace, so
-  replies can take a while.
+- **Questions, ideas and add-ons:** ask in [GitHub Discussions](https://github.com/priyevsingh/hmunmawi/discussions) (*Q&A & Setup Help*, *Ideas & Feature Requests*, *Add-ons, Scripts & MCP*, or *Wall of Apps / Show & Tell*). Open a GitHub issue ([new issue](../../issues/new/choose)) for reproducible bug reports. Hmunmawi is maintained by one person at their own pace, so replies can take a while.
 - **Security problems:** please report them privately as described in [SECURITY.md](SECURITY.md).
 - **Contributing:** bug reports, fixes and new connections are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md)
   first.

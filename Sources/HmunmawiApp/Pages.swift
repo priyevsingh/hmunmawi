@@ -344,13 +344,34 @@ struct InboxPage: View {
             }
             NextSteps(model: model)
             if !model.waiting.isEmpty {
+                let nonCriticalCount = model.waiting.filter { !AppModel.isCriticalWaiting($0.job) }.count
+                let displayRows = Self.groupWaiting(model.waiting)
                 KitCard {
-                    CardHeader(symbol: "hand.raised.fill", title: "Needs your OK", tint: Brand.caution, caption: "\(model.waiting.count)")
-                    ForEach(model.waiting) { action in
-                        HStack(alignment: .top) {
-                            LogRow(title: action.title, detail: action.detail)
-                            Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
-                            Button("Approve") { Task { await model.approve(action.job) } }.buttonStyle(.pillProminent)
+                    HStack {
+                        CardHeader(symbol: "hand.raised.fill", title: "Needs your OK", tint: Brand.caution, caption: "\(model.waiting.count)")
+                        Spacer()
+                        if nonCriticalCount > 0 {
+                            Button("Approve all non-critical (\(nonCriticalCount))") {
+                                Task { await model.approveAllNonCritical() }
+                            }.buttonStyle(.pill)
+                        }
+                    }
+                    ForEach(displayRows) { entry in
+                        switch entry {
+                        case .setKeyBatch(let connection, let items):
+                            SetKeyBatchWaitingRow(connection: connection, items: items, model: model)
+                        case .single(let action):
+                            if action.job.kind == "outreach.send" {
+                                OutreachWaitingRow(action: action, model: model)
+                            } else if action.job.kind == "review.reply" {
+                                ReviewReplyWaitingRow(action: action, model: model)
+                            } else {
+                                HStack(alignment: .top) {
+                                    LogRow(title: action.title, detail: action.detail)
+                                    Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
+                                    Button("Approve") { Task { await model.approve(action.job) } }.buttonStyle(.pillProminent)
+                                }
+                            }
                         }
                     }
                 }
@@ -560,6 +581,197 @@ struct EqualRowsGrid: Layout {
                                   proposal: .init(width: row.cell, height: row.height))
             }
             y += row.height + spacing
+        }
+    }
+}
+
+/// Editable outbound outreach draft in Log → Waiting with pinned recipient and MailCheck DNS status.
+private struct OutreachWaitingRow: View {
+    let action: WaitingAction
+    let model: AppModel
+    @State private var editing = false
+    @State private var subject = ""
+    @State private var bodyText = ""
+    @State private var mailCheck: Outreach.MailCheck?
+
+    private var toAddress: String { action.job.payload[path: "to"]?.string ?? "" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title).font(.body.weight(.medium))
+                    Text("To: \(toAddress) · via \(MailSender.modeDescription)")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if let mc = mailCheck, !mc.ok {
+                        Label("Mail DNS warning: \(mc.advice.first ?? "SPF/DKIM/DMARC incomplete")", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(Brand.caution)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
+                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
+                Button("Send") {
+                    Task {
+                        if editing { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) }
+                        await model.approve(action.job)
+                    }
+                }.buttonStyle(.pillProminent)
+            }
+            if editing {
+                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder)
+                TextEditor(text: $bodyText).font(.callout).frame(minHeight: 110, maxHeight: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                HStack {
+                    Spacer()
+                    Button("Save draft") { Task { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) } }.buttonStyle(.pill)
+                }
+            }
+        }
+        .onAppear {
+            subject = action.job.payload[path: "subject"]?.string ?? ""
+            bodyText = action.job.payload[path: "body"]?.string ?? ""
+        }
+        .task {
+            let own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? ""
+            if let domain = ReplyMatch.domain(own), mailCheck == nil {
+                mailCheck = await Outreach.mailCheck(domain: domain)
+            }
+        }
+    }
+}
+
+private extension InboxPage {
+    enum WaitingDisplayRow: Identifiable {
+        case setKeyBatch(connection: String, items: [WaitingAction])
+        case single(WaitingAction)
+
+        var id: String {
+            switch self {
+            case .setKeyBatch(let conn, let items): return "batch|\(conn)|\(items.map { String($0.id) }.joined(separator: ","))"
+            case .single(let a): return "single|\(a.id)"
+            }
+        }
+    }
+
+    static func groupWaiting(_ actions: [WaitingAction]) -> [WaitingDisplayRow] {
+        var batchedByConn: [String: [WaitingAction]] = [:]
+        var connOrder: [String] = []
+        var others: [WaitingAction] = []
+        for a in actions {
+            if a.job.kind == "agent.request",
+               a.job.payload[path: "command"]?.string == "set-key",
+               let conn = a.job.payload[path: "args.connection"]?.string, !conn.isEmpty {
+                if batchedByConn[conn] == nil { connOrder.append(conn) }
+                batchedByConn[conn, default: []].append(a)
+            } else {
+                others.append(a)
+            }
+        }
+        var out: [WaitingDisplayRow] = []
+        for conn in connOrder {
+            if let list = batchedByConn[conn], list.count > 1 {
+                out.append(.setKeyBatch(connection: conn, items: list))
+            } else if let only = batchedByConn[conn]?.first {
+                out.append(.single(only))
+            }
+        }
+        out += others.map { .single($0) }
+        return out
+    }
+}
+
+/// Formats grouped `set-key` lines cleanly, revealing plain values only when the connection's manifest explicitly marks the field non-secret.
+enum SetKeyBatchPreview {
+    static func displayLine(job: Job, connection: String, addOns: [AddOnRow]) -> String {
+        let field = job.payload[path: "args.field"]?.string ?? "field"
+        let value = previewValue(job: job, connection: connection, field: field, addOns: addOns)
+        return "\(field) = \(value ?? "•••")"
+    }
+
+    static func previewValue(job: Job, connection: String, field: String, addOns: [AddOnRow]) -> String? {
+        guard let setting = addOns.first(where: { $0.id == connection })?.manifest.settings.first(where: { $0.key == field }),
+              !setting.type.hasPrefix("secret") else { return nil }
+        if let v = job.payload[path: "args.value"]?.string, !v.isEmpty { return v }
+        guard let summary = job.payload[path: "summary"]?.string,
+              let range = summary.range(of: " value=") else { return nil }
+        let extracted = String(summary[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return extracted.isEmpty || extracted == "•••" ? nil : extracted
+    }
+}
+
+/// One Waiting card grouping multi-field `set-key` setups for a single connection (secrets masked as •••).
+private struct SetKeyBatchWaitingRow: View {
+    let connection: String
+    let items: [WaitingAction]
+    let model: AppModel
+    @State private var expanded = false
+
+    private func fieldLine(_ action: WaitingAction) -> String {
+        SetKeyBatchPreview.displayLine(job: action.job, connection: connection, addOns: model.addOns)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Configure \(connection) (\(items.count) fields)").font(.body.weight(.medium))
+                    Text(items.map(fieldLine).joined(separator: " · "))
+                        .font(.callout).foregroundStyle(.secondary)
+                        .lineLimit(expanded ? nil : 2)
+                }
+                Spacer()
+                Button(expanded ? "Less" : "Details") { expanded.toggle() }.buttonStyle(.pill)
+                Button("Skip all") { Task { await model.skipBatch(items.map(\.job)) } }.buttonStyle(.pill)
+                Button("Approve all") { Task { await model.approveBatch(items.map(\.job)) } }.buttonStyle(.pillProminent)
+            }
+        }
+    }
+}
+
+/// Editable proactive App Store review reply in Log → Waiting (alwaysAsk).
+private struct ReviewReplyWaitingRow: View {
+    let action: WaitingAction
+    let model: AppModel
+    @State private var editing = false
+    @State private var replyText = ""
+
+    private var reviewSummary: String {
+        let title = action.job.payload[path: "review_title"]?.string ?? ""
+        let body = action.job.payload[path: "review_body"]?.string ?? ""
+        return title.isEmpty ? body : "“\(title)” — \(body)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title).font(.body.weight(.medium))
+                    Text(reviewSummary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(replyText).font(.callout).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
+                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
+                Button("Post reply") {
+                    Task {
+                        if editing { await model.updateReviewReplyDraft(action.job, reply: replyText) }
+                        await model.approve(action.job)
+                    }
+                }.buttonStyle(.pillProminent)
+            }
+            if editing {
+                TextEditor(text: $replyText).font(.callout).frame(minHeight: 90, maxHeight: 160)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                HStack {
+                    Spacer()
+                    Button("Save draft") { Task { await model.updateReviewReplyDraft(action.job, reply: replyText) } }.buttonStyle(.pill)
+                }
+            }
+        }
+        .onAppear {
+            replyText = action.job.payload[path: "reply"]?.string ?? ""
         }
     }
 }

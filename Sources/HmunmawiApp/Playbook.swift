@@ -236,6 +236,17 @@ enum Playbook {
         let c = Calendar(identifier: .iso8601)
         return "\(c.component(.yearForWeekOfYear, from: .now))-\(c.component(.weekOfYear, from: .now))"
     }
+
+    /// Turns a Playbook finding into a copyable, agent-ready task brief.
+    nonisolated static func taskBrief(for s: Suggestion) -> String {
+        let appPart = s.app.map { " (\($0))" } ?? ""
+        return """
+        Task\(appPart): \(s.title)
+        Why: \(s.why)
+        Goal: \(s.action)
+        Guardrails: Keep the existing URL/slug unchanged, check wording against `hm lint-text`, and verify after shipping.
+        """
+    }
 }
 
 // MARK: What you said, and what worked
@@ -325,6 +336,7 @@ struct NextSteps: View {
     @State private var store = PlaybookStore.shared
     @State private var ai = AISettings.shared
     @State private var wording: [String: String] = [:]
+    @State private var copiedBriefID: String?
 
     var body: some View {
         let list = Playbook.ranked(model)
@@ -369,6 +381,11 @@ struct NextSteps: View {
             }
             Spacer(minLength: 8)
             HStack(spacing: 8) {
+                Button(copiedBriefID == s.id ? "Copied" : "Copy brief") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(Playbook.taskBrief(for: s), forType: .string)
+                    copiedBriefID = s.id
+                }.buttonStyle(.pill)
                 Button("Not useful") { withAnimation(.smooth) { store.notUseful(s) } }.buttonStyle(.pill)
                 Button("Done") { withAnimation(.smooth) { store.done(s) } }.buttonStyle(.pillProminent)
             }

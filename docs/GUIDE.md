@@ -87,7 +87,7 @@ The last 28 days from *Seen* (Google, YouTube, Bing) → *Visited* → *Saw an a
 
 <details><summary>How it works</summary>
 
-Worked out from your own numbers, no AI: search queries with no page, pages Google shows on its first page (position 10 or better, 100+ times in 28 days) that get under half your site's own click rate (rewrite the title and description), channels pulling this week, countries that look but don't download. Mark one Done and the number it should move is compared 14 days later, even after the step stops showing. Ads are suggested only above the cost per download you set in Settings → General.
+Worked out from your own numbers, no AI: search queries with no page, pages Google shows on its first page (position 10 or better, 100+ times in 28 days) that get under half your site's own click rate (rewrite the title and description), channels pulling this week, countries that look but don't download. Mark one Done and the number it should move is compared 14 days later, even after the step stops showing. Ads are suggested only above the cost per download you set in Settings → General. Press **Copy brief** on any step to copy a ready prompt brief for Claude Code or another coding agent.
 
 </details>
 
@@ -140,7 +140,7 @@ Each AI plan and API credit, how much is used and when it resets, plus the App S
 
 <details><summary>How it works</summary>
 
-A ready-to-share summary of the week (sales, wins, worries, releases). *Polish* has the AI tidy it; *Copy* puts it on the clipboard. Share cards turn the same numbers into a picture, with money in your currency, in dollars, or both.
+A ready-to-share summary of the week (sales, wins, worries, releases). *Polish* has the AI tidy it (and Settings → General includes an **AI weekly digest polish** toggle); *Copy* puts it on the clipboard. Share cards turn the same numbers into a picture, with money in your currency, in dollars, or both.
 
 </details>
 
@@ -173,7 +173,7 @@ Where the version in progress is: Building → TestFlight → Submitted → In r
 
 <details><summary>How it works</summary>
 
-Before you submit, what could get the version rejected (a missing build, review contact, promotional text, What's New in a language). *Fix it for me* fixes the small things after showing you the change; *Draft it for me* writes text; **Submit for Review** only after your OK.
+Before you submit, what could get the version rejected (a missing build, review contact, promotional text, What's New in a language), with a **Ready to submit checklist** banner and 1-click **Fix reversible** items. *Fix it for me* fixes the small things after showing you the change; *Draft it for me* writes text; **Submit for Review** only after your OK.
 
 </details>
 
@@ -230,7 +230,7 @@ Crash-free sessions per day, and freezes from Sentry (fatal hangs, and how many 
 
 <details><summary>How it works</summary>
 
-The newest reviews. *Draft reply* writes a reply with AI for you to edit; sending always asks first.
+The newest reviews. Open un-replied reviews are proactively drafted into **Log → Waiting** (`review.reply`), or press *Draft reply* here to edit in place; sending always asks first.
 
 </details>
 
@@ -352,7 +352,7 @@ Everything that came in, and what's waiting on you.
 
 <details><summary>How it works</summary>
 
-Every action waiting for approval (yours, a routine's or an agent's), with Approve or Skip.
+Every action waiting for approval (yours, a routine's or an agent's), with Approve or Skip. Multi-field `set-key` requests group into one card (showing non-secret fields inline while masking secrets, and superseded requests prune automatically when you save a connection manually), outreach and review drafts are editable before you approve, and **Approve all non-critical** lets you clear routine approvals in one tap while leaving critical owner-only items (`submit`, `vercel.redeploy`, `python-repair`, `outreach.send`, `review.reply`, `set-key`, `remove-*`, `publish`) for individual review.
 
 </details>
 
@@ -361,7 +361,7 @@ Every action waiting for approval (yours, a routine's or an agent's), with Appro
 
 <details><summary>How it works</summary>
 
-People you pitched (press, creators, partners) whose follow-up is due. *Open outreach* shows the full list: who, for which app, when you wrote, notes, a do-not-contact mark, and replies matched from your mail. A routine can watch for replies and for coverage (new posts on their site's feed). In the outreach editor, paste the outlet's page and press **Check** before adding: Hmunmawi reads that one page and says whether it loads, whether there's an email or contact form, whether it reads paid-only ("sponsored post", "review fee"), its language, and whether the outlet is already on your list (same name, website or address; a shared mail provider like gmail.com never counts). Agents get the same with `hm outreach-check`.
+People you pitched (press, creators, partners) whose follow-up is due. *Open outreach* shows the full list: who, for which app, when you wrote, notes, a do-not-contact mark, **Auto-updated** bookkeeping badges with **1-click Undo**, and replies matched from your mail. A routine watches for replies (respecting do-not-contact, embargo, 1-follow-up-per-outlet, and repitch-only-on-major/minor-release rules), pre-drafts your next outreach email into Log → Waiting (`outreach.send`), and checks coverage (new posts on their site's feed). Outbound sending runs only after your Approve click over **TLS/STARTTLS SMTP** (port 465 or 587) or **Zoho Mail compose in Safari**. In the outreach editor, paste the outlet's page and press **Check** before adding: Hmunmawi reads that one page and says whether it loads, whether there's an email or contact form, whether it reads paid-only ("sponsored post", "review fee"), its language, and whether the outlet is already on your list (same name, website or address; a shared mail provider like gmail.com never counts). Agents get the same with `hm outreach-check`.
 
 </details>
 
@@ -370,7 +370,7 @@ People you pitched (press, creators, partners) whose follow-up is due. *Open out
 
 <details><summary>How it works</summary>
 
-Replies to your outreach, from Apple Mail or any IMAP mailbox (Settings → Connections → Outreach replies). Only sender, subject and date are read, never the message.
+Replies to your outreach, from Apple Mail, TLS IMAP, or Zoho Mail via Safari (Settings → Connections → Outreach replies). Only sender, subject and date are read across the inbox; message text (`BODY.PEEK[TEXT]` or Zoho `md.do`) is read **only** for threads matching your outreach list (leaving unread state untouched) to pre-draft your next email locally.
 
 </details>
 
@@ -544,7 +544,7 @@ brings worker changes, it updates the worker by itself with the token you saved 
 
 <details><summary>More in General: appearance, currency, export, AI</summary>
 
-Appearance, the currency money is shown in, the ad cost per download, **Export your data** (reviews, daily numbers or every event, as CSV or JSON, as far back as you choose), and **AI wording**: pick a provider (Claude, OpenAI, Gemini, OpenRouter, Groq, Mistral, Ollama or any OpenAI-compatible service), a model and your key. Everything works without AI. What AI writes, the monthly limit and Apple's free on-device model: [Use any AI model, or none](AI-AND-COSTS.md#use-any-ai-model-or-none).
+Appearance, the currency money is shown in, the ad cost per download, **Export your data** (reviews, daily numbers or every event, as CSV or JSON, as far back as you choose), and **AI wording**: pick a provider (Claude, OpenAI, Gemini, OpenRouter, Groq, Mistral, Ollama or any OpenAI-compatible service), a model and your key (with **Find my key** discovery and built-in per-model pricing for Claude, OpenAI, Gemini and Groq, plus optional toggles for unpriced models and AI weekly digest polish). Everything works without AI. What AI writes, the monthly limit and Apple's free on-device model: [Use any AI model, or none](AI-AND-COSTS.md#use-any-ai-model-or-none).
 
 </details>
 
@@ -555,7 +555,7 @@ Appearance, the currency money is shown in, the ad cost per download, **Export y
 
 <details><summary>How it works</summary>
 
-One section per source, keys saved in the Keychain, *Find my key*, Check Now and Disconnect. A key that was found from a file is re-imported from that file at launch, in the background after the window is up, so a protected folder never freezes the start; if macOS refuses the file, only that connection is marked as needing attention. A key saved by a differently signed copy of the app is re-saved in a fresh Keychain item, with no password box. Also **how fast sales arrive**: next morning (Apple's daily report), within minutes (Apple's notification history, with an In-App Purchase key) or within seconds (a free worker in your own Cloudflare account, see [the relay guide](ASC-WEBHOOK-RELAY.md)), and **Outreach replies** (Apple Mail, or IMAP with presets for Gmail, iCloud, Outlook and Fastmail).
+One section per source, keys saved in the Keychain, *Find my key* (including Vercel, GitHub tokens from `gh` CLI, and AI provider keys), **Detect from repo…** on Vercel (for single or comma-separated multi-project setups), Check Now and Disconnect. A key that was found from a file is re-imported from that file at launch, in the background after the window is up, so a protected folder never freezes the start; if macOS refuses the file, only that connection is marked as needing attention. A key saved by a differently signed copy of the app is re-saved in a fresh Keychain item, with no password box. Also **how fast sales arrive**: next morning (Apple's daily report), within minutes (Apple's notification history, with an In-App Purchase key) or within seconds (a free worker in your own Cloudflare account, see [the relay guide](ASC-WEBHOOK-RELAY.md)), and **Outreach replies & sending** (Apple Mail, Zoho Mail via Safari, or IMAP/TLS SMTP with presets for Gmail, iCloud, Outlook and Fastmail).
 
 </details>
 
@@ -588,7 +588,7 @@ At the top, **Run by Hmunmawi** lists the jobs Hmunmawi itself runs for you: X u
 
 <details><summary>How it works</summary>
 
-"when this happens, do that", in plain sentences, each Hands-on, Try out or Autopilot. Ready-made rules by group: money moments (new subscriber, refund, billing problem), trends, reputation (low reviews), stability, AI & subscriptions, offer codes, releases (TestFlight feedback, an expiring certificate, a failed Xcode Cloud build), the weekly story, Mac jobs and your website going down.
+"when this happens, do that", in plain sentences, each Hands-on, Try out or Autopilot (with **Switch to Autopilot** nudges on eligible rules). Ready-made rules by group: money moments (new subscriber, refund, billing problem), trends, reputation (low reviews), stability, AI & subscriptions, offer codes, releases (TestFlight feedback, an expiring certificate, a failed Xcode Cloud build), the weekly story, Mac jobs and your website going down.
 
 </details>
 
@@ -630,7 +630,7 @@ Daily copies on your Mac with Restore, *Back up now*, an encrypted iCloud Drive 
 
 <details><summary>How it works</summary>
 
-Version, the story, and the [Wall of Apps](WALL-OF-APPS.md).
+Version, the story, a **Sponsor on GitHub** link, and the [Wall of Apps](WALL-OF-APPS.md).
 
 </details>
 
@@ -803,7 +803,7 @@ that can `notify` can add any of them ([Writing a connection](ADD-ONS.md)).
 | YouTube | Views, subscribers and newest videos | An API key, or the Google sign-in file your own upload scripts already use (client id, client secret and refresh token) |
 | X | Your X numbers, read through your Safari login or from a file Grok Bot writes (no paid X API). Full setup with drafts, reply ideas and unfollows (by hand or automatic): [Set up X](X-SETUP.md) | Nothing |
 | Cloudflare | Website visitors and AI-bot reads | An API token |
-| Vercel | Website visitors and page views (Web Analytics), which commit production runs, and whether your branch has a newer one that never got a deploy; Redeploy only after your OK | Project name or ID, an access token; optional Team ID, GitHub repository and a read-only GitHub token for a private repo |
+| Vercel | Website visitors and page views (Web Analytics, per project), which commit production runs (supporting comma-separated project IDs with **Detect from repo…**), and whether your branch has a newer one that never got a deploy; Redeploy only after your OK | Project name or ID (or comma-separated list), an access token; optional Team ID, GitHub repository and a read-only GitHub token for a private repo |
 | Mac jobs | Your Mac's scheduled jobs: runs, failures, Run now and Pause | Nothing |
 | Script feed | Any numbers your own scripts print: [Your own numbers](SCRIPT-FEED.md) | Nothing |
 | iMessage, ntfy | Alerts to your phone | Your number, or an ntfy topic |
@@ -820,18 +820,18 @@ Each runs as a separate sandboxed add-on that never sees your keys. Write your o
 > **What you get:** your AI coding agent can check your numbers and do the busywork for you, but nothing changes without your OK.
 
 Claude Code, Cursor and other agents use Hmunmawi through the `hm` command or its MCP server, under the same
-approval rules as you. Settings → Rules → Agents chooses what an agent may do without asking, and gives it a badge. Once any badge exists, an agent without one shows as unverified and always waits for your OK.
+approval rules as you. Settings → Rules → Agents offers **Smart Autopilot (recommended)** (HMAC-signed) and lets you choose what an agent may do without asking and give it a badge. Once any badge exists, an agent without one shows as unverified and always waits for your OK.
 Every command: [hm commands](HM-COMMANDS.md). Notes for coding agents: [AGENTS.md](../AGENTS.md).
 
 ```mermaid
 flowchart TD
     A["An agent asks for a change"] --> B{"Badges exist and it sent none?"}
     B -->|yes| W["Waits in Log, Waiting"]
-    B -->|no| C{"Always waits? (redeploy, Python repair, submit)"}
+    B -->|no| C{"Always waits? (submit, send/reply, key, remove, publish, redeploy, repair)"}
     C -->|yes| W
     C -->|no| D{"Its rule says ask?"}
     D -->|yes| W
-    D -->|no| E{"Allowed, or Full Autopilot on?"}
+    D -->|no| E{"Allowed, Smart Autopilot, or Full Autopilot on?"}
     E -->|yes| R["Runs and is logged"]
     E -->|no| W
 ```

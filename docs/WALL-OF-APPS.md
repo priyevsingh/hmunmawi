@@ -1,6 +1,6 @@
 # Wall of Apps
 
-Apps shipped by indie developers who use Hmunmawi, newest first. Add yours from the app: Settings → About → Wall of Apps.
+Apps shipped by indie developers who use Hmunmawi, newest first. Add yours from the app: Settings → About → Wall of Apps, and share your launch story in [Wall of Apps / Show & Tell](https://github.com/priyevsingh/hmunmawi/discussions/categories/wall-of-apps-show-tell).
 
 **3 apps**
 

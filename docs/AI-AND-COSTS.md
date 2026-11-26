@@ -10,14 +10,13 @@ anywhere except the service each key belongs to.
 your own key, and set how much it may spend.
 
 - **Providers:** Claude (Anthropic), OpenAI, Google Gemini, OpenRouter, Groq, Mistral, Ollama (free, runs on your
-  Mac) or any other OpenAI-compatible service. Settings → General → AI wording: provider, model and key (the key
-  stays in your Keychain).
+  Mac) or any other OpenAI-compatible service. Settings → General → AI wording: provider, model and key (with **Find my key** discovery and automatic Keychain recovery across rebuilds; keys stay in your Keychain).
 - **What AI writes for you:** reply drafts for reviews, featuring nomination pitches, outreach follow-ups, Rejection
-  Shield texts and review notes, the "Predict" read on where the month lands, a polish of your weekly story, the
+  Shield texts and review notes, the "Predict" read on where the month lands, a polish of your weekly story (also switchable via **AI weekly digest polish**), the
   wording of your next steps, and AI briefs and post drafts in routines. Every result is shown to you first; nothing
   is sent or changed without your OK.
-- **A monthly limit:** set the most Hmunmawi may spend on AI each month (estimated from the tokens your provider
-  reports). For a provider whose prices it doesn't know, you enter the price per million tokens. A routine's AI brief
+- **A monthly limit & built-in pricing:** set the most Hmunmawi may spend on AI each month (estimated from the tokens your provider
+  reports). Built-in per-model pricing is included for **Claude, OpenAI, Gemini, and Groq**; for another provider or model, enter a price per million tokens or enable **Allow models without known pricing** if you want unpriced models to run (capped only by your provider). A routine's AI brief
   can have its own monthly cap.
 - **Keep it separate at your provider:** the app tells you how, for your provider (for example, a separate workspace
   with its own spend limit in the Claude Console, or a dedicated key with a limit elsewhere), so Hmunmawi's spending

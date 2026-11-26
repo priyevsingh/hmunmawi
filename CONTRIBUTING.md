@@ -10,14 +10,23 @@ Thanks for wanting to help. Hmunmawi is maintained by one person, in their own t
 
 ## Please ask first
 
-Open an issue with the **Idea or question** form ([new issue](../../issues/new/choose)) before starting on:
+Start a thread in [GitHub Discussions](https://github.com/priyevsingh/hmunmawi/discussions) (*Ideas & Feature Requests*, *Q&A & Setup Help*, or *Add-ons, Scripts & MCP*) before starting on:
 
 - a new screen or a redesign of an existing one,
 - a new dependency (Hmunmawi's only one outside Apple's frameworks is Sparkle, for updates; that's on purpose),
 - anything that sends data somewhere new or reads files it didn't read before,
 - large refactors.
 
-A short conversation up front avoids a pull request that can't be merged.
+A short conversation up front avoids a pull request that can't be merged. Use [Bug report](../../issues/new?template=bug_report.yml) when something in the app is broken.
+
+## Where to start
+
+Good first areas if you are new to the codebase (look for issues labelled `good first issue` or `help wanted`):
+
+- **New add-ons** under `AddOns/` (each add-on is self-contained, sandboxed, and documented in [docs/ADD-ONS.md](docs/ADD-ONS.md)),
+- **`KeyFinder` discovery hints** in `Sources/HmunmawiApp/KeyFinder.swift` (adding `.env` or Keychain discovery patterns for existing services),
+- **`RuleTemplates`** in `Sources/HmunmawiApp/RulesView.swift` (adding ready-made automation rules),
+- **Docs and guides** in `docs/` and `README.md`.
 
 ## How decisions are made
 
