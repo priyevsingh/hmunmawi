@@ -161,7 +161,8 @@ def build(root):
         f'| [{esc(e["app"])}]({esc(e["link"])}) | {esc(e.get("developer") or "")} | {esc(e.get("added") or "")} |'
         for e in apps)
     page = ("# Wall of Apps\n\nApps shipped by indie developers who use Hmunmawi, newest first. "
-            "Add yours from the app: Settings → About → Wall of Apps.\n\n"
+            "Add yours from the app: Settings → About → Wall of Apps, and share your launch story in "
+            "[Wall of Apps / Show & Tell](https://github.com/priyevsingh/hmunmawi/discussions/categories/wall-of-apps-show-tell).\n\n"
             + (f"**{n} app{'s' if n != 1 else ''}**\n\n| | App | Developer | Joined |\n|---|---|---|---|\n{rows}\n" if apps
                else "_No apps yet. Be the first._\n"))
     (root / "docs/WALL-OF-APPS.md").write_text(page)

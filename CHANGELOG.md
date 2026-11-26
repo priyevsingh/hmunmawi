@@ -2,6 +2,16 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.6.0 (build 160), 26 Nov 2026
+
+**New**
+- **Smart Setup & Keychain recovery (`SecretRebinder`, `KeyFinder`, `VercelDetector`):** Find my key discovers and auto-rebinds `vercel/apiToken`, `vercel/githubToken` (including `gh` CLI Keychain extraction), and all AI provider keys (`claude`, `openai`, `gemini`, `openrouter`, `groq`, `mistral`). Added built-in pricing tables for OpenAI, Gemini, and Groq, an optional toggle to allow unpriced models, comma-separated multi-project Vercel polling with project-matched redeploys and repo auto-detection (`.vercel/project.json` + `.git/config`), and optional AI polish for Weekly Digest (enforcing `Wording.rules` and strictly forbidding developer-location leaks).
+- **Smart Outreach & mail transport (`SMTPClient`, `MailSender`, `ZohoSafariReader`):** Outreach bookkeeping updates replies, bounces, declines, and opt-outs automatically with 1-click Undo (`AutoApplied`), enforces do-not-contact / embargo / 1-follow-up-per-outlet / patch-release repitch guards, reads message bodies (`BODY.PEEK[TEXT]` over TLS IMAP or Zoho `md.do`) strictly for matched outreach threads without touching unread state, pre-drafts follow-ups and pitches into `Log → Waiting` (`outreach.send`), and supports editable approve-to-send over TLS/STARTTLS SMTP (ports 465/587; port 25 refused) or Zoho Mail Safari compose.
+- **Smart Autopilot & workflow polish (`AgentPolicy`, `ShieldChecklist`, `ReviewDrafter`):** Added an HMAC-signed `Smart Autopilot (recommended)` tier in Settings → Rules → Agents (`|smart|1`), explicit `alwaysAsk` owner-only gates (`submit`, `vercel.redeploy`, `python-repair`, `outreach-send`, `review-reply`, `set-key`, `remove-*`, `publish`, scripts), `hm approve` CLI refusal for critical/external jobs, proactive Ready to submit checklist (`Fix X reversible`) on Rejection Shield, proactive open review reply drafting into `Log → Waiting` (`review.reply`), 1-click Autopilot nudges on eligible rules, Next steps task brief copying (`Copy brief`), and batched `set-key` Waiting cards plus `Approve all non-critical` (skipping every critical `alwaysAsk` job).
+- **Community setup:** Added GitHub Discussions categories, `.github/SUPPORT.md`, updated `CONTRIBUTING.md`, issue template chooser links, and `scripts/github-settings.sh` (`has_discussions=true`).
+
+Hmunmawi still does everything it did in 1.5.9. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.5.9 (build 159), 24 Nov 2026
 
 **New**

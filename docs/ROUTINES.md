@@ -26,7 +26,7 @@ missed (the Mac was asleep) still starts if it's within the routine's catch-up w
 | Check my workspace Python | Finds the Python environments (venvs) your script routines and Mac jobs run with (from their commands and scripts' first lines), plus `folders` you name. A broken one (its Python removed or upgraded away) is told once with the fix; a working one's package list is saved about once a day. **Repair…** (in its form) or `hm python-repair` keeps the old folder as `<venv>.broken-<date>`, makes a fresh one with this Mac's python3 and reinstalls the saved packages. `repair=auto` (owner-only, in the app) repairs at once; an agent's edit of the routine turns it back to asking. Only folders with a `pyvenv.cfg` count as venvs (a folder with just a `bin/`, such as `~/go`, is never touched) | nothing (reads your LaunchAgents and scripts) |
 | Judge my changes | After 7 to 28 days, keep / improve / undo for each change you asked it to watch | a change to watch |
 | Run one of my Mac jobs | Starts one of your Mac jobs (LaunchAgents) on this schedule. "Take over its own timer" keeps a copy of the job's file and removes its own schedule; switching the routine off or deleting it puts the original back. A job that fails is started once more a minute later. Only your own jobs (names starting with your Mac jobs prefixes, never `com.apple.*`); an agent needs the "Run or pause Mac jobs" permission to add or change one | a Mac job |
-| Outreach replies | Matches replies in your mail to your outreach list; each change waits for your tap | a mail source (Settings → Connections → Outreach replies) and an outreach list |
+| Outreach replies | Matches replies in your mail to your outreach list, applies bounce/reply/opt-out bookkeeping automatically (with 1-click Undo), reads matched reply text (unread untouched), and pre-drafts follow-ups and pitches into Log → Waiting (`outreach.send`); sending waits for your Approve | a mail source (Settings → Connections → Outreach replies) and an outreach list |
 | Run my script | Your own script (time limit 1–60 minutes, 10 by default), output kept; optional working folder and a settings file of KEY=VALUE lines the script gets; **Try out** runs it with its dry-run argument and records only | a script |
 | Morning story, Weekly digest | The app's own summaries; switch them off here. The morning story can add one line from your AI | — |
 
@@ -55,8 +55,7 @@ agent can edit it too; an invalid pattern is shown in Settings and ignored.
   waits while another program's AI job holds the lock file (`HMAILockFile`).
 - **AI never acts on its own.** AI results are summaries sent to you or drafts you post yourself. The judge
   only suggests; nothing is undone for you.
-- **Nothing outside Hmunmawi changes by itself.** A website redeploy and a Python repair always wait for your OK
-  (or your own tap), even in Full Autopilot. Automatic Python repair can only be switched on by you, in the app.
+- **Nothing outside Hmunmawi changes or sends by itself.** Submitting for review, sending outreach mail (`outreach.send`), posting review replies (`review.reply`), changing keys, publishing, a website redeploy, and a Python repair always wait for your OK (or your own tap), even in Smart or Full Autopilot, and `hm approve` refuses those external actions from the CLI. Automatic Python repair can only be switched on by you, in the app.
 - **Agents ask unless allowed.** Once you give agents badges (Settings → Rules → Agents), an agent that sends no badge
   always waits for your OK, even in Full Autopilot.
 - **Scripts are yours alone.** Only you can add or change a script routine, in the app. Agents may run or

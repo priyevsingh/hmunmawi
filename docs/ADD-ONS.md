@@ -15,7 +15,7 @@ The full list of what Hmunmawi does is in [CAPABILITIES.md](CAPABILITIES.md). Hm
 | PostHog | Daily active users |
 | Sentry | Sessions and crashes each day (crash-free rate) and, with the `event:read` scope, your open problems, every 30 minutes |
 | Cloudflare | Website visitors each day |
-| Vercel | Website visitors and page views, and production deploy health; Redeploy only after your OK |
+| Vercel | Website visitors and page views (Web Analytics), multi-project deploy health (comma-separated project IDs); Redeploy only after your OK |
 | Google Search Console, Bing Webmaster Tools | Search clicks, impressions, top searches and pages (Search Console: 50 pages with their average position) |
 | YouTube | Subscribers, views and newest videos. A Google sign-in file from an OAuth app still in "Testing" stops working after 7 days (Google expires its refresh token); the Key watch routine tells you when that happens |
 | X | Followers, views and engagement from your daily X file; no key needed |
@@ -29,18 +29,18 @@ The Search Console and Bing add-ons only read: submitting pages or sitemaps to s
 
 ## Notes on some built-in add-ons
 
-**Vercel** (`AddOns/vercel`). Settings: project name or ID, Team ID (optional, `team_…`), the website name to show,
+**Vercel** (`AddOns/vercel`). Settings: project name or ID (or a comma-separated list of project names/IDs for multiple sites), Team ID (optional, `team_…`), the website name to show,
 a GitHub repository (`owner/name`, optional; read from the project's Git link when empty), the production branch
 (optional; Vercel's own when empty), an access token (Vercel → Account Settings → Tokens, scoped to the team that owns
-the project) and an optional GitHub token (fine-grained, read-only Contents, only for a private repository).
+the project) and an optional GitHub token (fine-grained, read-only Contents, only for a private repository; **Find my key** can pull this from `gh` CLI's Keychain entry or `.env`). In Settings → Connections → Vercel, **Detect from repo…** fills Project ID, GitHub repo, and production branch automatically from `.vercel/project.json` and `.git/config`.
 Hosts: `api.vercel.com` and `api.github.com`; each token may only go to its own host (`secretHosts`).
-- Every 15 minutes: the newest production deploy (`GET /v9/projects/{id}`, `GET /v7/deployments?target=production`),
+- Every 15 minutes: for each project, the newest production deploy (`GET /v9/projects/{id}`, `GET /v7/deployments?target=production`),
   the branch's newest commit from GitHub (`GET /repos/{owner}/{repo}/commits/{branch}`, no token for a public repo)
-  and any deploy for that commit (`GET /v7/deployments?sha=…`), as one `deploy.snapshot` event.
-- Every 3 hours: visitors and page views for 7 and 28 days and visitors per day, from Vercel Web Analytics
-  (`GET /v1/query/web-analytics/visits/count` and `/visits/aggregate?by=day`), as a card on the Reach page. A plan or
+  and any deploy for that commit (`GET /v7/deployments?sha=…`), as separate `deploy.snapshot` events.
+- Every 3 hours: visitors and page views for 7 and 28 days and visitors per day per project, from Vercel Web Analytics
+  (`GET /v1/query/web-analytics/visits/count` and `/visits/aggregate?by=day`), as cards on the Reach page (`vercel-visitors-<id>`). A plan or
   project without Web Analytics only skips this card.
-- One action, `vercel.redeploy`: deploys the branch's newest commit to production (`POST /v13/deployments` with
+- One action, `vercel.redeploy`: matches the target project and deploys the branch's newest commit to production (`POST /v13/deployments` with
   `gitSource`; refused if the branch moved since you approved), or rebuilds a given deployment (`deploymentId`). It
   runs only after the owner's OK in Log → Waiting (put there by Watch my services or `hm deploy-redeploy`).
 
@@ -169,4 +169,4 @@ await PluginRuntime.run(MyService())
 
 ## Sharing it
 
-Publish your add-on in your own repository with build instructions. To propose it as a built-in add-on, open an issue with the **Idea or question** form first; see [CONTRIBUTING.md](../CONTRIBUTING.md).
+Publish your add-on in your own repository with build instructions. To propose it as a built-in add-on or share what you built, start a thread in [Add-ons, Scripts & MCP](https://github.com/priyevsingh/hmunmawi/discussions/categories/add-ons-scripts-mcp) first; see [CONTRIBUTING.md](../CONTRIBUTING.md).

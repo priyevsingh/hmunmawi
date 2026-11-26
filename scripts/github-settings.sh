@@ -11,7 +11,7 @@ api() { gh api "$@" >/dev/null 2>/tmp/ghs.err; }
 # Auto-merge lets the Wall of Apps rebuild pull request land itself once required checks are green.
 api -X PATCH "repos/$R" -F allow_squash_merge=true -F allow_merge_commit=false -F allow_rebase_merge=false \
   -F delete_branch_on_merge=true -F allow_update_branch=true -F allow_auto_merge=true -F web_commit_signoff_required=true \
-  -F has_wiki=false -F has_issues=true && ok "merge settings" || skip "merge settings" "$(cat /tmp/ghs.err)"
+  -F has_wiki=false -F has_issues=true -F has_discussions=true && ok "merge settings" || skip "merge settings" "$(cat /tmp/ghs.err)"
 
 # Actions: only GitHub's own actions, read-only token by default, workflows can't approve pull requests.
 api -X PUT "repos/$R/actions/permissions" -F enabled=true -f allowed_actions=selected && \

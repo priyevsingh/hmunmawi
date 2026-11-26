@@ -2,6 +2,26 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.6.0",
+      "items": [
+        {
+          "title": "Smart Setup for AI & Vercel",
+          "detail": "Find my key discovers Vercel and AI provider keys and recovers them across rebuilds, including GitHub tokens. Vercel also tracks multiple comma-separated projects with repo auto-detection, and OpenAI, Gemini, and Groq include built-in pricing.",
+          "action": "settings:connections"
+        },
+        {
+          "title": "Smart Outreach & Reply Reading",
+          "detail": "Replies, bounces, and opt-outs update automatically with one-click Undo, and matched reply threads pre-draft your next outreach email in Log. Send over TLS SMTP or Zoho Safari compose only when you approve.",
+          "action": "page:log"
+        },
+        {
+          "title": "Smart Autopilot & Release Checks",
+          "detail": "Enable Smart Autopilot for badged agents while keeping submit, sends, replies, and keys owner-only. Apps shows a Ready to submit checklist, proactive review reply drafts wait in Log, and batch approval skips critical items.",
+          "action": "settings:rules"
+        }
+      ]
+    },
+    {
       "version": "1.5.9",
       "items": [
         {

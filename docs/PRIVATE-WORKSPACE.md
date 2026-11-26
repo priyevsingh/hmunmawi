@@ -507,8 +507,7 @@ flowchart LR
 
 ### Review reply drafts and store keyword ideas
 
-- **Built in:** new App Store reviews, with reply drafts you edit; a reply is posted only when you press Post and
-  confirm, and can be undone. `hm review-list` gives an agent the reviews with no reply yet.
+- **Built in:** new App Store reviews, with reply drafts proactively placed in **Log → Waiting** (`review.reply`) or editable on the Apps page; a reply is posted only when you approve or press Post and confirm, and can be undone. `hm review-list` gives an agent the reviews with no reply yet, and `hm review-reply` parks a draft in Log → Waiting (never posts directly).
 - **Your workspace:** a batch AI job can draft replies or App Store keyword ideas into files for you to read. Keep
   them as files; changing your App Store listing stays a step you take.
 
@@ -825,9 +824,8 @@ Read STATE.md before planning or changing anything. Update it after acting.
   into chats or reports, or commit them.
 - Scripts that feed Hmunmawi only read and print JSON (see Hmunmawi's docs/SCRIPT-FEED.md). Anything that changes
   something goes through Hmunmawi (`hm`) so it waits for my OK.
-- Never post, reply, send or publish for me on any platform. Produce drafts and to-dos.
-- Check drafts and pages against my Words I never use with `hm lint-text` before handing them over. Redeploys and
-  Python repairs go through `hm deploy-redeploy` / `hm python-repair`, which always wait for me.
+- Never post, reply, send or publish for me on any platform. Produce drafts (`hm outreach-send`, `hm review-reply` park drafts in Log → Waiting for my OK; `hm approve` refuses external actions).
+- Check drafts and pages against my Words I never use with `hm lint-text` before handing them over. Submitting (`shield-fix item=submit`), redeploys (`deploy-redeploy`), Python repairs (`python-repair`), key changes (`set-key`), deletions (`remove-*`), and `publish` always wait for me even under Smart Autopilot.
 - Use your Hmunmawi agent badge (`HM_AGENT_TOKEN`): once badges exist, a request without one always waits for me.
 - Mac jobs: only `<your job prefix>.*` jobs; Hmunmawi refuses others and never touches `com.apple.*`.
 - Before running an AI job, check `hm ai-pause-check`; if it says deferred, stop.
