@@ -42,14 +42,16 @@ struct OutreachSheet: View {
                                     Text(rec.why).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Button("Undo") {
+                                Button {
                                     Task {
                                         busy = rec.id
                                         let r = await Outreach.undoAutoApplied(rec)
-                                        busy = nil
                                         note = r.note
                                         reload()
+                                        busy = nil
                                     }
+                                } label: {
+                                    WaitingBusyLabel(title: "Undo", busyTitle: "Undoing…", busy: busy == rec.id)
                                 }.buttonStyle(.pill).disabled(busy != nil)
                             }
                         }
@@ -65,7 +67,13 @@ struct OutreachSheet: View {
                         Spacer()
                         let closes = open.filter { $0.kind == "no reply" }
                         if closes.count > 1 {
-                            Button("Close all \(closes.count) as no reply") { Task { for s in closes { await apply(s) } } }.disabled(busy != nil)
+                            Button {
+                                Task {
+                                    for s in closes { await apply(s) }
+                                }
+                            } label: {
+                                WaitingBusyLabel(title: "Close all \(closes.count) as no reply", busyTitle: "Closing…", busy: busy != nil)
+                            }.disabled(busy != nil)
                         }
                     }
                     Text("Draft email puts an email into Log → Needs your OK so you can review or send it. Not this hides the suggestion.")
@@ -157,6 +165,8 @@ struct OutreachSheet: View {
     }
 
     @ViewBuilder private func suggestionRow(_ s: OSuggestion) -> some View {
+        let isApplying = busy == s.id
+        let isDraft = Self.isDraftSuggestion(s)
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -168,10 +178,20 @@ struct OutreachSheet: View {
                 if let l = s.link, let u = InputCheck.httpsURL(l) { Link(l, destination: u).font(.callout).lineLimit(1).truncationMode(.middle) }
                 Text([s.mailSubject.map { "“\($0)”" }, s.mailFrom, s.why].compactMap { $0 }.joined(separator: " · "))
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if isApplying {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text(isDraft ? "Creating draft in Log → Needs your OK…" : "Updating outreach list…")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 2)
+                }
             }
             Spacer()
-            Button("Not this") { mark(s, "dismissed") }
-            Button(applyTitle(s)) { Task { await apply(s) } }.buttonStyle(.pillProminent).disabled(busy != nil)
+            Button("Not this") { mark(s, "dismissed") }.disabled(busy != nil)
+            Button { Task { await apply(s) } } label: {
+                WaitingBusyLabel(title: applyTitle(s), busyTitle: isDraft ? "Drafting…" : "Updating…", busy: isApplying)
+            }.buttonStyle(.pillProminent).disabled(busy != nil)
         }
         .padding(.vertical, 8)
     }
@@ -206,6 +226,7 @@ struct OutreachSheet: View {
                 return
             }
             busy = s.id
+            defer { busy = nil }
             await Outreach.refreshHighlights(model: model)
             let since = Millis(Date.now.addingTimeInterval(-60 * 86_400).timeIntervalSince1970 * 1000)
             let events = (try? await store.events(kind: "mail.seen", since: since)) ?? []
@@ -227,7 +248,6 @@ struct OutreachSheet: View {
                 model: model,
                 store: store
             )
-            busy = nil
             guard res.queued else {
                 note = res.reason ?? "Could not create a draft for \(s.outlet)."
                 return
@@ -254,6 +274,8 @@ struct OutreachSheet: View {
         }
         // A conversation's new state: remembered here (and the list's status, if it changes).
         if s.kind == "thread", let st = s.thread {
+            busy = s.id
+            defer { busy = nil }
             let mailID = String(s.id.split(separator: "|").last ?? "")
             Outreach.changeSide { $0.threads = ($0.threads ?? [:]).merging([s.entry: Outreach.Thread(state: st, promise: s.promise, since: s.day, mail: mailID, evidence: s.why)]) { _, b in b } }
             if s.status != nil, let item = items.first(where: { $0.id == s.entry }) {
@@ -275,8 +297,8 @@ struct OutreachSheet: View {
         }
         guard let item = items.first(where: { $0.id == s.entry }) else { note = "That entry isn't in the list any more."; return }
         busy = s.id
+        defer { busy = nil }
         let r = await Outreach.apply(item, status: s.status, followUp: s.followUp, markFollowedUp: s.markFollowedUp == true)
-        busy = nil
         note = r.ok ? "\(s.outlet): \(applyTitle(s).lowercased())." : r.note
         if r.ok { mark(s, "done") }
     }
@@ -423,7 +445,9 @@ struct OutreachDetail: View {
                         HStack {
                             if appID != nil { Toggle("Include a free code link", isOn: $withCode) }
                             Spacer()
-                            Button(busy ? "Writing…" : "Draft with AI") { Task { await aiDraft() } }
+                            Button { Task { await aiDraft() } } label: {
+                                WaitingBusyLabel(title: "Draft with AI", busyTitle: "Writing…", busy: busy)
+                            }
                                 .disabled(busy || theirMessage.trimmingCharacters(in: .whitespaces).isEmpty || !AISettings.shared.hasKey)
                         }
                         if !AISettings.shared.hasKey { Text("Needs an AI key (Settings → General).").font(.callout).foregroundStyle(.secondary) }
@@ -439,7 +463,9 @@ struct OutreachDetail: View {
                     Button("Copy") { copy(draft) }.disabled(draft.isEmpty)
                     Button("Open in Mail") { openMail() }.disabled(draft.isEmpty || Outreach.pinnedRecipient(for: item) == nil)
                     if MailSender.isConfigured {
-                        Button("Send via \(MailSender.modeDescription)") { confirmSend = true }
+                        Button { confirmSend = true } label: {
+                            WaitingBusyLabel(title: "Send via \(MailSender.modeDescription)", busyTitle: "Sending…", busy: busy)
+                        }
                             .buttonStyle(.pillProminent)
                             .disabled(busy || draft.isEmpty || draftSubject.trimmingCharacters(in: .whitespaces).isEmpty || Outreach.pinnedRecipient(for: item) == nil)
                     }

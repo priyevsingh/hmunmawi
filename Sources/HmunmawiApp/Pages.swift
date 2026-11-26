@@ -347,10 +347,16 @@ struct InboxPage: View {
                 let nonCritical = model.waiting.filter { !AppModel.isCriticalWaiting($0.job) }
                 let nonCriticalCount = nonCritical.count
                 let batchApproving = nonCritical.contains { model.isWaitingApproving($0.job.id) }
+                let anyBusy = model.waiting.contains { model.isWaitingBusy($0.job.id) }
                 let displayRows = Self.groupWaiting(model.waiting)
                 KitCard {
                     HStack {
                         CardHeader(symbol: "hand.raised.fill", title: "Needs your OK", tint: Brand.caution, caption: "\(model.waiting.count)")
+                        if anyBusy {
+                            ProgressView()
+                                .controlSize(.small)
+                                .help("Running your approved action and loading the next item…")
+                        }
                         Spacer()
                         if nonCriticalCount > 0 {
                             Button {
@@ -374,15 +380,30 @@ struct InboxPage: View {
                             } else if action.job.kind == "review.reply" {
                                 ReviewReplyWaitingRow(action: action, model: model)
                             } else {
-                                let isBusy = model.isWaitingBusy(action.job.id)
+                                let isApproving = model.isWaitingApproving(action.job.id)
+                                let isSkipping = model.isWaitingSkipping(action.job.id)
+                                let isBusy = isApproving || isSkipping
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(alignment: .top) {
-                                        LogRow(title: action.title, detail: action.detail)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            LogRow(title: action.title, detail: action.detail)
+                                            if isApproving {
+                                                HStack(spacing: 6) {
+                                                    ProgressView().controlSize(.small)
+                                                    Text("Running and loading next items…").font(.caption).foregroundStyle(.secondary)
+                                                }
+                                            } else if isSkipping {
+                                                HStack(spacing: 6) {
+                                                    ProgressView().controlSize(.small)
+                                                    Text("Skipping…").font(.caption).foregroundStyle(.secondary)
+                                                }
+                                            }
+                                        }
                                         Button { Task { await model.skip(action.job) } } label: {
-                                            WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: model.isWaitingSkipping(action.job.id))
+                                            WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: isSkipping)
                                         }.buttonStyle(.pill).disabled(isBusy)
                                         Button { Task { await model.approve(action.job) } } label: {
-                                            WaitingBusyLabel(title: "Approve", busyTitle: "Working…", busy: model.isWaitingApproving(action.job.id))
+                                            WaitingBusyLabel(title: "Approve", busyTitle: "Working…", busy: isApproving)
                                         }.buttonStyle(.pillProminent).disabled(isBusy)
                                     }
                                     if let err = model.jobErrors[action.job.id] {
