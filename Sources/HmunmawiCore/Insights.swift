@@ -284,11 +284,14 @@ public struct Finding: Sendable, Identifiable {
     /// What drove the change, e.g. "mostly My App (80%)"; nil when no single part explains it.
     public var driver: String?
     public var family: String?
+    /// Exact percentage shift for two-segment level changes (`newLevel`), matching the headline split.
+    public var deltaPercent: Int?
 
     public init(id: String, lane: Lane, detector: Detector, app: String?, title: String, evidence: String, why: String,
-                score: Double, metricKey: String? = nil, points: [(day: Date, value: Double)] = []) {
+                score: Double, metricKey: String? = nil, points: [(day: Date, value: Double)] = [], deltaPercent: Int? = nil) {
         self.id = id; self.lane = lane; self.detector = detector; self.app = app; self.title = title
         self.evidence = evidence; self.why = why; self.score = score; self.metricKey = metricKey; self.points = points
+        self.deltaPercent = deltaPercent
     }
 }
 
@@ -381,19 +384,22 @@ public enum InsightEngine {
         let before = mean(pts[..<best.i].map(\.value)), after = mean(pts[best.i...].map(\.value))
         guard abs(after - before) / max(abs(before), 1e-9) >= 0.15 else { return nil }
         let up = after > before
-        return finding(m, .newLevel, up: up, significance: min(1, abs(best.t) / 10),
-                       title: {
-                           let since = pts[best.i].day.formatted(.dateTime.day().month(.abbreviated))
-                           if let period = m.period {   // a rolling window read later: name the window, not the reading day
-                               if after.rounded() == 0 { return "No \(lower(m.name)) for \(period) (\(approx(fmt(before, m))) before)" }
-                               return "\(plainName(m.name)) \(up ? "up" : "down"): \(approx(fmtRate(after, m))) in recent readings (latest \(period)), \(up ? "from" : "down from") \(fmtRate(before, m))"
-                           }
-                           if after.rounded() == 0 { return "No \(lower(m.name)) since \(since) (\(approx(fmt(before, m))) before)" }
-                           return "\(plainName(m.name)) \(up ? "up" : "down") since \(since): \(approx(fmtRate(after, m))) now, \(up ? "from" : "down from") \(fmtRate(before, m))"
-                       }(),
-                       evidence: "\(up ? "up" : "down") to \(fmt(after, m))",
-                       why: "The days since \(pts[best.i].day.formatted(.dateTime.day().month(.abbreviated))) sit clearly apart from the days before, not a one-day blip.",
-                       effect: after - before)
+        let pct = before > 0 ? Int((((after - before) / abs(before)) * 100).rounded()) : nil
+        var f = finding(m, .newLevel, up: up, significance: min(1, abs(best.t) / 10),
+                        title: {
+                            let since = pts[best.i].day.formatted(.dateTime.day().month(.abbreviated))
+                            if let period = m.period {   // a rolling window read later: name the window, not the reading day
+                                if after.rounded() == 0 { return "No \(lower(m.name)) for \(period) (\(approx(fmt(before, m))) before)" }
+                                return "\(plainName(m.name)) \(up ? "up" : "down"): \(approx(fmtRate(after, m))) in recent readings (latest \(period)), \(up ? "from" : "down from") \(fmtRate(before, m))"
+                            }
+                            if after.rounded() == 0 { return "No \(lower(m.name)) since \(since) (\(approx(fmt(before, m))) before)" }
+                            return "\(plainName(m.name)) \(up ? "up" : "down") since \(since): \(approx(fmtRate(after, m))) now, \(up ? "from" : "down from") \(fmtRate(before, m))"
+                        }(),
+                        evidence: "\(up ? "up" : "down") to \(fmt(after, m))",
+                        why: "The days since \(pts[best.i].day.formatted(.dateTime.day().month(.abbreviated))) sit clearly apart from the days before, not a one-day blip.",
+                        effect: after - before)
+        f.deltaPercent = pct
+        return f
     }
 
     // 3. Steady trend: Theil-Sen slope, kept only when Mann-Kendall says it is real (p < 0.01).
@@ -446,11 +452,24 @@ public enum InsightEngine {
         return n
     }
 
-    /// "First downloads" → "first downloads" mid-sentence; names that start with an acronym ("X followers") stay.
+    /// "First downloads" → "first downloads" mid-sentence; brand/camelCase names ("YouTube", "iPhone", "X followers") stay.
     static func lower(_ name: String) -> String {
         let clean = name.replacingOccurrences(of: " (%)", with: "")
+        let firstWord = clean.split(separator: " ", maxSplits: 1).first ?? ""
+        if firstWord.dropFirst().contains(where: \.isUppercase) { return clean }
         guard let first = clean.first, clean.dropFirst().first?.isLowercase == true else { return clean }
         return first.lowercased() + clean.dropFirst()
+    }
+
+    static func businessWeight(for m: Metric, lane: Finding.Lane) -> Double {
+        let k = (m.key + "|" + m.family).lowercased()
+        if m.isMoney || k.contains("mrr") || k.contains("active_subs") || k.contains("paying") || k.contains("crashed") || k.contains("crash_free") {
+            return lane == .worry ? 1.55 : 1.30
+        }
+        if k.contains("new_subs") || k.contains("conversion") || k.contains("downloads") {
+            return lane == .worry ? 1.25 : 1.15
+        }
+        return 1.0
     }
 
     static func finding(_ m: Metric, _ d: Finding.Detector, up: Bool, significance: Double,
@@ -461,9 +480,10 @@ public enum InsightEngine {
         let age = at.timeIntervalSince(m.points.last?.day ?? at) / 86_400
         let freshness = max(0.3, 1 - age / 7)
         let laneWeight = lane == .change ? 0.4 : 1
+        let business = businessWeight(for: m, lane: lane)
         return Finding(id: "\(m.key)|\(d.rawValue)", lane: lane, detector: d, app: m.app,
                        title: (m.app.map { "\($0): " } ?? "") + title, evidence: evidence, why: why,
-                       score: significance * value * freshness * laneWeight, metricKey: m.key, points: m.points)
+                       score: significance * value * freshness * laneWeight * business, metricKey: m.key, points: m.points)
     }
 
     /// Splits the change by each breakdown; names the part behind at least 60% of it, using the dimension
