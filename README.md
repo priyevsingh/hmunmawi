@@ -15,7 +15,8 @@
   <a href="#documentation">Docs</a> ·
   <a href="https://github.com/priyevsingh/hmunmawi/discussions">Discussions</a> ·
   <a href="AGENTS.md">For AI agents</a> ·
-  <a href="docs/WALL-OF-APPS.md">Wall of Apps</a>
+  <a href="docs/WALL-OF-APPS.md">Wall of Apps</a> ·
+  <a href="https://github.com/sponsors/priyevsingh">Sponsor</a>
 </p>
 
 <p align="center">
@@ -24,6 +25,7 @@
   <img alt="Free and open source" src="https://img.shields.io/badge/free-open%20source-2ea44f">
   <img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
   <img alt="Notarized by Apple" src="https://img.shields.io/badge/notarized-Developer%20ID-555">
+  <a href="https://github.com/sponsors/priyevsingh"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=github"></a>
 </p>
 
 <p align="center">
@@ -33,7 +35,7 @@
 
 <br>
 
-## One Mac menu bar app. Your apps and everything else you run.
+## One Mac app. Your apps and everything else you run.
 
 Hmunmawi watches your Apple apps **and** the other things you run, then turns it all into one calm answer each morning.
 It runs on its own from your Mac's menu bar, and nothing is changed without your OK.
