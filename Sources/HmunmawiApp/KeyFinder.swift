@@ -43,11 +43,45 @@ enum KeyFinder {
         }
         out += envFiles(hints: hints, envKeys: envKeys)
         out += wholeFileCandidates(addOn: addOn, field: field, wantsFile: wantsFile)
+        if addOn == "vercel" && field == "apiToken" {
+            out += vercelCLIAuthMatches(rank: 1)
+        }
         if addOn == "vercel" && field == "githubToken" {
             out += ghCLIKeychain(rank: 1)
         }
         out += keychain(hints: hints, rank: 3)
         return deduped(out)
+    }
+
+    /// Returns the best non-prompting secret value for automatic configuration (canonical key folder, env files, CLI configs).
+    static func firstAutoValue(addOn: String, field: String, wantsFile: Bool = false) async -> (value: String, sourceRef: SecretSourceRef?)? {
+        let matches = await find(addOn: addOn, field: field, wantsFile: wantsFile)
+        for m in matches where m.rank <= 1 {
+            if let v = m.fetch()?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty {
+                return (v, m.sourceRef)
+            }
+        }
+        return nil
+    }
+
+    /// Reads the Vercel CLI's local `auth.json` token when `vercel login` has already been run on this Mac.
+    nonisolated static func vercelCLIAuthMatches(rank: Int) -> [Match] {
+        let home = URL.homeDirectory
+        let candidates = [
+            home.appending(path: "Library/Application Support/com.vercel.cli/Data/auth.json"),
+            home.appending(path: ".local/share/com.vercel.cli/auth.json"),
+            home.appending(path: ".config/vercel/auth.json"),
+        ]
+        var out: [Match] = []
+        for url in candidates {
+            guard let d = try? Data(contentsOf: url),
+                  let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                  let tok = (obj["token"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  tok.count >= 12 else { continue }
+            let short = url.path.replacingOccurrences(of: home.path, with: "~")
+            out.append(Match(label: "Vercel CLI · \(short)", source: "File", sourceRef: nil, fetch: { tok }, rank: rank))
+        }
+        return out
     }
 
     /// Decodes a macOS Keychain secret blob, including `go-keyring-base64:` values written by tools like `gh`.
@@ -600,5 +634,224 @@ enum VercelDetector {
         }
         if !sites.isEmpty { out["siteName"] = sites.joined(separator: ", ") }
         return out
+    }
+
+    struct AutoDetectResult: Sendable {
+        var values: [String: String]
+        var foundAPIToken: String?
+        var apiTokenSource: SecretSourceRef?
+        var foundGitHubToken: String?
+        var githubTokenSource: SecretSourceRef?
+        var projectCount: Int
+        var summary: String
+    }
+
+    /// Standard repo folders on this Mac that contain `.vercel/project.json` or `vercel.json`.
+    nonisolated static func scanLocalRepos(roots: [URL]? = nil) -> [Detected] {
+        let fm = FileManager.default
+        let home = URL.homeDirectory
+        let baseRoots: [URL] = roots ?? ([
+            Extras.current.reposFolder.url,
+            home.appending(path: "Documents/repos", directoryHint: .isDirectory),
+        ].compactMap { $0 } + KeyFinder.userFolders)
+
+        var dirs: [URL] = []
+        var seen = Set<String>()
+        for root in baseRoots {
+            let children = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+            for child in ([root] + children) where dirs.count < 80 {
+                let p = child.standardizedFileURL.path
+                guard seen.insert(p).inserted else { continue }
+                let hasVercel = fm.fileExists(atPath: child.appending(path: ".vercel/project.json").path)
+                    || fm.fileExists(atPath: child.appending(path: "vercel.json").path)
+                if hasVercel { dirs.append(child) }
+            }
+        }
+        return dirs.map { detect(in: $0) }
+            .filter { $0.projectID != nil || $0.repo != nil }
+    }
+
+    private nonisolated static func normalizedSiteKey(_ s: String) -> String {
+        s.lowercased()
+            .replacingOccurrences(of: "www.", with: "")
+            .filter { $0.isLetter || $0.isNumber }
+    }
+
+    /// Parses Vercel `/v9/projects` JSON, mapping projects to local repos, custom domain aliases, and Hmunmawi project members.
+    nonisolated static func parseAPIProjects(
+        data: Data,
+        defaultTeamID: String?,
+        knownMembers: [String] = [],
+        localRepos: [Detected] = []
+    ) -> [Detected] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let list = root["projects"] as? [[String: Any]] else { return [] }
+
+        struct RawEntry {
+            var detected: Detected
+            var hasLiveDomainOrMember: Bool
+            var memberRank: Int
+        }
+
+        let normMembers: [(idx: Int, original: String, key: String)] = knownMembers.enumerated().map {
+            ($0.offset, $0.element, normalizedSiteKey($0.element))
+        }.filter { !$0.key.isEmpty }
+
+        var parsed: [RawEntry] = []
+        for obj in list {
+            guard let pid = (obj["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !pid.isEmpty else { continue }
+            let name = (obj["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? pid
+            let acct = (obj["accountId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let teamID = (acct?.hasPrefix("team_") == true ? acct : nil) ?? (defaultTeamID?.hasPrefix("team_") == true ? defaultTeamID : nil)
+
+            let link = obj["link"] as? [String: Any]
+            let linkOrg = (link?["org"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let linkRepo = (link?["repo"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            var repo: String? = (link?["type"] as? String == "github" && linkOrg?.isEmpty == false && linkRepo?.isEmpty == false)
+                ? "\(linkOrg!)/\(linkRepo!)" : nil
+            var branch = (link?["productionBranch"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let prod = (obj["targets"] as? [String: Any])?["production"] as? [String: Any]
+            let aliases = (prod?["alias"] as? [String]) ?? []
+
+            // Fill missing repo/branch from matching local repo checkout if Vercel link is absent.
+            let nameKey = normalizedSiteKey(name)
+            if repo == nil || (branch ?? "").isEmpty {
+                if let local = localRepos.first(where: { lr in
+                    lr.projectID == pid
+                    || lr.repo.map { normalizedSiteKey($0.split(separator: "/").last.map(String.init) ?? $0) == nameKey } == true
+                    || normalizedSiteKey(lr.projectName ?? "") == nameKey
+                }) {
+                    if repo == nil { repo = local.repo }
+                    if (branch ?? "").isEmpty { branch = local.branch }
+                }
+            }
+
+            // Pick a clean display site name: exact Hmunmawi project member > custom domain alias > Vercel project name.
+            let aliasKeys = aliases.map { normalizedSiteKey($0) }
+            let repoTailKey = repo.map { normalizedSiteKey($0.split(separator: "/").last.map(String.init) ?? "") }
+            var matchedMember: (idx: Int, name: String)?
+            for m in normMembers {
+                let isHit = m.key == nameKey
+                    || aliasKeys.contains(where: { $0 == m.key || $0.hasPrefix(m.key) })
+                    || (repoTailKey.map { $0.contains(m.key) || m.key.contains($0) } ?? false)
+                if isHit {
+                    matchedMember = (m.idx, m.original)
+                    break
+                }
+            }
+            let customAlias = aliases.first { !$0.lowercased().hasSuffix(".vercel.app") }
+            let siteName = matchedMember?.name ?? (customAlias.map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 } ?? name)
+            let matchesLocal = localRepos.contains {
+                $0.projectID == pid || ($0.repo != nil && $0.repo == repo)
+            }
+            let isLiveOrRelevant = matchedMember != nil || customAlias != nil || matchesLocal
+            parsed.append(RawEntry(
+                detected: Detected(projectID: pid, orgID: teamID, projectName: siteName, repo: repo, branch: branch),
+                hasLiveDomainOrMember: isLiveOrRelevant,
+                memberRank: matchedMember?.idx ?? Int.max
+            ))
+        }
+
+        let hasRelevant = parsed.contains(where: \.hasLiveDomainOrMember)
+        let filtered = hasRelevant ? parsed.filter(\.hasLiveDomainOrMember) : parsed
+        return filtered.sorted { a, b in
+            if a.memberRank != b.memberRank { return a.memberRank < b.memberRank }
+            return (a.detected.projectName ?? "") < (b.detected.projectName ?? "")
+        }.map(\.detected)
+    }
+
+    /// Fetches Vercel teams and projects using `token` from the Vercel REST API.
+    static func detectViaAPI(
+        token: String,
+        knownMembers: [String] = [],
+        localRepos: [Detected] = []
+    ) async -> [Detected] {
+        let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanToken.isEmpty else { return [] }
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 12
+        let session = URLSession(configuration: config)
+
+        func get(_ urlString: String) async -> Data? {
+            guard let url = URL(string: urlString) else { return nil }
+            var req = URLRequest(url: url)
+            req.setValue("Bearer \(cleanToken)", forHTTPHeaderField: "Authorization")
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
+            guard let (data, resp) = try? await session.data(for: req),
+                  (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return data
+        }
+
+        var teamIDs: [String] = []
+        if let tData = await get("https://api.vercel.com/v2/teams"),
+           let obj = try? JSONSerialization.jsonObject(with: tData) as? [String: Any],
+           let teams = obj["teams"] as? [[String: Any]] {
+            teamIDs = teams.compactMap { $0["id"] as? String }.filter { $0.hasPrefix("team_") }
+        }
+
+        var all: [Detected] = []
+        var seenIDs = Set<String>()
+        let queries: [(url: String, team: String?)] = [("https://api.vercel.com/v9/projects?limit=50", nil)]
+            + teamIDs.map { ("https://api.vercel.com/v9/projects?teamId=\($0)&limit=50", $0) }
+        for q in queries {
+            guard let pData = await get(q.url) else { continue }
+            for d in parseAPIProjects(data: pData, defaultTeamID: q.team, knownMembers: knownMembers, localRepos: localRepos) {
+                if let pid = d.projectID, seenIDs.insert(pid).inserted {
+                    all.append(d)
+                }
+            }
+        }
+        return all
+    }
+
+    /// Discovers Vercel API/GitHub tokens, Vercel team/projects via API, and local website repositories in one call.
+    static func autoDetect(
+        currentValues: [String: String],
+        apiToken: String?,
+        hasSavedGitHubToken: Bool,
+        knownMembers: [String] = []
+    ) async -> AutoDetectResult {
+        var resolvedToken = (apiToken ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var apiSource: SecretSourceRef?
+        var foundToken: String?
+        if resolvedToken.isEmpty, let match = await KeyFinder.firstAutoValue(addOn: "vercel", field: "apiToken") {
+            resolvedToken = match.value
+            foundToken = match.value
+            apiSource = match.sourceRef
+        }
+
+        var foundGH: String?
+        var ghSource: SecretSourceRef?
+        let typedGH = (currentValues["githubToken"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !hasSavedGitHubToken, typedGH.isEmpty,
+           let match = await KeyFinder.firstAutoValue(addOn: "vercel", field: "githubToken") {
+            foundGH = match.value
+            ghSource = match.sourceRef
+        }
+
+        let localRepos = scanLocalRepos()
+        let apiProjects = resolvedToken.isEmpty ? [] : await detectViaAPI(token: resolvedToken, knownMembers: knownMembers, localRepos: localRepos)
+        let merged = merge(values: currentValues, detected: apiProjects.isEmpty ? localRepos : apiProjects)
+        let projCount = apiProjects.isEmpty ? localRepos.filter { $0.projectID != nil }.count : apiProjects.count
+        let names = (apiProjects.isEmpty ? localRepos : apiProjects).compactMap(\.projectName)
+
+        let summary: String
+        if projCount > 0 {
+            summary = "Auto-filled \(projCount) Vercel project\(projCount == 1 ? "" : "s") (\(names.joined(separator: ", ")))."
+        } else if resolvedToken.isEmpty {
+            summary = "No Vercel token found in Keychain, vercel.env, or Vercel CLI yet. Add an Access token or Pick repo… manually."
+        } else {
+            summary = "Checked Vercel with your token, but found no matching projects."
+        }
+        return AutoDetectResult(
+            values: merged,
+            foundAPIToken: foundToken,
+            apiTokenSource: apiSource,
+            foundGitHubToken: foundGH,
+            githubTokenSource: ghSource,
+            projectCount: projCount,
+            summary: summary
+        )
     }
 }

@@ -97,6 +97,14 @@ enum MailWatch {
         let emails: Set<String>
         let domains: Set<String>
         let subjects: Set<String>
+        let hasReleaseSubscribers: Bool
+
+        init(emails: Set<String>, domains: Set<String>, subjects: Set<String>, hasReleaseSubscribers: Bool = false) {
+            self.emails = emails
+            self.domains = domains
+            self.subjects = subjects
+            self.hasReleaseSubscribers = hasReleaseSubscribers
+        }
     }
 
     static func outreachMatchers() -> OutreachMatchers {
@@ -113,7 +121,17 @@ enum MailWatch {
                 if t.count >= 4 { subjects.insert(t) }
             }
         }
-        return OutreachMatchers(emails: emails, domains: domains, subjects: subjects)
+        let activeSubscriberEmails = ReleaseSubscribers.shared.book.subscribers
+            .filter(\.isActive)
+            .map { $0.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        emails.formUnion(activeSubscriberEmails)
+        return OutreachMatchers(
+            emails: emails,
+            domains: domains,
+            subjects: subjects,
+            hasReleaseSubscribers: !activeSubscriberEmails.isEmpty
+        )
     }
 
     nonisolated static func matchesOutreach(from: String, subject: String, matchers: OutreachMatchers) -> Bool {
@@ -122,7 +140,19 @@ enum MailWatch {
         if let d = ReplyMatch.domain(from), !ReplyMatch.sharedDomains.contains(d), matchers.domains.contains(d) { return true }
         let t = ReplyMatch.thread(subject)
         if !t.isEmpty, matchers.subjects.contains(t) { return true }
+        if matchers.hasReleaseSubscribers, isSystemSender(from), isBounceSubject(subject) { return true }
         return false
+    }
+
+    private nonisolated static func isSystemSender(_ from: String) -> Bool {
+        let a = ReplyMatch.address(from)
+        return ["mailer-daemon", "postmaster", "mail-daemon", "bounce", "no-reply@accounts."].contains(where: a.contains)
+    }
+
+    private nonisolated static func isBounceSubject(_ subject: String) -> Bool {
+        let s = subject.lowercased()
+        return ["undeliver", "returned to sender", "delivery status notification", "delivery failure", "failure notice",
+                "mail delivery failed", "could not be delivered", "delivery has failed"].contains(where: s.contains)
     }
 }
 
@@ -188,8 +218,18 @@ enum ZohoSafariReader {
         raw.wholeMatch(of: /^t?\d{6,25}$/) != nil
     }
 
-    static func read(host: String, matching: @escaping @Sendable (MailRow) -> Bool = { _ in false }) async -> Result<[MailRow], Error> {
+    /// Normalizes Zoho folder labels and reclassifies own-authored INBOX conversation rows as `SENT`.
+    nonisolated static func normalizeFolder(_ rawFolder: String, from: String, ownList: [String] = []) -> String {
+        let lower = rawFolder.lowercased()
+        if lower.contains("sent") { return "SENT" }
+        if lower.contains("draft") { return "DRAFT" }
+        if ReplyMatch.isOwn(from, own: ownList) { return "SENT" }
+        return "INBOX"
+    }
+
+    static func read(host: String, matching: @escaping @Sendable (MailRow) -> Bool = { _ in false }, ownList: [String] = []) async -> Result<[MailRow], Error> {
         guard hosts.contains(host) else { return .failure(WireError("mail", "Pick the Zoho address you sign in at.")) }
+        let ownList = ownList.isEmpty ? await MainActor.run { Outreach.own } : ownList
         return await Task.detached(priority: .utility) { () -> Result<[MailRow], Error> in
             let js = "(function(){var rows=document.querySelectorAll('.zmList');if(!rows.length)return '';return JSON.stringify(Array.prototype.slice.call(rows,0,60).map(function(r){function q(s){var e=r.querySelector(s);return e?((e.getAttribute('title')||e.innerText||'').trim()):'';}return {id:r.id,msgid:(r.getAttribute('data-msgid')||r.id||''),from:q('.zmLSenderName'),subject:q('.zmLSub'),folder:q('.zmLFolder')};}));})()"
             // Its own tagged tab through SafariAuto: the shared Safari lock, found by tag, closed on every path.
@@ -208,8 +248,13 @@ enum ZohoSafariReader {
             var rawList: [[String: Any]] = []
             var bodiesByID: [String: String] = [:]
             do {
-                let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "mail.zoho", seconds: 30)
+                let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "zoho.", seconds: 30)
                 for _ in 0..<20 {
+                    if let rawState = try? await tab.js(ZohoSafariAuth.pageStateJS),
+                       let st = ZohoSafariAuth.parsePageState(rawState), st.needsSignIn {
+                        await session.exit()
+                        return .failure(WireError("mail", "Zoho Mail isn't signed in on \(host) in Safari yet. Open \(host) in Safari to sign in."))
+                    }
                     try? await Task.sleep(for: .seconds(1.5))
                     if let r = try? await tab.js(js), !r.isEmpty, r != "[]", r != "missing value" { found = r; break }
                 }
@@ -221,13 +266,15 @@ enum ZohoSafariReader {
                     var fetched = 0
                     for m in list where fetched < 15 {
                         guard let rawID = m["id"] as? String, !rawID.isEmpty else { continue }
-                        let folder = (m["folder"] as? String ?? "").lowercased().contains("sent") ? "SENT" : "INBOX"
+                        let from = String((m["from"] as? String ?? "").prefix(200))
+                        let folder = Self.normalizeFolder(m["folder"] as? String ?? "", from: from, ownList: ownList)
                         guard folder == "INBOX" else { continue }
                         let row = MailRow(id: "zoho-\(rawID.prefix(80))",
-                                          from: String((m["from"] as? String ?? "").prefix(200)),
+                                          from: from,
                                           subject: String((m["subject"] as? String ?? "").prefix(300)),
                                           folder: folder, sentMs: nil,
                                           messageID: "zoho-\(rawID.prefix(80))", inReplyTo: nil)
+                        guard !ReplyMatch.isOwn(row.from, own: ownList) else { continue }
                         guard matching(row) else { continue }
                         let msgID = ((m["msgid"] as? String) ?? rawID).trimmingCharacters(in: .whitespacesAndNewlines)
                         guard Self.isValidMessageID(msgID) else { continue }
@@ -252,8 +299,9 @@ enum ZohoSafariReader {
             }
             let rows: [MailRow] = rawList.compactMap { m in
                 guard let id = m["id"] as? String, !id.isEmpty else { return nil }
-                let folder = (m["folder"] as? String ?? "").lowercased().contains("sent") ? "SENT" : "INBOX"
-                return MailRow(id: "zoho-\(id.prefix(80))", from: String((m["from"] as? String ?? "").prefix(200)),
+                let from = String((m["from"] as? String ?? "").prefix(200))
+                let folder = Self.normalizeFolder(m["folder"] as? String ?? "", from: from, ownList: ownList)
+                return MailRow(id: "zoho-\(id.prefix(80))", from: from,
                                subject: String((m["subject"] as? String ?? "").prefix(300)), folder: folder, sentMs: nil,
                                messageID: "zoho-\(id.prefix(80))", inReplyTo: nil, text: bodiesByID[id])
             }

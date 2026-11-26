@@ -247,7 +247,7 @@ Your scripts (or an AI job you run) do the thinking and hand over cards, to-dos 
 
 | You want | Your workspace does | Hmunmawi shows |
 |---|---|---|
-| **Apple apps** | Nothing needed. Connect App Store Connect and RevenueCat in Settings. Add scripts only for numbers from your own backend | Sales, subscriptions, reviews, releases, the Rejection Shield, offer codes |
+| **Apple apps** | Nothing needed. Connect App Store Connect and RevenueCat in Settings. Add scripts only for numbers from your own backend | Sales, subscriptions, reviews, releases, customer release subscriber lists and notifications, the Rejection Shield, offer codes |
 | **Websites and search** | A script that checks a page, a sitemap or your analytics and prints a card; a routine can also watch a website address; a search health monitor writes `search_health.json` | Cloudflare, Vercel, Google Search Console and Bing numbers, "website down", deploy health with a Redeploy that waits for your OK, dead outside links (Check links on my site), next steps such as searches with no page yet and ranking pages nobody clicks, the Search health card and its Fix buttons |
 | **Social: Shorts, Reels, carousels, Reddit, Discord, X** | A script or AI job writes plans and drafts into `out/` and prints a card whose `items` have an `action` (a plain sentence). X drafts can sit in a bank (`hm bank-add`) | To-do lines on a card, routine reminders, X drafts at your best hours, the Social posts group on the Automations map |
 | **Publishing: articles and posts** | A job that produces the article or post file and a card saying what is due | To-dos and jobs on the Automations map: what is due, what ran, what failed |
@@ -824,7 +824,7 @@ Read STATE.md before planning or changing anything. Update it after acting.
   into chats or reports, or commit them.
 - Scripts that feed Hmunmawi only read and print JSON (see Hmunmawi's docs/SCRIPT-FEED.md). Anything that changes
   something goes through Hmunmawi (`hm`) so it waits for my OK.
-- Never post, reply, send or publish for me on any platform. Produce drafts (`hm outreach-send`, `hm review-reply` park drafts in Log → Waiting for my OK; `hm approve` refuses external actions).
+- Never post, reply, send or publish for me on any platform. Produce drafts (`hm outreach-send`, `hm release-notify-draft`, `hm review-reply` park drafts in Log → Waiting for my OK; `hm approve` refuses external actions).
 - Check drafts and pages against my Words I never use with `hm lint-text` before handing them over. Submitting (`shield-fix item=submit`), redeploys (`deploy-redeploy`), Python repairs (`python-repair`), key changes (`set-key`), deletions (`remove-*`), and `publish` always wait for me even under Smart Autopilot.
 - Use your Hmunmawi agent badge (`HM_AGENT_TOKEN`): once badges exist, a request without one always waits for me.
 - Mac jobs: only `<your job prefix>.*` jobs; Hmunmawi refuses others and never touches `com.apple.*`.

@@ -19,6 +19,7 @@ import Testing
         p.setSmartAutopilot(true)
         #expect(AgentPolicy(defaults: d).verify(key))
         #expect(p.allowsSmart(command: "routine-run", args: [:], need: .routines, agent: "My Bot"))
+        #expect(p.allowsSmart(command: "subscribers-add", args: [:], need: .routines, agent: "My Bot"))
         #expect(p.allowsSmart(command: "shield-fix", args: ["item": "build"], need: .releases, agent: "My Bot"))
         #expect(p.allowsSmart(command: "shield-fix", args: ["item": "promo"], need: .releases, agent: "My Bot"))
         #expect(p.allowsSmart(command: "set", args: ["key": "project"], need: nil, agent: "My Bot"))
@@ -27,6 +28,7 @@ import Testing
         #expect(!p.allowsSmart(command: "shield-fix", args: ["item": "submit"], need: .releases, agent: "My Bot"))
         #expect(!p.allowsSmart(command: "deploy-redeploy", args: [:], need: .releases, agent: "My Bot"))
         #expect(!p.allowsSmart(command: "outreach-send", args: [:], need: .messages, agent: "My Bot"))
+        #expect(!p.allowsSmart(command: "release-notify-draft", args: [:], need: .messages, agent: "My Bot"))
         #expect(!p.allowsSmart(command: "review-reply", args: [:], need: .releases, agent: "My Bot"))
         #expect(!p.allowsSmart(command: "set-key", args: [:], need: .connections, agent: "My Bot"))
         #expect(!p.allowsSmart(command: "remove-connection", args: [:], need: .deletes, agent: "My Bot"))
@@ -44,7 +46,7 @@ import Testing
     }
 
     @Test func alwaysAskGatesAllCriticalCommands() {
-        for cmd in ["deploy-redeploy", "python-repair", "outreach-send", "review-reply", "set-key",
+        for cmd in ["deploy-redeploy", "python-repair", "outreach-send", "release-notify-draft", "review-reply", "set-key",
                     "publish", "remove-connection", "routine-remove", "change-remove", "plan-remove"] {
             #expect(AgentBridge.isAlwaysAsk(command: cmd, args: [:]), "\(cmd) must be alwaysAsk")
         }
@@ -59,9 +61,11 @@ import Testing
             Job(id: 1, kind: kind, resource: "agent", priority: 3, state: .waitingApproval, attempts: 0, maxAttempts: 1, runAfter: 0, payload: payload)
         }
         #expect(AppModel.isCriticalWaiting(job("outreach.send", payload: .object([:]))))
+        #expect(AppModel.isCriticalWaiting(job("release.notify", payload: .object([:]))))
         #expect(AppModel.isCriticalWaiting(job("review.reply", payload: .object([:]))))
         #expect(AppModel.isCriticalWaiting(job("asc.fix", payload: .object(["fix": .string("submit")]))))
         #expect(AppModel.isCriticalWaiting(job("agent.request", payload: .object(["command": .string("set-key")]))))
+        #expect(AppModel.isCriticalWaiting(job("agent.request", payload: .object(["command": .string("release-notify-draft")]))))
         #expect(AppModel.isCriticalWaiting(job("agent.request", payload: .object(["command": .string("deploy-redeploy")]))))
         #expect(AppModel.isCriticalWaiting(job("agent.request", payload: .object(["command": .string("python-repair")]))))
         #expect(AppModel.isCriticalWaiting(job("agent.request", payload: .object(["command": .string("publish")]))))

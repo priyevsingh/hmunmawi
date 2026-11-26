@@ -65,12 +65,26 @@ public enum ReplyMatch {
                                       "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com", "protonmail.ch",
                                       "zoho.com", "zohomail.com", "aol.com", "gmx.com", "fastmail.com"]
 
+    /// True when `from` belongs to any configured own email address or domain in `own`.
+    public static func isOwn(_ from: String, own: [String]) -> Bool {
+        let normalizedOwn = own.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty }
+        guard !normalizedOwn.isEmpty else { return false }
+        let ownAddresses = Set(normalizedOwn.filter { $0.contains("@") }.map(address))
+        let ownDomains = Set(normalizedOwn.compactMap { entry -> String? in
+            if entry.contains("@") { return domain(entry) }
+            return domain(entry) ?? entry
+        }).subtracting(shared)
+        let addr = address(from)
+        if !addr.isEmpty, ownAddresses.contains(addr) { return true }
+        if let d = domain(from), ownDomains.contains(d) { return true }
+        return false
+    }
+
     /// Matches, at most one per entry and message (the surest wins). `own` is your own address or domain, so your
     /// messages never count as replies.
     /// `apps` are your app names: a message that names one of them only matches entries about that app.
     public static func match(_ entries: [Entry], mail: [Mail], own: [String], apps: [String] = []) -> [Match] {
-        let ownDomains = Set(own.map { domain($0) ?? $0.lowercased() })
-        func mine(_ m: Mail) -> Bool { domain(m.from).map(ownDomains.contains) ?? false || own.contains(address(m.from)) }
+        func mine(_ m: Mail) -> Bool { isOwn(m.from, own: own) }
         // A bounce names nobody: it belongs to the message you sent last before it (within 2 hours).
         let sentByTime = mail.filter { $0.sent && $0.at != nil && mine($0) }.sorted { $0.at! < $1.at! }
         // A bounce whose text was read names the address that failed: that's certain. Without its text, the message
@@ -103,14 +117,14 @@ public enum ReplyMatch {
                 best = Match(entry: e.id, mail: b.id, kind: .bounced, sure: .unsure, why: "a bounce came soon after you sent it (check which address failed)")
             }
             for m in mail where m.day >= e.date {
-                let fromAddr = address(m.from), fromDomain = domain(m.from)
-                if let d = fromDomain, ownDomains.contains(d) || own.contains(fromAddr) {
+                if mine(m) {
                     // Yours: a sent follow-up in the same thread closes the follow-up.
                     if m.sent, let s = subj, !s.isEmpty, thread(m.subject) == s, e.followUp != nil, m.day > e.date {
                         best = better(best, Match(entry: e.id, mail: m.id, kind: .followedUp, sure: .sure, why: "your follow-up in the same thread"))
                     }
                     continue
                 }
+                let fromAddr = address(m.from), fromDomain = domain(m.from)
                 if m.sent { continue }
                 // Bounces and mail-system notices never count (they name your subject, but nobody read it).
                 if isSystem(m.from) { continue }
@@ -169,14 +183,14 @@ public enum ReplyMatch {
     }
 
     /// A delivery failure ("Undelivered Mail Returned to Sender", "Delivery Status Notification (Failure)").
-    static func isBounce(_ subject: String) -> Bool {
+    public static func isBounce(_ subject: String) -> Bool {
         let s = subject.lowercased()
         return ["undeliver", "returned to sender", "delivery status notification", "delivery failure", "failure notice",
                 "mail delivery failed", "could not be delivered", "delivery has failed"].contains(where: s.contains)
     }
 
     /// Mail-system senders: bounces and delivery notices.
-    static func isSystem(_ from: String) -> Bool {
+    public static func isSystem(_ from: String) -> Bool {
         let a = address(from)
         return ["mailer-daemon", "postmaster", "mail-daemon", "bounce", "no-reply@accounts."].contains(where: a.contains)
     }

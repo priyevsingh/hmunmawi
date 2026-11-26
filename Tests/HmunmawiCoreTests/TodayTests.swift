@@ -74,7 +74,7 @@ import Testing
         // The sample includes Apple's daily sales report, which (like a real connection) leads with downloads.
         #expect(garden.metric == "Downloads")
         #expect(garden.daily.count == 7)
-        #expect((garden.latest ?? 0) > 0)
+        #expect(garden.latest > 0)
         #expect(garden.averageRating == 5)
     }
 

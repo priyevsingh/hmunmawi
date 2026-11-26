@@ -20,21 +20,21 @@ import Testing
         let now = Millis(Date.now.timeIntervalSince1970 * 1000)
         let week = try await time("events(since: 8 days) incl. decode") { try await store.events(since: now - 8 * TodayBuilder.day) }
         print("BENCH          rows in 8 days: \(week.count)")
-        _ = try await time("dedupe one-source-per-day (8 days)") { DailyEvents.oneSourcePerDay(week) }
+        _ = await time("dedupe one-source-per-day (8 days)") { DailyEvents.oneSourcePerDay(week) }
         _ = try await time("today() card") { try await store.today() }
         _ = try await time("appSummaries()") { try await store.appSummaries() }
         let history = try await time("events(since: 60 days) incl. decode") { try await store.events(since: now - 60 * TodayBuilder.day) }
         print("BENCH          rows in 60 days: \(history.count)")
-        let metrics = try await time("MetricExtractor.extract (60 days)") { MetricExtractor.extract(DailyEvents.oneSourcePerDay(history)) }
-        _ = try await time("InsightEngine.run") { InsightEngine.run(metrics) }
+        let metrics = await time("MetricExtractor.extract (60 days)") { MetricExtractor.extract(DailyEvents.oneSourcePerDay(history)) }
+        _ = await time("InsightEngine.run") { InsightEngine.run(metrics) }
         var window = EventWindow(days: 9)
         _ = try await time("window: first load (9 days)") { try await window.update(from: store, now: now) }
         _ = try await time("window: quiet refresh (nothing new)") { try await window.update(from: store, now: now) }
         let rows = window.rows
         _ = try await time("today(recent:) from window") { try await store.today(recent: rows) }
-        _ = try await time("appSummaries(recent:) from window") { await store.appSummaries(recent: rows) }
+        _ = await time("appSummaries(recent:) from window") { await store.appSummaries(recent: rows) }
         let lean = try await time("insightRows(60 days)") { try await store.insightRows(since: now - 60 * TodayBuilder.day) }
-        _ = try await time("insights from lean rows (extract + run)") { InsightEngine.run(MetricExtractor.extract(DailyEvents.oneSourcePerDay(lean))) }
+        _ = await time("insights from lean rows (extract + run)") { InsightEngine.run(MetricExtractor.extract(DailyEvents.oneSourcePerDay(lean))) }
         var iw = EventWindow(days: 60, lean: true)
         _ = try await time("insight window: first load (60 days, lean)") { try await iw.update(from: store, now: now) }
         _ = try await time("insight window: quiet refresh") { try await iw.update(from: store, now: now) }

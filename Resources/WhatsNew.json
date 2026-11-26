@@ -5,18 +5,18 @@
       "version": "1.6.0",
       "items": [
         {
-          "title": "Smart Setup for AI & Vercel",
-          "detail": "Find my key discovers Vercel and AI provider keys and recovers them across rebuilds, including GitHub tokens. Vercel also tracks multiple comma-separated projects with repo auto-detection, and OpenAI, Gemini, and Groq include built-in pricing.",
+          "title": "Smart Setup & Vercel Auto-Fill",
+          "detail": "Find my key discovers and auto-fills Vercel teams, projects, sites, GitHub repos, and AI provider keys from Keychain, env files, and Vercel CLI. OpenAI, Gemini, and Groq include built-in pricing.",
           "action": "settings:connections"
         },
         {
-          "title": "Smart Outreach & Reply Reading",
-          "detail": "Replies, bounces, and opt-outs update automatically with one-click Undo, and matched reply threads pre-draft your next outreach email in Log. Send over TLS SMTP or Zoho Safari compose only when you approve.",
+          "title": "Release Updates & Smart Outreach",
+          "detail": "Notify opt-in customer subscribers on new App Store releases with spam lint, test sends, and unsubscribe tracking. Outreach uses App Store highlights, clean reply filters, spinners, and Safari Zoho sign-in support.",
           "action": "page:log"
         },
         {
           "title": "Smart Autopilot & Release Checks",
-          "detail": "Enable Smart Autopilot for badged agents while keeping submit, sends, replies, and keys owner-only. Apps shows a Ready to submit checklist, proactive review reply drafts wait in Log, and batch approval skips critical items.",
+          "detail": "Enable Smart Autopilot for badged agents while keeping submit, sends, replies, and keys owner-only. Apps shows a Ready to submit checklist, proactive review replies wait in Log, and batch approval skips critical items.",
           "action": "settings:rules"
         }
       ]

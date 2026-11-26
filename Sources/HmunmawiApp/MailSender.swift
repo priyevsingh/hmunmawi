@@ -117,6 +117,109 @@ enum MailSender {
     }
 }
 
+/// Inspects Zoho Mail Safari login state and brings Safari forward on the Zoho sign-in page if sign-in is required.
+enum ZohoSafariAuth {
+    struct PageState: Equatable, Sendable {
+        var url: String
+        var hasCompose: Bool
+        var hasRows: Bool
+        var loginForm: Bool
+        var composeOpen: Bool
+
+        var isMailReady: Bool { hasCompose || hasRows || composeOpen }
+        var needsSignIn: Bool { loginForm || isLoginURL(url) }
+    }
+
+    nonisolated static func isLoginURL(_ raw: String) -> Bool {
+        let u = raw.lowercased()
+        return u.contains("accounts.zoho.") || u.contains("/signin") || u.contains("/login") || u.contains("://iam.")
+    }
+
+    nonisolated static func parsePageState(_ raw: String) -> PageState? {
+        guard !raw.isEmpty, raw != "missing value",
+              let data = raw.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return PageState(
+            url: (obj["url"] as? String) ?? "",
+            hasCompose: (obj["hasCompose"] as? Bool) ?? false,
+            hasRows: (obj["hasRows"] as? Bool) ?? false,
+            loginForm: (obj["loginForm"] as? Bool) ?? false,
+            composeOpen: (obj["composeOpen"] as? Bool) ?? false
+        )
+    }
+
+    nonisolated static let pageStateJS = #"""
+    (function(){
+      var composeSel='[data-testid="new-btn-opt"],[data-testid*="compose"],.zmComposeBtn,button[title*="Compose"],button[title*="New Mail"],a[href*="compose"]';
+      var hasComp=!!document.querySelector(composeSel)||Array.from(document.querySelectorAll('button')).some(function(b){var t=(b.innerText||'').trim();return t==='New Mail'||t==='Compose';});
+      var compOpen=!!document.querySelector('[data-testid="com_To_field"],[data-testid="com_send"]');
+      var loginEl=!!document.querySelector('#login_id,input[name="LOGIN_ID"],[data-testid="signin"],.signin_box');
+      var hasRows=document.querySelectorAll('.zmList').length>0;
+      return JSON.stringify({url:location.href,hasCompose:hasComp,hasRows:hasRows,loginForm:loginEl,composeOpen:compOpen});
+    })()
+    """#
+
+    @MainActor
+    static func openInSafari(host: String) {
+        let cleanHost = ZohoSafariReader.hosts.contains(host) ? host : "mail.zoho.com"
+        if let u = URL(string: "https://\(cleanHost)/zm/#mail/views/all") {
+            NSWorkspace.shared.open(u)
+        }
+    }
+
+    /// Opens Zoho Mail in a `SafariAuto` tab, waiting cleanly whether already signed in or redirected to Zoho login.
+    nonisolated static func ensureReady(
+        session: SafariAuto.Session,
+        host: String,
+        allowInteractiveLogin: Bool,
+        loginWaitSeconds: Int = 90
+    ) async throws -> SafariAuto.Tab {
+        let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "zoho.", seconds: 30)
+        // 1. Give the SPA / SSO redirect up to ~10 seconds to settle into inbox automatically.
+        var lastState: PageState?
+        for _ in 0..<12 {
+            if let raw = try? await tab.js(pageStateJS), let st = parsePageState(raw) {
+                lastState = st
+                if st.isMailReady && !st.needsSignIn { return tab }
+                if st.needsSignIn { break }
+            }
+            try? await Task.sleep(for: .seconds(0.8))
+        }
+
+        // Already redirected into Zoho Login / accounts.zoho.*.
+        if let st = lastState, st.needsSignIn || !st.isMailReady {
+            guard allowInteractiveLogin else {
+                throw WireError("mail", "Zoho Mail isn't signed in on \(host) in Safari yet. Open \(host) in Safari (or click Send once to sign in).")
+            }
+            // Bring the sign-in tab forward in Safari so the user sees it immediately and can sign in.
+            await tab.revealInSafari()
+            let polls = max(1, Int(Double(loginWaitSeconds) / 1.5))
+            var missCount = 0
+            for _ in 0..<polls {
+                try? await Task.sleep(for: .seconds(1.5))
+                do {
+                    let raw = try await tab.js(pageStateJS)
+                    missCount = 0
+                    if let cur = parsePageState(raw), cur.isMailReady && !cur.needsSignIn {
+                        return tab
+                    }
+                } catch SafariAuto.Failure.noTab {
+                    missCount += 1
+                    if missCount >= 4 {
+                        throw WireError("mail_send", "Zoho Mail tab was closed before sign-in finished.")
+                    }
+                } catch {
+                    // Brief error while cross-origin OAuth page reloads.
+                }
+            }
+            // Leave Safari open on Zoho login for the user rather than closing it under them.
+            await session.handOffToUser(tab)
+            throw WireError("mail_send", "Opened Zoho Mail in Safari for sign-in — finish signing in there, then click Send again.")
+        }
+        return tab
+    }
+}
+
 /// Sends an owner-approved email through Zoho Webmail inside a dedicated SafariAuto tab.
 /// Fails loudly if Zoho's compose DOM changed rather than claiming sent.
 enum ZohoSafariSender {
@@ -145,32 +248,43 @@ enum ZohoSafariSender {
             }
             defer { Task { await session.exit() } }
 
-            let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "mail.zoho", seconds: 30)
+            let tab = try await ZohoSafariAuth.ensureReady(session: session, host: host, allowInteractiveLogin: true)
+
             // 1. Open compose if not already open.
             let openJS = """
             (function(){
-              var btn=document.querySelector('[data-testid*="compose"],.zmComposeBtn,button[title*="Compose"],a[href*="compose"]');
+              if(document.querySelector('[data-testid="com_To_field"],[data-testid="com_send"]')) return 'already';
+              var btn=document.querySelector('[data-testid="new-btn-opt"],[data-testid*="compose"],.zmComposeBtn,button[title*="Compose"],button[title*="New Mail"],a[href*="compose"]');
+              if(!btn){
+                btn=Array.from(document.querySelectorAll('button')).find(function(b){
+                  var t=(b.innerText||'').trim();
+                  return (t==='New Mail'||t==='Compose')&&b.getBoundingClientRect().width>0;
+                });
+              }
               if(btn){btn.click();return 'clicked';}
               return document.querySelector('input[placeholder*="Subject"],input[name="subject"],[data-testid="subject"]')?'already':'missing';
             })()
             """
             var opened = false
             for _ in 0..<12 {
-                try? await Task.sleep(for: .seconds(1))
                 let r = (try? await tab.js(openJS)) ?? ""
                 if r == "clicked" || r == "already" { opened = true; break }
+                try? await Task.sleep(for: .seconds(1))
             }
             guard opened else {
-                throw WireError("mail_send", "Zoho Mail's Compose button wasn't found (are you signed in, or did Zoho change its page?).")
+                throw WireError("mail_send", "Zoho Mail's Compose button wasn't found (are you signed in on \(host), or did Zoho change its page?).")
             }
 
-            // 2. Fill To, Subject, Body using JSON-encoded string literals and verify fields exist.
+            // 2. Fill To, Subject, and the visible Body editor using JSON-encoded string literals.
             let fillJS = """
             (function(){
               var toVal=\(toJS), subjVal=\(subjJS), bodyVal=\(bodyJS);
-              var toEl=document.querySelector('input[data-testid*="to"],input[name="to"],.zmCmpTo input,input[aria-label="To"]');
-              var subjEl=document.querySelector('input[placeholder*="Subject"],input[name="subject"],[data-testid="subject"]');
-              var bodyEl=document.querySelector('.zmCmpBody [contenteditable="true"],iframe.ze_area,textarea[name="content"],[data-testid="compose-body"] [contenteditable="true"]');
+              var toEl=document.querySelector('[data-testid="com_To_field"],input[aria-label="To Recipients"],input[data-testid*="to"],input[name="to"],.zmCmpTo input,input[aria-label="To"]');
+              var subjEl=document.querySelector('input[placeholder="Subject"],input[placeholder*="Subject"],input[name="subject"],[data-testid="subject"]');
+              var bodyEl=Array.from(document.querySelectorAll('iframe.ze_area,iframe[title="Text editor area"]')).find(function(f){
+                var rc=f.getBoundingClientRect();
+                return rc.width>0&&rc.height>0;
+              })||document.querySelector('.zmCmpBody [contenteditable="true"],textarea[name="content"],[data-testid="compose-body"] [contenteditable="true"]');
               if(!toEl||!subjEl||!bodyEl) return 'missing_fields';
               function setInput(el,val){
                 el.focus();
@@ -179,42 +293,71 @@ enum ZohoSafariSender {
                 if(setter&&setter.set){setter.set.call(el,val);}else{el.value=val;}
                 el.dispatchEvent(new Event('input',{bubbles:true}));
                 el.dispatchEvent(new Event('change',{bubbles:true}));
-                el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,bubbles:true}));
+              }
+              function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+              function toHtml(s){
+                return s.split('\\n').map(function(line){
+                  return line===''?'<div><br></div>':'<div>'+esc(line)+'</div>';
+                }).join('');
               }
               setInput(toEl,toVal);
+              toEl.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));
+              toEl.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));
               setInput(subjEl,subjVal);
               if(bodyEl.tagName==='IFRAME'){
                 var doc=bodyEl.contentDocument;
                 if(!doc||!doc.body) return 'missing_body_doc';
-                doc.body.innerText=bodyVal;
+                doc.body.focus();
+                doc.body.innerHTML=toHtml(bodyVal);
+                doc.body.dispatchEvent(new Event('input',{bubbles:true}));
               }else if(bodyEl.isContentEditable){
                 bodyEl.focus();
-                bodyEl.innerText=bodyVal;
+                bodyEl.innerHTML=toHtml(bodyVal);
                 bodyEl.dispatchEvent(new Event('input',{bubbles:true}));
               }else{
                 setInput(bodyEl,bodyVal);
               }
-              var sendBtn=document.querySelector('[data-testid*="send"],button.zmSendBtn,button[title*="Send"]');
+              return 'filled';
+            })()
+            """
+            var filled = ""
+            for _ in 0..<10 {
+                try? await Task.sleep(for: .seconds(0.8))
+                let r = (try? await tab.js(fillJS)) ?? ""
+                if !r.isEmpty && r != "missing value" {
+                    filled = r
+                    if r == "filled" || r == "missing_body_doc" {
+                        if r == "filled" { break }
+                    }
+                }
+            }
+            guard filled == "filled" else {
+                throw WireError("mail_send", "Zoho Mail compose fields didn't load (\(filled.isEmpty ? "timeout" : filled)); nothing was sent.")
+            }
+
+            // 3. Give Zoho's recipient pill a moment to commit, verify Subject, and click Send (`com_send`, not `com_send_later`).
+            try? await Task.sleep(for: .seconds(0.7))
+            let sendJS = """
+            (function(){
+              var subjVal=\(subjJS);
+              var subjEl=document.querySelector('input[placeholder="Subject"],input[placeholder*="Subject"],input[name="subject"],[data-testid="subject"]');
+              if(!subjEl||(subjEl.value||'').indexOf(subjVal)===-1) return 'verify_failed';
+              var sendBtn=document.querySelector('button[data-testid="com_send"],button[aria-label="Send"],button.zmSendBtn,button[title="Send"],button[title*="Send Mail"]');
               if(!sendBtn) return 'missing_send';
-              if((subjEl.value||'').indexOf(subjVal)===-1) return 'verify_failed';
               sendBtn.click();
               return 'sent';
             })()
             """
-            var outcome = ""
+            let sendResult = (try? await tab.js(sendJS)) ?? ""
+            guard sendResult == "sent" else {
+                throw WireError("mail_send", "Zoho Mail send didn't complete (\(sendResult.isEmpty ? "no response" : sendResult)); nothing was marked sent.")
+            }
+            // Wait until the compose Send button closes (or settle 5s) before closing the tab.
             for _ in 0..<8 {
-                try? await Task.sleep(for: .seconds(1))
-                let r = (try? await tab.js(fillJS)) ?? ""
-                if !r.isEmpty && r != "missing value" {
-                    outcome = r
-                    if r == "sent" || r == "verify_failed" || r == "missing_send" { break }
-                }
+                try? await Task.sleep(for: .seconds(0.7))
+                let stillOpen = (try? await tab.js("!!document.querySelector('button[data-testid=\"com_send\"]')")) ?? ""
+                if stillOpen == "false" { break }
             }
-            guard outcome == "sent" else {
-                throw WireError("mail_send", "Zoho Mail send didn't complete (\(outcome.isEmpty ? "compose didn't load" : outcome)); nothing was marked sent.")
-            }
-            // Brief settle for XHR dispatch before closing the tab.
-            try? await Task.sleep(for: .seconds(2))
         }.value
     }
 }

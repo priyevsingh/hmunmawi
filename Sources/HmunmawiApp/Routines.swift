@@ -203,7 +203,7 @@ final class Routines {
         case .serviceWatch:
             model?.addOns.contains { ($0.id == "sentry" || $0.id == "vercel") && $0.approved } == true ? nil
                 : "the Sentry or Vercel connection (Settings → Connections)"
-        case .outreachReplies: Outreach.items().isEmpty ? "an outreach list (Outreach → Setup)" : nil
+        case .outreachReplies: (Outreach.items().isEmpty && ReleaseSubscribers.shared.book.subscribers.isEmpty) ? "an outreach list (Outreach → Setup)" : nil
         case .macJob: MacJobRoutine.plist(r.params?["label"] ?? "") == nil ? "one of your Mac jobs (its name)" : nil
         case .replyIdeas:
             ReplyIdeas.fromSafari(r)
@@ -1324,12 +1324,40 @@ final class Routines {
 
     // MARK: Outreach replies (suggestions only; each change waits for your tap)
 
+    /// Returns `"new"` suggestions that should be queued as outbound email drafts in Log → Waiting.
+    nonisolated static func actionableDraftSuggestions(from suggestions: [OSuggestion]) -> [OSuggestion] {
+        suggestions.filter { s in
+            s.state == "new" &&
+            (["answer", "check in", "thank", "repitch"].contains(s.kind) || (s.kind == "thread" && s.thread == "your turn"))
+        }
+    }
+
     private func outreachReplies(_ r: MyRoutine, key: String) async -> (ok: Bool, note: String) {
         guard let model, let store = model.liveStore else { return (false, "The app isn't ready.") }
         let items = Outreach.items()
-        guard !items.isEmpty else { return (true, "No outreach list yet.") }
+        let hasSubscribers = !ReleaseSubscribers.shared.book.subscribers.isEmpty
+        guard !items.isEmpty || hasSubscribers else { return (true, "No outreach list yet.") }
         // A built-in mail source (Apple Mail or IMAP), when one is chosen in Settings, is read first.
         _ = await MailWatch.refresh(model: model)
+        let subMailRecords = await ReleaseSubscribers.shared.processMailEvents(model: model)
+        let newReleaseDrafts = await ReleaseSubscribers.shared.checkNewReleases(model: model)
+        let releaseDraftLines = newReleaseDrafts.map { d in
+            "\(d.app) \(d.version): release update ready for \(d.recipients) subscriber(s)"
+        }
+        let unsubCount = subMailRecords.filter { $0.kind == .unsubscribe }.count
+        let bounceCount = subMailRecords.filter { $0.kind == .bounce }.count
+        var subEventParts: [String] = []
+        if unsubCount > 0 { subEventParts.append("\(unsubCount) unsubscribed") }
+        if bounceCount > 0 { subEventParts.append("\(bounceCount) bounced") }
+        let subEventLines = subEventParts.isEmpty ? [] : ["Subscribers: " + subEventParts.joined(separator: ", ")]
+        if items.isEmpty {
+            let subSummaryLines = releaseDraftLines + subEventLines
+            guard !subSummaryLines.isEmpty else {
+                return (true, "Checked subscriber mail and releases.")
+            }
+            let suffix = releaseDraftLines.isEmpty ? "" : "\nReview in Hmunmawi → Log."
+            return await tell(r, text: "Release subscribers:\n" + subSummaryLines.joined(separator: "\n") + suffix, key: key, urgent: false)
+        }
         let since = Millis(Date.now.addingTimeInterval(-60 * 86_400).timeIntervalSince1970 * 1000)
         let events = (try? await store.events(kind: "mail.seen", since: since)) ?? []
         var versions: [String: String] = [:]
@@ -1338,9 +1366,26 @@ final class Routines {
         // Matching 60 days of mail is real work: off the main thread, so the window never stalls on the half hour.
         let day = Date.now.localDay
         let fixedVersions = versions
-        let (mail, suggested) = await Task.detached(priority: .utility) {
-            let mail = Outreach.mail(events)
-            return (mail, Outreach.suggest(items: items, mail: mail, apps: apps, today: day, versions: fixedVersions))
+        let mail = await Task.detached(priority: .utility) { Outreach.mail(events) }.value
+        let purgedSuggestionIDs = Outreach.purgeSelfAuthoredThreads(items: items, mail: mail)
+        for w in model.waiting where w.job.kind == "outreach.send" && w.job.state == .waitingApproval {
+            let sid = w.job.payload[path: "suggestion_id"]?.string
+            let kind = w.job.payload[path: "kind"]?.string ?? "follow-up"
+            let offerCode = w.job.payload[path: "offer_code"]?.string ?? ""
+            var hasCodeFlag = false
+            if case .bool(let b)? = w.job.payload[path: "has_code"] { hasCodeFlag = b }
+            let hasCode = hasCodeFlag || !offerCode.isEmpty
+            let body = w.job.payload[path: "body"]?.string ?? ""
+            let purged = sid.map { purgedSuggestionIDs.contains($0) } ?? false
+            let unwantedCode = kind != "answer" && !offerCode.isEmpty
+            let leakedCoupon = AppStorePitchExtract.couponLeakProblem(body, allowCode: kind == "answer" && hasCode) != nil
+            if purged || unwantedCode || leakedCoupon {
+                await model.skip(w.job)
+            }
+        }
+        await Outreach.refreshHighlights(model: model)
+        let suggested = await Task.detached(priority: .utility) {
+            Outreach.suggest(items: items, mail: mail, apps: apps, today: day, versions: fixedVersions)
         }.value
         var found = suggested
         let before = Outreach.side()
@@ -1436,7 +1481,7 @@ final class Routines {
         let latestByID = Dictionary(latestItems.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var draftedKeys = Set(latestSide.draftedIDs ?? [])
         var newDraftKeys: [String] = []
-        var parkedDraftLines: [String] = []
+        var parkedDraftLines: [String] = releaseDraftLines
 
         struct DraftCandidate {
             let key: String
@@ -1447,54 +1492,42 @@ final class Routines {
             let coverageURL: String?
         }
         var candidates: [DraftCandidate] = []
-        for s in fresh where ["answer", "check in", "thank", "repitch"].contains(s.kind) || (s.kind == "thread" && s.thread == "your turn") {
+        var seenCandKeys = Set<String>()
+        for s in Self.actionableDraftSuggestions(from: latestSide.suggestions) {
+            let candKey = "v2|sug|\(s.id)"
+            guard seenCandKeys.insert(candKey).inserted else { continue }
             guard let item = latestByID[s.entry] else { continue }
             let dKind = s.kind == "thread" ? "answer" : s.kind
             let ver = s.kind == "repitch" ? versions.first(where: { item.app.localizedCaseInsensitiveContains($0.key) })?.value : nil
             let cov = s.kind == "thank" ? latestSide.extras[item.id]?.coverage?.last?.url : nil
-            candidates.append(DraftCandidate(key: "sug|\(s.id)", item: item, kind: dKind, suggestionID: s.id, version: ver, coverageURL: cov))
+            candidates.append(DraftCandidate(key: candKey, item: item, kind: dKind, suggestionID: s.id, version: ver, coverageURL: cov))
         }
         for item in latestItems where item.isEmail && item.open && item.followedUpOn == nil {
             guard let fu = item.followUp, let fuDay = DayNumber.of(fu), let todayNum = DayNumber.of(today), fuDay <= todayNum else { continue }
-            candidates.append(DraftCandidate(key: "fu|\(item.id)|\(fu)", item: item, kind: "follow-up", suggestionID: nil, version: nil, coverageURL: nil))
+            let candKey = "fu|\(item.id)|\(fu)"
+            guard seenCandKeys.insert(candKey).inserted else { continue }
+            candidates.append(DraftCandidate(key: candKey, item: item, kind: "follow-up", suggestionID: nil, version: nil, coverageURL: nil))
         }
 
+        var reservedCodes = Outreach.reservedOfferCodes(in: model.waiting)
+
         for cand in candidates where !draftedKeys.contains(cand.key) {
-            let item = cand.item
-            guard let to = Outreach.pinnedRecipient(for: item) else { continue }
-            let inReview = model.snapshots("release.check").contains {
-                $0.app?.localizedCaseInsensitiveContains(item.app) == true && ($0.payload[path: "state"]?.string ?? "").contains("REVIEW")
-            }
-            guard Outreach.canDraft(for: item, allItems: latestItems, side: latestSide, inReview: inReview, kind: cand.kind) else { continue }
-            let appFirst = item.app.split(separator: "+").first.map(String.init) ?? item.app
-            let appID = OfferCodes.shared.appIDs.first { QuickName.of($0, model: model).caseInsensitiveCompare(appFirst) == .orderedSame }
-            let appLink = appID.map { Outreach.campaignLink(appID: $0, outlet: item.outlet, app: item.app) }
-            let wantsCode = ["answer", "check in", "repitch", "follow-up"].contains(cand.kind)
-            let code = wantsCode ? appID.flatMap { OfferCodes.shared.codes(app: $0).first { $0.sharedAt == nil } } : nil
-            let theirReply = cand.kind == "answer" ? Outreach.latestTheirReply(for: item, in: events) : nil
-            var itemForDraft = item
-            if let cov = cand.coverageURL { itemForDraft.url = cov }
-            guard let built = await Outreach.buildAutoDraft(
-                for: itemForDraft, kind: cand.kind, theirReply: theirReply, version: cand.version,
-                appLink: appLink, codeLink: code?.url, versions: versions
-            ) else { continue }
-            var payloadFields: [String: JSONValue] = [
-                "entry": .string(item.id),
-                "outlet": .string(item.outlet),
-                "app": .string(item.app),
-                "kind": .string(cand.kind),
-                "to": .string(to),
-                "subject": .string(built.subject),
-                "body": .string(built.body),
-            ]
-            if let sid = cand.suggestionID { payloadFields["suggestion_id"] = .string(sid) }
-            if let code { payloadFields["offer_code"] = .string(code.code) }
-            if let appID { payloadFields["app_id"] = .string(appID) }
-            if (try? await store.enqueue(kind: "outreach.send", resource: "mail", priority: 3, maxAttempts: 1,
-                                         payload: .object(payloadFields), needsApproval: true)) != nil {
+            let res = await Outreach.queueDraft(
+                item: cand.item,
+                kind: cand.kind,
+                suggestionID: cand.suggestionID,
+                version: cand.version,
+                coverageURL: cand.coverageURL,
+                events: events,
+                versions: versions,
+                reservedCodes: &reservedCodes,
+                model: model,
+                store: store
+            )
+            if res.queued {
                 draftedKeys.insert(cand.key)
                 newDraftKeys.append(cand.key)
-                parkedDraftLines.append("\(item.outlet) (\(item.app)): \(cand.kind) email ready to send")
+                parkedDraftLines.append("\(cand.item.outlet) (\(cand.item.app)): \(cand.kind) email ready to send")
             }
         }
         if !newDraftKeys.isEmpty {
@@ -1503,7 +1536,7 @@ final class Routines {
         }
 
         let remainingFresh = fresh.filter { !autoDoneIDs.contains($0.id) }
-        guard !remainingFresh.isEmpty || !parkedDraftLines.isEmpty else {
+        guard !remainingFresh.isEmpty || !parkedDraftLines.isEmpty || !subEventLines.isEmpty else {
             if autoAppliedCount > 0 {
                 return (true, "Auto-updated \(autoAppliedCount) outreach item\(autoAppliedCount == 1 ? "" : "s") (with 1-click Undo in Outreach).")
             }
@@ -1516,7 +1549,7 @@ final class Routines {
                                        "thank": "covered you: say thanks", "repitch": "worth telling about the new version",
                                        "thread": "wrote again", "answer": "waiting for your answer", "check in": "time for one friendly check-in",
                                        "covered": "may have covered you"]
-        let lines = parkedDraftLines.prefix(3) + remainingFresh.prefix(4).map { "\($0.outlet) (\($0.app)): \(words[$0.kind] ?? $0.kind)\($0.sure ? "" : "?")" }
+        let lines = Array(parkedDraftLines.prefix(3)) + subEventLines + remainingFresh.prefix(4).map { "\($0.outlet) (\($0.app)): \(words[$0.kind] ?? $0.kind)\($0.sure ? "" : "?")" }
         let extraCount = max(0, (parkedDraftLines.count - 3)) + max(0, (remainingFresh.count - 4))
         let more = extraCount > 0 ? "\n…and \(extraCount) more" : ""
         return await tell(r, text: "Outreach:\n" + lines.joined(separator: "\n") + more + "\nReview in Hmunmawi → Log.", key: key, urgent: false)

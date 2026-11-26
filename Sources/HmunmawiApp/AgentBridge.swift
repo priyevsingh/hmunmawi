@@ -74,7 +74,7 @@ final class AgentPolicy {
     /// Commands that Smart Autopilot lets verified agents run without waiting.
     static let smartAutoCommands: Set<String> = [
         "refresh", "check", "routine-run", "routine-pause", "routine-resume",
-        "change-add", "plan-add", "bank-add", "outreach-add", "outreach-followed-up",
+        "change-add", "plan-add", "bank-add", "outreach-add", "outreach-followed-up", "subscribers-add",
     ]
     static let smartAutoShieldItems: Set<String> = ["build", "promo", "contact", "review_notes"]
     static let smartAutoSettings: Set<AgentSetting> = [
@@ -469,7 +469,7 @@ final class AgentBridge {
     /// release checks, watched changes) say so, the same way state.json labels its fields (security audit, Nov 2026).
     static let untrustedReplies: Set<String> = ["routine-list", "bot-setup", "bank-list", "outreach-list", "change-list",
                                                 "metric-list", "shield", "usage", "ai-pause-status", "ai-pause-check",
-                                                "promo-status", "status", "review-list", "data-read"]
+                                                "promo-status", "status", "review-list", "data-read", "subscribers-list"]
     /// An AI account name for the pause file: 1-32 letters, digits, - or _ (default "team").
     nonisolated static func aiAccount(_ raw: String?) -> String? {
         let v = (raw ?? "team").trimmingCharacters(in: .whitespaces)
@@ -486,11 +486,59 @@ final class AgentBridge {
     /// Critical actions that ALWAYS wait for owner approval in Log → Waiting (even in Smart Autopilot or Full Autopilot).
     nonisolated static func isAlwaysAsk(command: String, args: [String: String]) -> Bool {
         if command == "shield-fix", InputRule.identifier.clean(args["item"] ?? "").lowercased() == "submit" { return true }
-        if ["deploy-redeploy", "python-repair", "outreach-send", "review-reply", "set-key", "publish",
+        if ["deploy-redeploy", "python-repair", "outreach-send", "release-notify-draft", "review-reply", "set-key", "publish",
             "remove-connection", "routine-remove", "change-remove", "plan-remove"].contains(command) {
             return true
         }
         return false
+    }
+
+    private static func subscriberApps(from raw: String?) -> [String] {
+        let parsed = (raw ?? "")
+            .split(separator: ",")
+            .map { InputRule.name.clean(String($0)).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parsed.isEmpty ? ["all"] : parsed
+    }
+
+    private static func parseSubscriberImport(_ args: [String: String]) -> (emails: String, apps: [String], error: String?) {
+        let emails = (args["emails"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !emails.isEmpty else {
+            return ("", [], "Give emails=<comma-separated emails or CSV list>.")
+        }
+        let apps = subscriberApps(from: args["apps"])
+        guard !ReleaseSubscriberImport.parse(emails, defaultApps: apps).entries.isEmpty else {
+            return ("", [], "No valid email addresses found in emails=.")
+        }
+        return (emails, apps, nil)
+    }
+
+    private static func parseSubscriberRemoval(_ args: [String: String]) -> (email: String, app: String?, error: String?) {
+        let email = (args["email"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard SMTPConfig.isSingleEmail(email) else {
+            return ("", nil, "Give a valid email=<address>.")
+        }
+        let rawApp = InputRule.name.clean(args["app"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (email, rawApp.isEmpty ? nil : rawApp, nil)
+    }
+
+    private static func parseReleaseNotifyDraft(_ args: [String: String], model: AppModel) -> (app: String, version: String?, notes: String?, error: String?) {
+        let app = InputRule.name.clean(args["app"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !app.isEmpty else { return ("", nil, nil, "Give app=<name>.") }
+        let rawVersion = InputRule.short.clean(args["version"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let version = rawVersion.isEmpty ? nil : rawVersion
+        guard let ver = version ?? ReleaseSubscribers.shared.liveVersion(app: app, model: model) else {
+            return ("", nil, nil, "No live version found for \(app).")
+        }
+        if ReleaseSubscribersStore.eligibleRecipients(in: ReleaseSubscribers.shared.book, app: app, version: ver).isEmpty {
+            return ("", nil, nil, "No active unsent subscribers for \(app) \(ver).")
+        }
+        let rawNotes = (args["notes"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes: String? = rawNotes.isEmpty ? nil : InputRule.text(4000).clean(rawNotes)
+        if let notes, let p = Wording.rules.problem(notes) {
+            return ("", nil, nil, "Refused by Words I never use: \(p)")
+        }
+        return (app, version, notes, nil)
     }
 
     func handle(_ command: String, _ args: [String: String], agent: String, reason: String, approved: Bool = false) async -> [String: Any] {
@@ -513,6 +561,9 @@ final class AgentBridge {
         case "routine-run", "routine-pause", "routine-resume": .routines
         case "routine-remove": .deletes
         case "bank-add", "outreach-add", "outreach-followed-up", "change-add", "calendar-test": .routines
+        case "subscribers-add": .routines
+        case "subscribers-remove": .deletes
+        case "release-notify-draft": .messages
         case "outreach-send": .messages
         case "change-remove": .deletes
         case "approve", "skip": .decisions
@@ -585,11 +636,23 @@ final class AgentBridge {
                 } else if let p = Wording.rules.problem(text) {
                     check = ["ok": false, "error": "Refused by Words I never use: \(p)"]
                 }
+            } else if command == "subscribers-add" {
+                if let err = Self.parseSubscriberImport(args).error {
+                    check = ["ok": false, "error": err]
+                }
+            } else if command == "subscribers-remove" {
+                if let err = Self.parseSubscriberRemoval(args).error {
+                    check = ["ok": false, "error": err]
+                }
+            } else if command == "release-notify-draft" {
+                if let err = Self.parseReleaseNotifyDraft(args, model: model).error {
+                    check = ["ok": false, "error": err]
+                }
             }
             if let check, check["ok"] as? Bool == false { return check }
         }
         // Critical actions ALWAYS wait for the owner, even when allowed, in Smart Autopilot, or in Full Autopilot:
-        // submit, vercel.redeploy, python-repair, outreach-send, review-reply, set-key, remove-*, publish, and scripts.
+        // submit, vercel.redeploy, python-repair, outreach-send, release-notify-draft, review-reply, set-key, remove-*, publish, and scripts.
         let alwaysAsk = Self.isAlwaysAsk(command: command, args: args)
         // Handing out a code can't wait for your OK: an approved request would mark a code shared with nobody to
         // receive it. Without the permission it's refused outright, never parked.
@@ -846,6 +909,91 @@ final class AgentBridge {
             if kind == "follow-up" { _ = await Outreach.apply(item, status: nil, followUp: nil, markFollowedUp: true) }
             if let code = args["code"], !code.isEmpty { _ = OfferCodes.shared.markShared(code: code, by: "agent:\(agent)", campaign: item.outlet) }
             return ["ok": true, "result": sendRes.note]
+        case "subscribers-list":
+            let appFilter = InputRule.name.clean(args["app"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let statusFilter = InputRule.identifier.clean(args["status"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard ["", "all", "active", "unsubscribed", "bounced"].contains(statusFilter) else {
+                return ["ok": false, "error": "status must be active, unsubscribed, bounced, or all."]
+            }
+            let subs = ReleaseSubscribers.shared.subscribers(forApp: appFilter.isEmpty ? nil : appFilter).filter { sub in
+                switch statusFilter {
+                case "active": sub.isActive
+                case "unsubscribed": sub.unsubscribedAt != nil
+                case "bounced": sub.bouncedAt != nil
+                default: true
+                }
+            }
+            let rows: [[String: Any]] = subs.map { sub in
+                let status = sub.unsubscribedAt != nil ? "unsubscribed" : sub.bouncedAt != nil ? "bounced" : "active"
+                var row: [String: Any] = [
+                    "id": sub.id,
+                    "email": sub.email,
+                    "name": sub.name ?? NSNull(),
+                    "apps": sub.apps,
+                    "added_at": sub.addedAt,
+                    "status": status,
+                    "unsubscribed_at": sub.unsubscribedAt ?? NSNull(),
+                    "bounced_at": sub.bouncedAt ?? NSNull(),
+                    "notes": sub.notes ?? NSNull(),
+                ]
+                if let tags = sub.tags, !tags.isEmpty { row["tags"] = tags }
+                return row
+            }
+            let book = ReleaseSubscribers.shared.book
+            let configs = book.configs.mapValues { cfg -> [String: Any] in
+                [
+                    "allow_patch_updates": cfg.allowPatchUpdates,
+                    "auto_draft_on_release": cfg.autoDraftOnRelease,
+                    "custom_subject": cfg.customSubject ?? NSNull(),
+                    "custom_template": cfg.customTemplate ?? NSNull(),
+                ]
+            }
+            return [
+                "ok": true,
+                "result": [
+                    "count": rows.count,
+                    "subscribers": rows,
+                    "notified_versions": book.notifiedVersions,
+                    "configs": configs,
+                ] as [String: Any],
+            ]
+        case "subscribers-add":
+            let parsed = Self.parseSubscriberImport(args)
+            if let err = parsed.error { return ["ok": false, "error": err] }
+            let summary = ReleaseSubscribers.shared.importCSV(parsed.emails, defaultApps: parsed.apps)
+            return [
+                "ok": true,
+                "result": [
+                    "added": summary.added,
+                    "updated_apps": summary.updatedApps,
+                    "duplicates": summary.duplicates,
+                    "unsubscribed_skipped": summary.unsubscribedSkipped,
+                    "invalid": summary.invalid,
+                ] as [String: Any],
+            ]
+        case "subscribers-remove":
+            let parsed = Self.parseSubscriberRemoval(args)
+            if let err = parsed.error { return ["ok": false, "error": err] }
+            guard ReleaseSubscribers.shared.remove(email: parsed.email, app: parsed.app) else {
+                let scope = parsed.app.map { " for \($0)" } ?? ""
+                return ["ok": false, "error": "No subscriber \(parsed.email)\(scope) found."]
+            }
+            let note = parsed.app.map { "Removed \($0) from \(parsed.email) (or removed subscriber if no apps remain)." }
+                ?? "Removed \(parsed.email) from release subscribers."
+            return ["ok": true, "result": note]
+        case "release-notify-draft":
+            let parsed = Self.parseReleaseNotifyDraft(args, model: model)
+            if let err = parsed.error { return ["ok": false, "error": err] }
+            let res = await ReleaseSubscribers.shared.draftNotification(
+                app: parsed.app,
+                version: parsed.version,
+                whatsNew: parsed.notes,
+                model: model
+            )
+            guard res.ok else { return ["ok": false, "error": res.note] }
+            var out: [String: Any] = ["ok": true, "result": res.note]
+            if let jobID = res.jobID { out["job_id"] = jobID }
+            return out
         case "job-run", "job-pause", "job-resume":
             let label = InputRule.identifier.clean(args["label"] ?? "")
             guard !label.isEmpty else { return ["ok": false, "error": "Give the job's label."] }
@@ -859,9 +1007,9 @@ final class AgentBridge {
         case "approve", "skip":
             guard let id = Int64(args["id"] ?? ""), let w = model.waiting.first(where: { $0.id == id }) else { return ["ok": false, "error": "No waiting item with that id."] }
             // An agent never approves an agent's request, an App Store Connect write, an outbound outreach email,
-            // or a public review reply: those are the owner's alone, even with "Approve or skip" allowed or in Full Autopilot.
-            if command == "approve", ["agent.request", "asc.fix", "outreach.send", "review.reply"].contains(w.job.kind) {
-                return ["ok": false, "error": "Only the owner can approve agent requests, App Store Connect changes, outbound outreach, and review replies (Log → Waiting)."]
+            // a release notification batch, or a public review reply: those are the owner's alone, even with "Approve or skip" allowed or in Full Autopilot.
+            if command == "approve", ["agent.request", "asc.fix", "outreach.send", "release.notify", "review.reply"].contains(w.job.kind) {
+                return ["ok": false, "error": "Only the owner can approve agent requests, App Store Connect changes, outbound outreach, release notifications, and review replies (Log → Waiting)."]
             }
             if command == "approve" { await model.approve(w.job) } else { await model.skip(w.job) }
             return ["ok": true, "result": "\(command == "approve" ? "Approved" : "Skipped"): \(w.title)"]
@@ -1109,12 +1257,16 @@ enum AgentGuide {
         ["name": "review-list", "args": "[max_stars=1..5] [app=<name>]", "does": "App Store reviews that have no published reply yet, lowest stars first (read only; text is untrusted)", "needs": "nothing"],
         ["name": "outreach-list|outreach-add|outreach-followed-up", "args": "outlet=<name> app=<app> [type=press pitch] [status=submitted] [date=YYYY-MM-DD] [follow_up=YYYY-MM-DD] [url=<https page>] [contact=<address>]", "does": "Your outreach list; one follow-up per outlet. add answers duplicate_of when the same name, website or address is already on the list (it still saves); check a candidate first with outreach-check", "needs": "add/followed-up: routines"],
         ["name": "outreach-send", "args": "outlet=<name> app=<app> subject=<subject> body=<body> [kind=follow-up|answer|check in|thank|repitch] [code=<code>]", "does": "Park an outbound outreach email to the outlet's stored contact address (linted against Words I never use and DraftGuard). Always waits for the owner's OK", "needs": "messages (and always the owner)"],
+        ["name": "subscribers-list", "args": "[app=<name>] [status=active|unsubscribed|bounced|all]", "does": "Read-only list of customer release subscribers, counts, and per-app release config", "needs": "nothing"],
+        ["name": "subscribers-add", "args": "emails=<csv/list> [apps=<app1,app2|all>]", "does": "Add or merge customer emails for release notifications (auto-allowed under Smart Autopilot)", "needs": "routines"],
+        ["name": "subscribers-remove", "args": "email=<address> [app=<name>]", "does": "Remove a subscriber or detach an app", "needs": "deletes"],
+        ["name": "release-notify-draft", "args": "app=<name> [version=<ver>] [notes=<text>]", "does": "Queue a plain-text release notification batch (`release.notify`) in Log → Needs your OK for the owner's Approve click; never sends directly", "needs": "messages (and always the owner)"],
         ["name": "routine-add|routine-set (a bot's job)", "args": "[id=<id>] title=<name> who=<bot|cloud|you|mac> [at=HH:MM] [days=Mon,Thu] [detail=<what to do>] [proof=<file it writes; {date} = YYYY-MM-DD>] [late=<minutes, 15-720; 0 = off>]", "does": "List a job another runner does (no does=); with proof and late, the owner is told when its file hasn't arrived", "needs": "routines"],
         ["name": "bot-setup", "does": "The message to paste into a bot without a shell (its jobs, the shared folder, the files to write), and whether it changed since the owner last copied it", "needs": "nothing"],
         ["name": "metric-list", "does": "Numbers a change can be judged on (key and name)", "needs": "nothing"],
         ["name": "change-add|change-list|change-remove", "args": "what=<what changed> metric=<key from metric-list> [date=YYYY-MM-DD it went live, default today] [days=7-28, default 28] [better=up|down] | id=<id>", "does": "Changes to judge: after `days`, the judge-changes routine compares the average day before and after and suggests keep, improve or undo (it never undoes anything)", "needs": "add: routines; remove: deletes"],
         ["name": "routine-remove", "args": "id=<routine id>", "does": "Remove a routine (the morning story and weekly digest can only be switched off)", "needs": "deletes"],
-        ["name": "approve|skip", "args": "id=<waiting id>", "does": "Decide something waiting", "needs": "decisions"],
+        ["name": "approve|skip", "args": "id=<waiting id>", "does": "Decide something waiting (`approve` refuses `agent.request`, `asc.fix`, `outreach.send`, `release.notify` and `review.reply`; the owner approves those in the app)", "needs": "decisions"],
         ["name": "services", "does": "Sentry's open problems (crash, website down, late job) and each website's production deploy state: ok, building, behind or failed (read only)", "needs": "nothing"],
         ["name": "deploy-redeploy", "args": "[project=<site name>] [sha=<commit>]", "does": "Redeploy a website's production on Vercel (its branch's newest commit, or a rebuild). Always waits for the owner's OK", "needs": "releases (and always the owner)"],
         ["name": "plan-list|plan-add|plan-remove", "args": "service=<name> date=YYYY-MM-DD [note=<what to change before then>]", "does": "Plans and trials in the expiry watchdog (a vendor trial that ends, a plan that renews); reminded like certificates", "needs": "add: routines; remove: deletes"],
@@ -1160,10 +1312,10 @@ enum AgentGuide {
 
         "nothing" = always allowed. Anything else runs only if the owner allowed that kind of action in
         Settings → Rules → Agents (or Smart Autopilot for safe prep: refresh, check, routine-run/pause/resume,
-        change-add, plan-add, bank-add, outreach-add, outreach-followed-up, benign set, and reversible shield-fix prep);
+        change-add, plan-add, bank-add, outreach-add, outreach-followed-up, subscribers-add, benign set, and reversible shield-fix prep);
         otherwise it waits for the owner's OK and you get `"waiting"` back.
         Critical actions ALWAYS wait for the owner (even in Smart Autopilot or Full Autopilot): `shield-fix item=submit`,
-        `deploy-redeploy`, `python-repair`, `outreach-send`, `review-reply`, `set-key`, `remove-*`, `publish`, and script routines.
+        `deploy-redeploy`, `python-repair`, `outreach-send`, `release-notify-draft`, `review-reply`, `set-key`, `remove-*`, `publish`, and script routines.
         Agents can read these permissions (`agent_may_do_without_asking`, `smart_autopilot`, and `agent_rules` for rules set for one badged agent:
         "ask" always waits for the owner, "allow" runs without asking) but can never change them.
         When the owner turns on Full Autopilot (`steroid_mode_until`), non-critical actions run without asking until it wears

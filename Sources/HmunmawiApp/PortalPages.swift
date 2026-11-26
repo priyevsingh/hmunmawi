@@ -487,7 +487,6 @@ struct GrowthPage: View {
     func shows(_ k: Int) -> Bool { part == nil || part == k }
 
     var body: some View {
-        let search = model.snapshots("growth.search").first?.payload
         let youtube = model.snapshots("growth.youtube").first
         let x = model.snapshots("growth.x").first?.payload
         let pulse = model.snapshots("growth.x_pulse").first?.payload

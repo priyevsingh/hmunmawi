@@ -139,6 +139,7 @@ final class AppModel {
     func succeededConnections() async -> [String: Millis] { await engine?.succeeded() ?? [:] }
     private var loops: [Task<Void, Never>] = []
     private var loadStarted = false
+    private var vercelAutoConfigured = false
 
     private var configURL: URL { supportDirectory.appending(path: "config.json") }
     private var currentStore: Store? { isDemo ? demoStore : liveStore }
@@ -147,6 +148,13 @@ final class AppModel {
         self.supportDirectory = supportDirectory
         self.runsEngine = runsEngine
         KeychainSecretStore.catalogURL = supportDirectory.appending(path: SecretSourceCatalog.fileName)
+    }
+
+    /// Attaches an in-memory or custom live store for unit tests (leaves demo mode and refreshes).
+    func attachTestStore(_ store: Store) async {
+        liveStore = store
+        isDemo = false
+        await refresh()
     }
 
     static func defaultSupportDirectory() -> URL {
@@ -876,6 +884,48 @@ final class AppModel {
         enableRefundTextIfIMessageReady(rows)
         if wasDemo != isDemo { await refresh() }
         updateTruth()
+        if !vercelAutoConfigured, rows.contains(where: { $0.id == "vercel" && $0.approved && !$0.missing.isEmpty }) {
+            Task { await autoConfigureVercelIfNeeded() }
+        }
+    }
+
+    func secretForAutoFill(plugin: String, name: String) -> String? {
+        try? secrets.peekSecret(plugin: plugin, name: name)
+    }
+
+    /// Automatically fills missing Vercel configuration (project IDs, team ID, site names, GitHub repos, and CLI/Keychain
+    /// tokens) when Vercel is already approved and missing required fields, so the user doesn't have to fill them by hand.
+    func autoConfigureVercelIfNeeded() async {
+        guard TestProfile.name == nil, !Fixtures.noHub, !vercelAutoConfigured,
+              let row = addOns.first(where: { $0.id == "vercel" }),
+              row.approved, !row.missing.isEmpty else { return }
+        vercelAutoConfigured = true
+
+        let existing = config.plugins["vercel"] ?? [:]
+        let peekedToken = try? secrets.peekSecret(plugin: "vercel", name: "apiToken")
+        let hasSavedGH = row.savedSecrets.contains("githubToken")
+        let members = ProjectStore.shared.projects.flatMap(\.members)
+
+        let res = await VercelDetector.autoDetect(
+            currentValues: existing,
+            apiToken: peekedToken,
+            hasSavedGitHubToken: hasSavedGH,
+            knownMembers: members
+        )
+
+        var toSave = res.values
+        if let tok = res.foundAPIToken, !row.savedSecrets.contains("apiToken") {
+            toSave["apiToken"] = tok
+            if let ref = res.apiTokenSource { recordSecretSource(plugin: "vercel", name: "apiToken", ref: ref) }
+        }
+        if let gh = res.foundGitHubToken, !hasSavedGH {
+            toSave["githubToken"] = gh
+            if let ref = res.githubTokenSource { recordSecretSource(plugin: "vercel", name: "githubToken", ref: ref) }
+        }
+
+        let hasProject = !(toSave["project"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard hasProject || res.foundAPIToken != nil || res.foundGitHubToken != nil else { return }
+        await save(toSave, for: row)
     }
 
     /// Settings > General > Alerts: quiet hours (alerts wait; urgent rules still go out).
@@ -1284,6 +1334,17 @@ final class AppModel {
             events += ExpiryWatch.shared.statusEvents(self)
                 await UsageWatch.shared.refresh()
             events += UsageWatch.shared.statusEvents()
+            if !isDemo {
+                Task {
+                    await Outreach.refreshHighlights(model: self)
+                    if tick == 0, let liveStore {
+                        let since = Millis(Date.now.addingTimeInterval(-60 * 86_400).timeIntervalSince1970 * 1000)
+                        let recentMail = Outreach.mail((try? await liveStore.events(kind: "mail.seen", since: since)) ?? [])
+                        Outreach.purgeSelfAuthoredThreads(items: Outreach.items(), mail: recentMail)
+                    }
+                    _ = await ReleaseSubscribers.shared.checkNewReleases(model: self)
+                }
+            }
             }
         if tick % 15 == 0, UserDefaults.standard.string(forKey: "HMLiveMode") == "history" { events += await AppleHistory.shared.check() }
         await ingestLocal(events)
@@ -1373,7 +1434,18 @@ final class AppModel {
         await refresh()
     }
 
-    @ObservationIgnored private var approving: Set<Int64> = []
+    private(set) var approving: Set<Int64> = []
+    private(set) var skipping: Set<Int64> = []
+    private(set) var jobErrors: [Int64: String] = [:]
+
+    func isWaitingApproving(_ id: Int64) -> Bool { approving.contains(id) }
+    func isWaitingSkipping(_ id: Int64) -> Bool { skipping.contains(id) }
+    func isWaitingBusy(_ id: Int64) -> Bool { approving.contains(id) || skipping.contains(id) }
+
+    private func setJobError(_ message: String, for id: Int64) {
+        jobErrors[id] = message
+        errorText = message
+    }
     /// True when one of Hmunmawi's windows is actually visible on screen (not closed, minimised or fully covered).
     static func windowOnScreen() -> Bool {
         NSApp.windows.contains { $0.isVisible && !$0.isMiniaturized && $0.occlusionState.contains(.visible) && $0.canBecomeMain }
@@ -1396,7 +1468,8 @@ final class AppModel {
     func approve(_ job: Job) async {
         // One approval per item: a double click (or owner and agent at once) must not run it twice. Checked and
         // claimed before any await, so the main actor can't interleave two runs.
-        guard !approving.contains(job.id) else { return }
+        guard !approving.contains(job.id), !skipping.contains(job.id) else { return }
+        jobErrors.removeValue(forKey: job.id)
         approving.insert(job.id); defer { approving.remove(job.id) }
         // An agent's request you approved: the app runs it itself, then marks it done.
         if job.kind == "agent.request", case .object(let p) = job.payload {
@@ -1420,7 +1493,7 @@ final class AppModel {
                     await skip(stale)
                 }
             }
-            if !ok { errorText = "The agent's request ran but didn't work: \(message)" }
+            if !ok { setJobError("The agent's request ran but didn't work: \(message)", for: job.id) }
             return
         }
         // Outbound outreach email approved by the owner: send via SMTP or Zoho Safari, then update outreach & offer code.
@@ -1437,12 +1510,12 @@ final class AppModel {
             // Pin recipient strictly from stored outreach entry (never from reply bodies or payload tampering if entry exists).
             let recipient = item.flatMap(Outreach.pinnedRecipient(for:)) ?? (p["to"]?.string ?? "")
             guard let itemForCheck = item, Outreach.pinnedRecipient(for: itemForCheck) != nil else {
-                errorText = "Outreach entry or stored contact email is missing; nothing was sent."
+                setJobError("Outreach entry or stored contact email is missing; nothing was sent.", for: job.id)
                 return
             }
             let sendRes = await MailSender.send(to: recipient, subject: subject, body: body, inReplyTo: inReplyTo)
             if !sendRes.ok {
-                errorText = sendRes.note
+                setJobError(sendRes.note, for: job.id)
                 return
             }
             // Update outreach status/marks and mark any attached offer code as shared only after successful send.
@@ -1471,22 +1544,37 @@ final class AppModel {
                 "ok": .bool(true), "via": .string(sendRes.via), "note": .string(sendRes.note)])) }
             return
         }
+        // Customer release update batch approved by the owner: send individually with per-recipient checkpointing.
+        if job.kind == "release.notify" {
+            let res = await ReleaseSubscribers.shared.sendBatchJob(job, model: self)
+            if !res.ok {
+                setJobError(res.note, for: job.id)
+                return
+            }
+            await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
+                "ok": .bool(true), "sent": .number(Double(res.sent)), "skipped": .number(Double(res.skipped)),
+                "failed": .number(Double(res.failed)), "note": .string(String(res.note.prefix(500)))])) }
+            if res.failed > 0 {
+                setJobError(res.note, for: job.id)
+            }
+            return
+        }
         // Proactive review reply approved by the owner: post publicly on App Store Connect.
         if job.kind == "review.reply", case .object(let p) = job.payload {
             let rid = p["review_id"]?.string ?? ""
             let reply = p["reply"]?.string ?? ""
             guard !rid.isEmpty, !reply.isEmpty else {
-                errorText = "Review reply is missing review_id or reply text."
+                setJobError("Review reply is missing review_id or reply text.", for: job.id)
                 return
             }
             if let problem = Wording.rules.problem(reply) {
-                errorText = "Blocked by Words I never use: \(problem)"
+                setJobError("Blocked by Words I never use: \(problem)", for: job.id)
                 return
             }
             let r = await shieldFix(.object(["fix": .string("review_reply"), "review_id": .string(rid), "text": .string(reply)]), by: "you")
             await act { try await $0.resolveApproved(job.id, ok: r.ok, by: "you", detail: .object([
                 "ok": .bool(r.ok), "message": .string(String(r.message.prefix(500)))])) }
-            if !r.ok { errorText = "Couldn't post review reply: \(r.message)" }
+            if !r.ok { setJobError("Couldn't post review reply: \(r.message)", for: job.id) }
             return
         }
         await act { try await $0.approve(job.id, by: "you") }
@@ -1501,14 +1589,14 @@ final class AppModel {
 
     /// Critical actions that are NEVER approved by "Approve all non-critical" and always wait for individual owner review.
     nonisolated static func isCriticalWaiting(_ job: Job) -> Bool {
-        if job.kind == "outreach.send" || job.kind == "review.reply" { return true }
+        if job.kind == "outreach.send" || job.kind == "review.reply" || job.kind == "release.notify" { return true }
         if job.kind == "asc.fix" {
             let fix = job.payload[path: "params.fix"]?.string ?? job.payload[path: "fix"]?.string ?? ""
             if fix == "submit" || fix == "review_reply" { return true }
         }
         if job.kind == "agent.request" {
             let cmd = job.payload[path: "command"]?.string ?? ""
-            if ["deploy-redeploy", "python-repair", "outreach-send", "review-reply", "set-key", "publish",
+            if ["deploy-redeploy", "python-repair", "outreach-send", "release-notify-draft", "review-reply", "set-key", "publish",
                 "remove-connection", "routine-remove", "change-remove", "plan-remove"].contains(cmd) {
                 return true
             }
@@ -1543,6 +1631,14 @@ final class AppModel {
     /// Saves edits to a waiting `outreach.send` draft before sending.
     func updateOutreachDraft(_ job: Job, subject: String, body: String) async {
         guard job.kind == "outreach.send", case .object(var p) = job.payload else { return }
+        p["subject"] = .string(String(subject.prefix(300)))
+        p["body"] = .string(String(body.prefix(10_000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
+    }
+
+    /// Saves edits to a waiting `release.notify` draft before sending.
+    func updateReleaseNotifyDraft(_ job: Job, subject: String, body: String) async {
+        guard job.kind == "release.notify", case .object(var p) = job.payload else { return }
         p["subject"] = .string(String(subject.prefix(300)))
         p["body"] = .string(String(body.prefix(10_000)))
         await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
@@ -1665,6 +1761,9 @@ final class AppModel {
         await refreshAddOns()
     }
     func skip(_ job: Job) async {
+        guard !approving.contains(job.id), !skipping.contains(job.id) else { return }
+        jobErrors.removeValue(forKey: job.id)
+        skipping.insert(job.id); defer { skipping.remove(job.id) }
         if job.kind == "agent.request", case .object(let p) = job.payload, p["command"]?.string == "set-key",
            case .object(let a)? = p["args"] {
             // Only this request's own secret (skipping one request never deletes another's).
@@ -1684,7 +1783,7 @@ final class AppModel {
 /// beside the trust key, not in preferences: any program can `defaults delete` a preference and so make the app sign
 /// whatever is on disk again (security re-check, Nov 2026). An old preference that says "done" is carried over once.
 enum TrustFlags {
-    nonisolated(unsafe) private static let store = KeychainSecretStore()
+    private static let store = KeychainSecretStore()
 
     static func isSet(_ name: String, legacyDefaultsKey: String? = nil) -> Bool {
         // Fail closed: a Keychain that can't be read (locked, or the mark belongs to a differently signed copy) counts

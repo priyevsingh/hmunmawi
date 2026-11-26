@@ -66,6 +66,18 @@ import Testing
         #expect(ReplyMatch.domain("indielist.example/app/x") == "indielist.example")
         #expect(ReplyMatch.thread("Re: AW: Fwd:  Hello   World") == "hello world")
     }
+
+    @Test func isOwnMatchesOwnAddressAndCustomDomainButNotSharedProvidersForStrangers() {
+        #expect(ReplyMatch.isOwn("me@mydomain.example", own: own))
+        #expect(ReplyMatch.isOwn("My Name <me@mydomain.example>", own: own))
+        #expect(ReplyMatch.isOwn("team@mydomain.example", own: own))
+        #expect(!ReplyMatch.isOwn("stranger@otherdomain.example", own: own))
+
+        let sharedOwn = ["owner@gmail.com"]
+        #expect(ReplyMatch.isOwn("owner@gmail.com", own: sharedOwn))
+        #expect(ReplyMatch.isOwn("Owner <owner@gmail.com>", own: sharedOwn))
+        #expect(!ReplyMatch.isOwn("stranger@gmail.com", own: sharedOwn))
+    }
 }
 
 /// Found on the real outreach list (4 Nov 2026).
