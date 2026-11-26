@@ -92,28 +92,29 @@ struct OutreachSheet: View {
             }
             if let note { Text(note).font(.callout).foregroundStyle(.secondary) }
             let shown = filteredItems
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("\(filter.rawValue) (\(shown.count))").font(.headline)
-                Spacer()
                 Picker("Show", selection: $filter) {
                     ForEach(Filter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.enumerated()), id: \.element.id) { n, i in
                         Button { let m = model; openSheet?({ AnyView(OutreachDetail(model: m, item: i).buttonStyle(.pill)) }) } label: { itemRow(i) }.buttonStyle(.plain)
                         if n < shown.count - 1 { Divider() }
                     }
                     if shown.isEmpty { Text(items.isEmpty ? "No outreach list yet. Open Setup." : "Nothing in \(filter.rawValue.lowercased()).").foregroundStyle(.secondary).padding(.vertical, 8) }
                 }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .frame(minHeight: 160, maxHeight: 360)
+            .frame(minHeight: shown.count <= 2 ? 72 : 160, maxHeight: shown.count <= 2 ? 120 : 340, alignment: .top)
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(.pillProminent) }
         }
         .padding(22)
-        .frame(minWidth: 620, idealWidth: 820)
+        .frame(width: 660)
         .onAppear(perform: reload)
     }
 
