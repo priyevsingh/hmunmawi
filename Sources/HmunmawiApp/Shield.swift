@@ -597,10 +597,26 @@ private struct ShieldChecklistBanner: View {
 enum ShieldPrep {
     static let preparedKey = "HMPreparedShieldVersions"
 
+    static func validBuild(in snapshots: [StoredEvent], versionID: String) -> String? {
+        guard let snap = snapshots.first(where: { $0.payload[path: "version_id"]?.string == versionID }),
+              (snap.payload[path: "build_processing"]?.string ?? "").uppercased() == "VALID",
+              let build = snap.payload[path: "build"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !build.isEmpty else { return nil }
+        return build
+    }
+
+    static func summary(app: String, version: String, item: String, build: String?) -> String {
+        if item == "build", let build, !build.isEmpty {
+            return "Rejection Shield: attach build \(build) to \(app) \(version)"
+        }
+        return "Rejection Shield: prepare \(item) for \(app) \(version)"
+    }
+
     static func prepareIfNeeded(model: AppModel) async {
         guard !model.isDemo, !TestProfile.runningUnitTests else { return }
         let d = UserDefaults.standard
         var prepared = Set(d.stringArray(forKey: preparedKey) ?? [])
+        let releaseSnapshots = model.snapshots("release.snapshot")
         var added = 0
         for snap in model.snapshots("release.check") {
             let report = snap.payload
@@ -610,6 +626,7 @@ enum ShieldPrep {
             let app = ComingSoon.shortName(snap.app ?? "")
             let fixed = ShieldMemory.fixedIDs(report)
             let checklist = ShieldChecklist.build(report: report, fixedIDs: fixed)
+            let targetBuild = validBuild(in: releaseSnapshots, versionID: vid)
             for item in checklist.reversibleIDs {
                 let already = model.waiting.contains {
                     $0.job.kind == "agent.request"
@@ -623,7 +640,7 @@ enum ShieldPrep {
                     args: ["app": app, "item": item, "version_id": vid],
                     agent: "Rejection Shield",
                     reason: "\(app) \(checklist.version) is in Prepare for Submission",
-                    summary: "Rejection Shield: prepare \(item) for \(app) \(checklist.version)")
+                    summary: summary(app: app, version: checklist.version, item: item, build: item == "build" ? targetBuild : nil))
                 added += 1
             }
             prepared.insert(vid)

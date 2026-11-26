@@ -550,4 +550,55 @@ enum VercelDetector {
               parts[1].wholeMatch(of: /[A-Za-z0-9_.-]{1,100}/) != nil else { return nil }
         return "\(parts[0])/\(parts[1])"
     }
+
+    /// Merges one or more detected repositories into Vercel's comma-separated settings fields, keeping indices aligned.
+    static func merge(values: [String: String], detected: [Detected]) -> [String: String] {
+        var out = values
+        func splitList(_ key: String) -> [String] {
+            (out[key] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        }
+        var projects = splitList("project")
+        var repos = splitList("repo")
+        var branches = splitList("branch")
+        var sites = splitList("siteName")
+        for d in detected {
+            if let oid = d.orgID, (out["teamID"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+                out["teamID"] = oid
+            }
+            guard let pid = d.projectID, !projects.contains(pid) else {
+                if let r = d.repo, projects.count <= 1, !repos.contains(r) { repos.append(r) }
+                if let b = d.branch, (out["branch"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { branches = [b] }
+                if let s = d.projectName, (out["siteName"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { sites = [s] }
+                continue
+            }
+            let prevCount = projects.count
+            projects.append(pid)
+            if let r = d.repo, !r.isEmpty {
+                while repos.count < prevCount { repos.append("") }
+                repos.append(r)
+            } else if !repos.isEmpty {
+                repos.append("")
+            }
+            if let b = d.branch, !b.isEmpty {
+                while branches.count < prevCount { branches.append(branches.first ?? "main") }
+                branches.append(b)
+            } else if !branches.isEmpty {
+                branches.append(branches.first ?? "main")
+            }
+            if let s = d.projectName, !s.isEmpty {
+                while sites.count < prevCount { sites.append(projects[sites.count]) }
+                sites.append(s)
+            } else if !sites.isEmpty {
+                sites.append(pid)
+            }
+        }
+        if !projects.isEmpty { out["project"] = projects.joined(separator: ", ") }
+        if !repos.isEmpty && !repos.contains("") { out["repo"] = repos.joined(separator: ", ") }
+        else if repos.count == 1, !repos[0].isEmpty { out["repo"] = repos[0] }
+        if !branches.isEmpty {
+            out["branch"] = Set(branches).count == 1 ? (branches.first ?? "") : branches.joined(separator: ", ")
+        }
+        if !sites.isEmpty { out["siteName"] = sites.joined(separator: ", ") }
+        return out
+    }
 }

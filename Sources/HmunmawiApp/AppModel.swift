@@ -1218,9 +1218,24 @@ final class AppModel {
         await checkNowIfReady(id)
     }
 
+    /// Returns waiting `set-key` jobs superseded when the given fields are saved for `connection`.
+    static func supersededSetKeyJobs(waiting: [WaitingAction], connection: String, savedFields: Set<String>) -> [Job] {
+        guard !savedFields.isEmpty else { return [] }
+        return waiting.compactMap { action in
+            let p = action.job.payload
+            guard action.job.kind == "agent.request",
+                  p[path: "command"]?.string == "set-key",
+                  p[path: "args.connection"]?.string == connection,
+                  let field = p[path: "args.field"]?.string,
+                  savedFields.contains(field) else { return nil }
+            return action.job
+        }
+    }
+
     /// Plain values go to config.json; secrets go to the Keychain. Empty secret fields keep the saved value.
     func save(_ values: [String: String], for row: AddOnRow) async {
         guard let host else { return }
+        var savedNonEmpty: Set<String> = []
         do {
             var plain = config.plugins[row.id] ?? [:]
             // Only the fields given change: saving one field (an agent's set-key) must not blank the others.
@@ -1230,9 +1245,11 @@ final class AppModel {
                     if !value.isEmpty {
                         try secrets.replaceSecret(value, plugin: row.id, name: setting.key)
                         SecretSourceDefaults.mirrorTypedKey(value, plugin: row.id, name: setting.key)
+                        savedNonEmpty.insert(setting.key)
                     }
                 } else {
                     plain[setting.key] = value
+                    if !value.isEmpty { savedNonEmpty.insert(setting.key) }
                 }
             }
             config.plugins[row.id] = plain
@@ -1240,6 +1257,9 @@ final class AppModel {
             await host.setSettings(config.settingsJSON(for: row.id), for: row.id)
             await host.restart(row.id)
             try await liveStore?.appendAudit(actor: "you", action: "plugin.settings_saved", subject: "plugin:\(row.id)")
+            for stale in Self.supersededSetKeyJobs(waiting: waiting, connection: row.id, savedFields: savedNonEmpty) {
+                await skip(stale)
+            }
         } catch {
             errorText = "Couldn't save: \(plainError(error))"
         }
@@ -1395,6 +1415,11 @@ final class AppModel {
             let message = (answer["result"] as? String) ?? (answer["error"] as? String) ?? ""
             await act { try await $0.resolveApproved(job.id, ok: ok, by: "you", detail: .object([
                 "ok": .bool(ok), "approved_by": .string("you"), "result": .string(String(message.prefix(500)))])) }
+            if ok, p["command"]?.string == "set-key", let conn = args["connection"], let fld = args["field"] {
+                for stale in Self.supersededSetKeyJobs(waiting: waiting, connection: conn, savedFields: [fld]) {
+                    await skip(stale)
+                }
+            }
             if !ok { errorText = "The agent's request ran but didn't work: \(message)" }
             return
         }

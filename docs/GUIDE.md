@@ -352,7 +352,7 @@ Everything that came in, and what's waiting on you.
 
 <details><summary>How it works</summary>
 
-Every action waiting for approval (yours, a routine's or an agent's), with Approve or Skip. Multi-field `set-key` requests group into one card, outreach and review drafts are editable before you approve, and **Approve all non-critical** lets you clear routine approvals in one tap while leaving critical owner-only items (`submit`, `vercel.redeploy`, `python-repair`, `outreach.send`, `review.reply`, `set-key`, `remove-*`, `publish`) for individual review.
+Every action waiting for approval (yours, a routine's or an agent's), with Approve or Skip. Multi-field `set-key` requests group into one card (showing non-secret fields inline while masking secrets, and superseded requests prune automatically when you save a connection manually), outreach and review drafts are editable before you approve, and **Approve all non-critical** lets you clear routine approvals in one tap while leaving critical owner-only items (`submit`, `vercel.redeploy`, `python-repair`, `outreach.send`, `review.reply`, `set-key`, `remove-*`, `publish`) for individual review.
 
 </details>
 

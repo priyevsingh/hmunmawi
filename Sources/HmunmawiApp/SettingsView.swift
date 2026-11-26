@@ -747,30 +747,13 @@ struct AddOnSection: View {
 
     private func detectVercelRepo() {
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.showsHiddenFiles = true
-        panel.message = "Pick the local website repository folder (containing .vercel or .git)"
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        let d = VercelDetector.detect(in: folder)
-        if let pid = d.projectID {
-            let cur = (values["project"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if cur.isEmpty { values["project"] = pid }
-            else if !cur.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }).contains(pid) {
-                values["project"] = cur + ", " + pid
-            }
-        }
-        if let oid = d.orgID, (values["teamID"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { values["teamID"] = oid }
-        if let repo = d.repo {
-            let cur = (values["repo"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if cur.isEmpty { values["repo"] = repo }
-            else if !cur.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }).contains(repo) {
-                values["repo"] = cur + ", " + repo
-            }
-        }
-        if let branch = d.branch, (values["branch"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { values["branch"] = branch }
-        if let name = d.projectName, (values["siteName"] ?? "").trimmingCharacters(in: .whitespaces).isEmpty { values["siteName"] = name }
+        panel.message = "Pick one or more local website repository folders (containing .vercel or .git)"
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        values = VercelDetector.merge(values: values, detected: panel.urls.map { VercelDetector.detect(in: $0) })
     }
 
     private func chooseFile() -> String? {
@@ -1235,7 +1218,7 @@ private struct MailSourceSection: View {
                     Spacer()
                     if permissions.safari != .granted { Button("Allow") { Task { await permissions.askSafari() } } }
                 }
-                Text("For Zoho's free plan (no IMAP). Hmunmawi opens Zoho's page in a background Safari tab, with the login Safari already has, and reads only the list of senders and subjects. It never opens a message, never sees your password and changes nothing. In Safari, turn on Develop → Allow JavaScript from Apple Events. Zoho doesn't publish this page's layout, so a Zoho redesign can stop it working; the note below tells you if so.")
+                Text("For Zoho's free plan (no IMAP). Hmunmawi opens Zoho's page in a background Safari tab, with the login Safari already has, reads senders and subjects, and reads message text only for threads matching your outreach list (leaving unread status untouched). It never sees your password, and sends only when you explicitly approve an email in Log → Waiting. In Safari, turn on Develop → Allow JavaScript from Apple Events. Zoho doesn't publish this page's layout, so a Zoho redesign can stop it working; the note below tells you if so.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if kind == .imap {
@@ -1273,7 +1256,7 @@ private struct MailSourceSection: View {
                 Text("Where Hmunmawi looks for answers to your pitches and follow-ups.").font(.callout).foregroundStyle(.secondary)
             }.padding(.top, 8)
         } footer: {
-            Label("Read-only: sender, subject and dates of recent messages. Hmunmawi never sends, moves, flags or deletes mail, and never reads message text. The app password stays in your Keychain.", systemImage: "lock.fill")
+            Label("Inbox scan reads sender, subject and dates only; message bodies are read read-only strictly for matched outreach threads (unread untouched). Outbound mail sends only when you explicitly approve an item in Log → Waiting. Passwords stay in your Keychain.", systemImage: "lock.fill")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .task { password = MailWatch.password(); await permissions.refreshIfStale(olderThan: 30) }

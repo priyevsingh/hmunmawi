@@ -682,6 +682,25 @@ private extension InboxPage {
     }
 }
 
+/// Formats grouped `set-key` lines cleanly, revealing plain values only when the connection's manifest explicitly marks the field non-secret.
+enum SetKeyBatchPreview {
+    static func displayLine(job: Job, connection: String, addOns: [AddOnRow]) -> String {
+        let field = job.payload[path: "args.field"]?.string ?? "field"
+        let value = previewValue(job: job, connection: connection, field: field, addOns: addOns)
+        return "\(field) = \(value ?? "•••")"
+    }
+
+    static func previewValue(job: Job, connection: String, field: String, addOns: [AddOnRow]) -> String? {
+        guard let setting = addOns.first(where: { $0.id == connection })?.manifest.settings.first(where: { $0.key == field }),
+              !setting.type.hasPrefix("secret") else { return nil }
+        if let v = job.payload[path: "args.value"]?.string, !v.isEmpty { return v }
+        guard let summary = job.payload[path: "summary"]?.string,
+              let range = summary.range(of: " value=") else { return nil }
+        let extracted = String(summary[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return extracted.isEmpty || extracted == "•••" ? nil : extracted
+    }
+}
+
 /// One Waiting card grouping multi-field `set-key` setups for a single connection (secrets masked as •••).
 private struct SetKeyBatchWaitingRow: View {
     let connection: String
@@ -690,10 +709,7 @@ private struct SetKeyBatchWaitingRow: View {
     @State private var expanded = false
 
     private func fieldLine(_ action: WaitingAction) -> String {
-        let field = action.job.payload[path: "args.field"]?.string ?? "field"
-        let value = action.job.payload[path: "args.value"]?.string
-        let isSecret = action.job.payload[path: "pending"]?.string != nil || value == nil
-        return isSecret ? "\(field) = •••" : "\(field) = \(value ?? "")"
+        SetKeyBatchPreview.displayLine(job: action.job, connection: connection, addOns: model.addOns)
     }
 
     var body: some View {

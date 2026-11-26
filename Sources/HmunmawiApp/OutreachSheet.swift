@@ -406,8 +406,17 @@ struct OutreachSetup: View {
     @AppStorage(MailSender.smtpFromKey) private var smtpFrom = ""
     @State private var smtpPassword = ""
     @State private var smtpNote: String?
+    @State private var testingSend = false
     @State private var check: Outreach.MailCheck?
     @State private var checking = false
+
+    private var selfTestAddress: String? {
+        for candidate in [own, smtpFrom, smtpUser] {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if SMTPConfig.isSingleEmail(trimmed) { return trimmed }
+        }
+        return nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -461,8 +470,17 @@ struct OutreachSetup: View {
                         if let p = MailSender.smtpConfig.problem, !smtpHost.isEmpty {
                             Text(p).font(.callout).foregroundStyle(Brand.caution)
                         }
-                        if let smtpNote { Text(smtpNote).font(.callout).foregroundStyle(.secondary) }
                     }
+                    HStack {
+                        Button(testingSend ? "Sending test…" : "Send test to my address") {
+                            Task { await sendTestToSelf() }
+                        }
+                        .disabled(testingSend || selfTestAddress == nil || sendTransport == MailSendTransport.mailto.rawValue)
+                        .help("Sends one short verification email to your own configured address only")
+                        Spacer()
+                        Text(MailSender.modeDescription).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let smtpNote { Text(smtpNote).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
                 }
                 Section("List & rules") {
                     Toggle("Repitch contacts on patch releases (x.y.z)", isOn: $allowPatchRepitch)
@@ -482,6 +500,24 @@ struct OutreachSetup: View {
             own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? own
             smtpPassword = MailSender.smtpPassword()
         }
+    }
+
+    private func sendTestToSelf() async {
+        guard let to = selfTestAddress else {
+            smtpNote = "Enter a valid sending address first."
+            return
+        }
+        testingSend = true; defer { testingSend = false }
+        if !smtpPassword.isEmpty {
+            do { try MailSender.setSMTPPassword(smtpPassword) }
+            catch { smtpNote = "Couldn't save SMTP password: \(error.localizedDescription)"; return }
+        }
+        let res = await MailSender.send(
+            to: to,
+            subject: "Hmunmawi outreach mail test",
+            body: "This test confirmed Hmunmawi can send approved outreach messages via \(MailSender.modeDescription)."
+        )
+        smtpNote = "Test to \(to): \(res.note)"
     }
 }
 
