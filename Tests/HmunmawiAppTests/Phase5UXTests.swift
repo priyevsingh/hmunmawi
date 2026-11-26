@@ -54,11 +54,11 @@ import Testing
             payload: .object([
                 "command": .string("set-key"),
                 "pending": .string("tok-1"),
-                "summary": .string("Antigravity: set-key connection=vercel field=project value=escapethematrix.app"),
+                "summary": .string("Antigravity: set-key connection=vercel field=project value=example.com"),
                 "args": .object(["connection": .string("vercel"), "field": .string("project")])
             ]),
             lastError: nil, updatedAt: 0)
-        #expect(SetKeyBatchPreview.displayLine(job: projJobWithPlainSummary, connection: "vercel", addOns: [row]) == "project = escapethematrix.app")
+        #expect(SetKeyBatchPreview.displayLine(job: projJobWithPlainSummary, connection: "vercel", addOns: [row]) == "project = example.com")
 
         // Secret and secret-file fields ALWAYS stay masked even if args.value or summary existed.
         let tok = setKeyJob(id: 2, connection: "vercel", field: "apiToken", value: "super-secret", pending: nil)
