@@ -174,6 +174,42 @@ enum SafariAuto {
     end run
     """#
 
+    /// Brings our tagged tab forward in Safari and activates Safari (used only when the user needs to sign in).
+    static let revealScript = #"""
+    on run argv
+      set tag to item 1 of argv
+      set needle to item 2 of argv
+      tell application "Safari"
+        activate
+        repeat with w in windows
+          repeat with t in tabs of w
+            try
+              if (URL of t) contains needle then
+                if ((do JavaScript "window.name" in t) as text) is tag then
+                  set current tab of w to t
+                  set index of w to 1
+                  return "shown"
+                end if
+              end if
+            end try
+          end repeat
+        end repeat
+      end tell
+      return "__NOTAB__"
+    end run
+    """#
+
+    /// Clears Hmunmawi's automation tag so an abandoned login tab stays open for the user without future auto-sweep.
+    static let untagScript = find + #"""
+
+    on run argv
+      set t to my findTab(item 1 of argv, item 2 of argv)
+      if t is missing value then return "__NOTAB__"
+      tell application "Safari" to do JavaScript "window.name=''" in t
+      return "untagged"
+    end run
+    """#
+
     /// argv: URL part, JavaScript. Runs it in an already-open tab of yours (read only, nothing else is touched);
     /// "__NONE__" when no tab shows that page.
     static let readExistingScript = #"""
@@ -276,6 +312,21 @@ enum SafariAuto {
             closed = out == "closed" || out == "__NOTAB__"
             return closed
         }
+
+        /// Brings the tab forward and activates Safari so the user can sign in interactively.
+        @discardableResult
+        func revealInSafari() async -> Bool {
+            guard case .success("shown") = await SafariAuto.run(SafariAuto.revealScript, args: [tag, needle], timeout: 20) else { return false }
+            return true
+        }
+
+        /// Clears the automation tag and leaves the tab open in Safari for the user.
+        @discardableResult
+        func releaseToUser() async -> Bool {
+            closed = true
+            guard case .success("untagged") = await SafariAuto.run(SafariAuto.untagScript, args: [tag, needle], timeout: 20) else { return false }
+            return true
+        }
     }
 
     /// `let s = Session(job:); try await s.enter(); defer ...; let tab = try await s.open(url:); ...; await s.exit()`.
@@ -303,6 +354,12 @@ enum SafariAuto {
                 tabs.append(tab)
                 return tab
             }
+        }
+
+        /// Leaves `tab` open in Safari (e.g. so the user can finish signing in) while `exit()` frees `safari.lock`.
+        func handOffToUser(_ tab: Tab) async {
+            _ = await tab.releaseToUser()
+            tabs.removeAll { $0 === tab }
         }
 
         func exit() async {

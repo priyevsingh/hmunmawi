@@ -617,6 +617,12 @@ struct OutreachSetup: View {
                         }
                         .disabled(testingSend || selfTestAddress == nil || sendTransport == MailSendTransport.mailto.rawValue)
                         .help("Sends one short verification email to your own configured address only")
+                        if MailSender.modeDescription.contains("Zoho") || MailWatch.kind == .zohoSafari {
+                            Button("Open Zoho Mail in Safari") {
+                                let host = UserDefaults.standard.string(forKey: MailWatch.zohoHostKey) ?? "mail.zoho.com"
+                                ZohoSafariAuth.openInSafari(host: host)
+                            }
+                        }
                         Spacer()
                         Text(MailSender.modeDescription).font(.caption).foregroundStyle(.secondary)
                     }

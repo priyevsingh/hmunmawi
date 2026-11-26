@@ -271,4 +271,18 @@ import Testing
         #expect(model.jobErrors[id] == nil)
         #expect(!model.isWaitingBusy(id))
     }
+
+    @Test func zohoSafariAuthDetectsLoginRedirectsAndLoggedInComposeState() {
+        #expect(ZohoSafariAuth.isLoginURL("https://accounts.zoho.in/signin?servicename=VirtualOffice"))
+        #expect(ZohoSafariAuth.isLoginURL("https://accounts.zoho.com/signin"))
+        #expect(!ZohoSafariAuth.isLoginURL("https://mail.zoho.in/zm/#mail/views/all"))
+
+        let loggedOut = ZohoSafariAuth.parsePageState(#"{"url":"https://accounts.zoho.in/signin","hasCompose":false,"hasRows":false,"loginForm":true,"composeOpen":false}"#)
+        #expect(loggedOut?.needsSignIn == true)
+        #expect(loggedOut?.isMailReady == false)
+
+        let signedIn = ZohoSafariAuth.parsePageState(#"{"url":"https://mail.zoho.in/zm/#mail/views/all","hasCompose":true,"hasRows":true,"loginForm":false,"composeOpen":false}"#)
+        #expect(signedIn?.needsSignIn == false)
+        #expect(signedIn?.isMailReady == true)
+    }
 }

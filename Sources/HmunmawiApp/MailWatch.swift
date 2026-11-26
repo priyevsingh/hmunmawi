@@ -248,8 +248,13 @@ enum ZohoSafariReader {
             var rawList: [[String: Any]] = []
             var bodiesByID: [String: String] = [:]
             do {
-                let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "mail.zoho", seconds: 30)
+                let tab = try await session.open(url: "https://\(host)/zm/#mail/views/all", needle: "zoho.", seconds: 30)
                 for _ in 0..<20 {
+                    if let rawState = try? await tab.js(ZohoSafariAuth.pageStateJS),
+                       let st = ZohoSafariAuth.parsePageState(rawState), st.needsSignIn {
+                        await session.exit()
+                        return .failure(WireError("mail", "Zoho Mail isn't signed in on \(host) in Safari yet. Open \(host) in Safari to sign in."))
+                    }
                     try? await Task.sleep(for: .seconds(1.5))
                     if let r = try? await tab.js(js), !r.isEmpty, r != "[]", r != "missing value" { found = r; break }
                 }
