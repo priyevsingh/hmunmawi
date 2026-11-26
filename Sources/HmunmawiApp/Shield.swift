@@ -38,6 +38,10 @@ struct ShieldView: View {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                         ShieldItem(item: item, report: report, model: model, fixed: fixed.contains(item[path: "id"]?.string ?? ""))
                     }
+                    let checklist = ShieldChecklist.build(report: report, fixedIDs: fixed)
+                    if !checklist.reversibleIDs.isEmpty || checklist.state == "PREPARE_FOR_SUBMISSION" {
+                        ShieldChecklistBanner(checklist: checklist, report: report, model: model)
+                    }
                     SubmitRow(report: report, model: model, ready: blocking.isEmpty)
                     HStack {
                         if let url = ShieldGuide.link("version", report) {
@@ -482,5 +486,150 @@ struct TestFlightTidy: View {
         let r = await model.shieldFix(.object(["fix": .string("expire_old_builds"), "app_id": .string(appID), "ids": .array(ids)]))
         busy = false
         result = r.ok ? r.message : "Couldn't expire them: \(r.message)"
+    }
+}
+
+/// Consolidated "Ready to submit" checklist computed from a `release.check` report.
+struct ShieldChecklist: Equatable {
+    let app: String
+    let version: String
+    let versionID: String
+    let state: String
+    let passedCount: Int
+    let totalCount: Int
+    let reversibleIDs: [String]
+    let manualTitles: [String]
+    var canSubmit: Bool { manualTitles.isEmpty && reversibleIDs.isEmpty && !blockingRemaining }
+    let blockingRemaining: Bool
+
+    static let reversibleFixable: Set<String> = ["build", "promo", "contact"]
+
+    static func build(report: JSONValue, fixedIDs: Set<String>) -> ShieldChecklist {
+        let items = report[path: "items"]?.array ?? []
+        let liveID = report[path: "live_version_id"]?.string
+        var passed = 0
+        var reversible: [String] = []
+        var manual: [String] = []
+        var blocking = false
+        for item in items {
+            let id = item[path: "id"]?.string ?? ""
+            let ok = item[path: "ok"] == .bool(true) || fixedIDs.contains(id)
+            if ok { passed += 1; continue }
+            let level = item[path: "level"]?.string ?? "block"
+            if level == "block" { blocking = true }
+            if reversibleFixable.contains(id) && (id == "build" || liveID != nil) {
+                reversible.append(id)
+            } else if level == "block" || level == "manual" {
+                manual.append(item[path: "title"]?.string ?? id)
+            }
+        }
+        return ShieldChecklist(
+            app: ComingSoon.shortName(report[path: "app_name"]?.string ?? ""),
+            version: report[path: "version"]?.string ?? "",
+            versionID: report[path: "version_id"]?.string ?? "",
+            state: report[path: "state"]?.string ?? "",
+            passedCount: passed,
+            totalCount: items.count,
+            reversibleIDs: reversible,
+            manualTitles: manual,
+            blockingRemaining: blocking
+        )
+    }
+}
+
+/// Consolidated Ready-to-submit summary & 1-click reversible prep inside ShieldView.
+private struct ShieldChecklistBanner: View {
+    let checklist: ShieldChecklist
+    let report: JSONValue
+    let model: AppModel
+    @State private var busy = false
+    @State private var note: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+            HStack {
+                Label("Ready to submit checklist (\(checklist.passedCount)/\(checklist.totalCount) passed)",
+                      systemImage: checklist.canSubmit ? "checkmark.seal.fill" : "checklist")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(checklist.canSubmit ? Brand.good : .primary)
+                Spacer()
+                if !checklist.reversibleIDs.isEmpty {
+                    Button(busy ? "Fixing…" : "Fix \(checklist.reversibleIDs.count) reversible") {
+                        Task { await fixAllReversible() }
+                    }.buttonStyle(.pill).disabled(busy)
+                }
+            }
+            if !checklist.manualTitles.isEmpty {
+                Text("Needs your hand: " + checklist.manualTitles.joined(separator: ", "))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else if checklist.reversibleIDs.isEmpty {
+                Text("Everything reversible is ready. Review and tap Submit for Review below when you're ready.")
+                    .font(.caption).foregroundStyle(Brand.good)
+            }
+            if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func fixAllReversible() async {
+        busy = true; defer { busy = false }
+        let vid = report[path: "version_id"] ?? .null
+        let appID = report[path: "app_id"] ?? .null
+        let liveID = report[path: "live_version_id"] ?? .null
+        var fixed = 0
+        for id in checklist.reversibleIDs {
+            var p: [String: JSONValue] = ["version_id": vid, "app_id": appID]
+            switch id {
+            case "build": p["fix"] = .string("attach_build")
+            case "promo": p["fix"] = .string("set_texts"); p["field"] = .string("promotionalText"); p["copy_live"] = .bool(true); p["only_empty"] = .bool(true); p["live_id"] = liveID
+            case "contact": p["fix"] = .string("set_review"); p["copy_contact_from"] = liveID
+            default: continue
+            }
+            let r = await model.shieldFix(.object(p))
+            if r.ok { ShieldMemory.remember(checklist.versionID, id, undo: r.undo); fixed += 1 }
+        }
+        note = "Prepared \(fixed) of \(checklist.reversibleIDs.count) reversible items."
+    }
+}
+
+/// Automatically prepares reversible Rejection Shield fixes in Log → Waiting when a version enters PREPARE_FOR_SUBMISSION.
+@MainActor
+enum ShieldPrep {
+    static let preparedKey = "HMPreparedShieldVersions"
+
+    static func prepareIfNeeded(model: AppModel) async {
+        guard !model.isDemo, !TestProfile.runningUnitTests else { return }
+        let d = UserDefaults.standard
+        var prepared = Set(d.stringArray(forKey: preparedKey) ?? [])
+        var added = 0
+        for snap in model.snapshots("release.check") {
+            let report = snap.payload
+            let state = report[path: "state"]?.string ?? ""
+            let vid = report[path: "version_id"]?.string ?? ""
+            guard state == "PREPARE_FOR_SUBMISSION", !vid.isEmpty, !prepared.contains(vid) else { continue }
+            let app = ComingSoon.shortName(snap.app ?? "")
+            let fixed = ShieldMemory.fixedIDs(report)
+            let checklist = ShieldChecklist.build(report: report, fixedIDs: fixed)
+            for item in checklist.reversibleIDs {
+                let already = model.waiting.contains {
+                    $0.job.kind == "agent.request"
+                        && $0.job.payload[path: "command"]?.string == "shield-fix"
+                        && $0.job.payload[path: "args.version_id"]?.string == vid
+                        && $0.job.payload[path: "args.item"]?.string == item
+                }
+                if already { continue }
+                _ = await model.parkAgentRequest(
+                    command: "shield-fix",
+                    args: ["app": app, "item": item, "version_id": vid],
+                    agent: "Rejection Shield",
+                    reason: "\(app) \(checklist.version) is in Prepare for Submission",
+                    summary: "Rejection Shield: prepare \(item) for \(app) \(checklist.version)")
+                added += 1
+            }
+            prepared.insert(vid)
+        }
+        if added > 0 || !prepared.isEmpty {
+            d.set(Array(prepared.suffix(200)).sorted(), forKey: preparedKey)
+        }
     }
 }

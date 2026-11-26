@@ -642,7 +642,11 @@ final class AppModel {
             }
             updateTruth()
             MacNotifier.shared.consider(events: events, model: self)
-            if !isDemo, !TestProfile.runningUnitTests { Task { await PayoutBook.shared.autoFillIfDue() } }
+            if !isDemo, !TestProfile.runningUnitTests {
+                Task { await PayoutBook.shared.autoFillIfDue() }
+                Task { await ReviewDrafter.draftPendingReviews(model: self) }
+                Task { await ShieldPrep.prepareIfNeeded(model: self) }
+            }
             // Settings → Publish → "Publish again after each refresh". Quiet on failure; the tab shows the last time.
             if UserDefaults.standard.bool(forKey: PortalPublisher.autoKey), !isDemo, !TestProfile.runningUnitTests {
                 if (try? PortalPublisher.publish(self)) != nil { PortalUpload.afterPublish(manual: false) }
@@ -1442,7 +1446,73 @@ final class AppModel {
                 "ok": .bool(true), "via": .string(sendRes.via), "note": .string(sendRes.note)])) }
             return
         }
+        // Proactive review reply approved by the owner: post publicly on App Store Connect.
+        if job.kind == "review.reply", case .object(let p) = job.payload {
+            let rid = p["review_id"]?.string ?? ""
+            let reply = p["reply"]?.string ?? ""
+            guard !rid.isEmpty, !reply.isEmpty else {
+                errorText = "Review reply is missing review_id or reply text."
+                return
+            }
+            if let problem = Wording.rules.problem(reply) {
+                errorText = "Blocked by Words I never use: \(problem)"
+                return
+            }
+            let r = await shieldFix(.object(["fix": .string("review_reply"), "review_id": .string(rid), "text": .string(reply)]), by: "you")
+            await act { try await $0.resolveApproved(job.id, ok: r.ok, by: "you", detail: .object([
+                "ok": .bool(r.ok), "message": .string(String(r.message.prefix(500)))])) }
+            if !r.ok { errorText = "Couldn't post review reply: \(r.message)" }
+            return
+        }
         await act { try await $0.approve(job.id, by: "you") }
+    }
+
+    /// Saves edits to a waiting `review.reply` draft before posting.
+    func updateReviewReplyDraft(_ job: Job, reply: String) async {
+        guard job.kind == "review.reply", case .object(var p) = job.payload else { return }
+        p["reply"] = .string(String(reply.prefix(5000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
+    }
+
+    /// Critical actions that are NEVER approved by "Approve all non-critical" and always wait for individual owner review.
+    nonisolated static func isCriticalWaiting(_ job: Job) -> Bool {
+        if job.kind == "outreach.send" || job.kind == "review.reply" { return true }
+        if job.kind == "asc.fix" {
+            let fix = job.payload[path: "params.fix"]?.string ?? job.payload[path: "fix"]?.string ?? ""
+            if fix == "submit" || fix == "review_reply" { return true }
+        }
+        if job.kind == "agent.request" {
+            let cmd = job.payload[path: "command"]?.string ?? ""
+            if ["deploy-redeploy", "python-repair", "outreach-send", "review-reply", "set-key", "publish",
+                "remove-connection", "routine-remove", "change-remove", "plan-remove"].contains(cmd) {
+                return true
+            }
+            if cmd == "shield-fix",
+               (job.payload[path: "args.item"]?.string ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "submit" {
+                return true
+            }
+            if ["routine-add", "routine-set"].contains(cmd),
+               (job.payload[path: "args.does"]?.string ?? "") == "run-script" {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Approves all currently waiting non-critical items, explicitly skipping all alwaysAsk critical actions.
+    func approveAllNonCritical() async {
+        let targets = waiting.filter { !Self.isCriticalWaiting($0.job) }.map(\.job)
+        for job in targets { await approve(job) }
+    }
+
+    /// Approves a grouped batch of waiting items (e.g. a multi-field connection setup card).
+    func approveBatch(_ jobs: [Job]) async {
+        for job in jobs { await approve(job) }
+    }
+
+    /// Skips a grouped batch of waiting items.
+    func skipBatch(_ jobs: [Job]) async {
+        for job in jobs { await skip(job) }
     }
 
     /// Saves edits to a waiting `outreach.send` draft before sending.

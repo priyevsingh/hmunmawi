@@ -62,6 +62,16 @@ private struct RuleRow: View {
     var body: some View {
         LabeledContent {
             HStack(spacing: 10) {
+                if RuleText.shouldNudgeToAutopilot(rule, stat: stat) {
+                    Button("Switch to Autopilot") {
+                        var r = rule
+                        r.dryRun = false
+                        r.approval = .auto
+                        onChange(r)
+                    }
+                    .buttonStyle(.pill)
+                    .controlSize(.small)
+                }
                 Picker("Mode", selection: Binding(get: { RuleText.mode(rule) }, set: { m in
                     var r = rule
                     r.dryRun = m == "Try out"
@@ -227,6 +237,17 @@ enum RuleText {
 
     static func mode(_ rule: Rule) -> String {
         rule.dryRun ? "Try out" : rule.approval == .auto ? "Autopilot" : rule.approval == .ask ? "Hands-on" : "Never"
+    }
+
+    /// Surfaces a gentle 1-click "Switch to Autopilot" nudge for rules stuck in Try out after firing,
+    /// or read-only notification rules set to ask.
+    static func shouldNudgeToAutopilot(_ rule: Rule, stat: RuleStat?) -> Bool {
+        guard rule.enabled else { return false }
+        if rule.dryRun, let stat, stat.count > 0 { return true }
+        if !rule.dryRun, rule.approval == .ask, !rule.actions.isEmpty, rule.actions.allSatisfy({ $0.action == "notify" }) {
+            return true
+        }
+        return false
     }
 
     static func symbol(_ kind: String) -> String {
