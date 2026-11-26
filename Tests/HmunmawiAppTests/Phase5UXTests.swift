@@ -120,4 +120,9 @@ import Testing
         #expect(deduped["project"] == "prj_1, prj_2")
         #expect(deduped["repo"] == "org/site-one, org/site-two")
     }
+
+    @Test func aboutPaneSponsorLinkPointsToGitHubSponsors() {
+        #expect(SupportLinks.sponsorURL?.scheme == "https")
+        #expect(SupportLinks.sponsorURL?.absoluteString == "https://github.com/sponsors/priyevsingh")
+    }
 }

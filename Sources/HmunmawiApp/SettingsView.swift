@@ -779,6 +779,10 @@ private struct PermissionsForm: View {
 }
 
 /// About, like a Mac app's About pane: icon, name, version, one line, and the story.
+enum SupportLinks {
+    static let sponsorURL = URL(string: "https://github.com/sponsors/priyevsingh")
+}
+
 private struct AboutPane: View {
     @Environment(\.openWindow) private var openWindow
 
@@ -802,9 +806,18 @@ private struct AboutPane: View {
             }
             .padding(.top, 6)
             .frame(maxWidth: 460)
-            Button("Watch the Story") { openWindow(id: "about") }
-                .buttonStyle(.pillProminent)
-                .padding(.top, 8)
+            HStack(spacing: 10) {
+                Button("Watch the Story") { openWindow(id: "about") }
+                    .buttonStyle(.pillProminent)
+                if let sponsorURL = SupportLinks.sponsorURL {
+                    Link(destination: sponsorURL) {
+                        Label("Sponsor on GitHub", systemImage: "heart")
+                    }
+                    .buttonStyle(.pill)
+                    .help("Open Hmunmawi's GitHub Sponsors page in your browser")
+                }
+            }
+            .padding(.top, 8)
             WallOfAppsBox().frame(maxWidth: 460).padding(.top, 14)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

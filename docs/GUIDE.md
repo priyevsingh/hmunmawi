@@ -630,7 +630,7 @@ Daily copies on your Mac with Restore, *Back up now*, an encrypted iCloud Drive 
 
 <details><summary>How it works</summary>
 
-Version, the story, and the [Wall of Apps](WALL-OF-APPS.md).
+Version, the story, a **Sponsor on GitHub** link, and the [Wall of Apps](WALL-OF-APPS.md).
 
 </details>
 
