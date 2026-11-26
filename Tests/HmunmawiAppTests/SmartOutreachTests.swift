@@ -237,4 +237,38 @@ import Testing
         #expect(OutreachSheet.isDraftSuggestion(OSuggestion(id: "1", entry: "e1", outlet: "Podcast", app: "AppA", kind: "repitch", why: "new release", day: "2026-11-26", sure: true)))
         #expect(!OutreachSheet.isDraftSuggestion(OSuggestion(id: "2", entry: "e2", outlet: "Blog", app: "AppA", kind: "bounced", why: "bounced", day: "2026-11-26", sure: true)))
     }
+
+    @Test func appModelWaitingBusyAndErrorStateDefaultsCleanly() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "hm-wait-ui-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = try Store(path: dir.appending(path: "test.sqlite").path)
+        let model = AppModel(supportDirectory: dir, runsEngine: false)
+        await model.attachTestStore(store)
+
+        let id = try await store.enqueue(
+            kind: "outreach.send",
+            resource: "mail",
+            priority: 3,
+            maxAttempts: 1,
+            payload: .object([
+                "entry": .string("missing-entry"),
+                "to": .string("editor@example.com"),
+                "subject": .string("Subject"),
+                "body": .string("Body"),
+            ]),
+            needsApproval: true
+        )
+        await model.refresh()
+        let job = try #require(model.waiting.first { $0.id == id }?.job)
+        #expect(!model.isWaitingBusy(id))
+
+        await model.approve(job)
+        #expect(!model.isWaitingBusy(id))
+        #expect(model.jobErrors[id] != nil)
+
+        await model.skip(job)
+        #expect(model.jobErrors[id] == nil)
+        #expect(!model.isWaitingBusy(id))
+    }
 }

@@ -193,17 +193,28 @@ private struct TodayTile: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             if let action, let model {
+                let isBusy = model.isWaitingBusy(action.job.id)
+                let approveWord = action.job.kind == "outreach.send" || action.job.kind == "release.notify" ? "Sending…" : "Working…"
                 HStack {
-                    Button("Approve") { Task { await model.approve(action.job) } }
-                        .buttonStyle(.pillProminent)
-                    Button("Skip") { Task { await model.skip(action.job) } }
-                        .buttonStyle(.pill)
+                    Button { Task { await model.approve(action.job) } } label: {
+                        WaitingBusyLabel(title: "Approve", busyTitle: approveWord, busy: model.isWaitingApproving(action.job.id))
+                    }
+                    .buttonStyle(.pillProminent)
+                    .disabled(isBusy)
+                    Button { Task { await model.skip(action.job) } } label: {
+                        WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: model.isWaitingSkipping(action.job.id))
+                    }
+                    .buttonStyle(.pill)
+                    .disabled(isBusy)
                     if more > 0 {
                         Spacer()
                         Text("+\(more) more").font(.callout).foregroundStyle(.secondary)
                     }
                 }
                 .controlSize(.small)
+                if let err = model.jobErrors[action.job.id] {
+                    WaitingErrorBanner(text: err)
+                }
             }
         }
         .padding(16)

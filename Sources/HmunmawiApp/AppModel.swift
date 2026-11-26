@@ -1434,7 +1434,18 @@ final class AppModel {
         await refresh()
     }
 
-    @ObservationIgnored private var approving: Set<Int64> = []
+    private(set) var approving: Set<Int64> = []
+    private(set) var skipping: Set<Int64> = []
+    private(set) var jobErrors: [Int64: String] = [:]
+
+    func isWaitingApproving(_ id: Int64) -> Bool { approving.contains(id) }
+    func isWaitingSkipping(_ id: Int64) -> Bool { skipping.contains(id) }
+    func isWaitingBusy(_ id: Int64) -> Bool { approving.contains(id) || skipping.contains(id) }
+
+    private func setJobError(_ message: String, for id: Int64) {
+        jobErrors[id] = message
+        errorText = message
+    }
     /// True when one of Hmunmawi's windows is actually visible on screen (not closed, minimised or fully covered).
     static func windowOnScreen() -> Bool {
         NSApp.windows.contains { $0.isVisible && !$0.isMiniaturized && $0.occlusionState.contains(.visible) && $0.canBecomeMain }
@@ -1457,7 +1468,8 @@ final class AppModel {
     func approve(_ job: Job) async {
         // One approval per item: a double click (or owner and agent at once) must not run it twice. Checked and
         // claimed before any await, so the main actor can't interleave two runs.
-        guard !approving.contains(job.id) else { return }
+        guard !approving.contains(job.id), !skipping.contains(job.id) else { return }
+        jobErrors.removeValue(forKey: job.id)
         approving.insert(job.id); defer { approving.remove(job.id) }
         // An agent's request you approved: the app runs it itself, then marks it done.
         if job.kind == "agent.request", case .object(let p) = job.payload {
@@ -1481,7 +1493,7 @@ final class AppModel {
                     await skip(stale)
                 }
             }
-            if !ok { errorText = "The agent's request ran but didn't work: \(message)" }
+            if !ok { setJobError("The agent's request ran but didn't work: \(message)", for: job.id) }
             return
         }
         // Outbound outreach email approved by the owner: send via SMTP or Zoho Safari, then update outreach & offer code.
@@ -1498,12 +1510,12 @@ final class AppModel {
             // Pin recipient strictly from stored outreach entry (never from reply bodies or payload tampering if entry exists).
             let recipient = item.flatMap(Outreach.pinnedRecipient(for:)) ?? (p["to"]?.string ?? "")
             guard let itemForCheck = item, Outreach.pinnedRecipient(for: itemForCheck) != nil else {
-                errorText = "Outreach entry or stored contact email is missing; nothing was sent."
+                setJobError("Outreach entry or stored contact email is missing; nothing was sent.", for: job.id)
                 return
             }
             let sendRes = await MailSender.send(to: recipient, subject: subject, body: body, inReplyTo: inReplyTo)
             if !sendRes.ok {
-                errorText = sendRes.note
+                setJobError(sendRes.note, for: job.id)
                 return
             }
             // Update outreach status/marks and mark any attached offer code as shared only after successful send.
@@ -1536,14 +1548,14 @@ final class AppModel {
         if job.kind == "release.notify" {
             let res = await ReleaseSubscribers.shared.sendBatchJob(job, model: self)
             if !res.ok {
-                errorText = res.note
+                setJobError(res.note, for: job.id)
                 return
             }
             await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
                 "ok": .bool(true), "sent": .number(Double(res.sent)), "skipped": .number(Double(res.skipped)),
                 "failed": .number(Double(res.failed)), "note": .string(String(res.note.prefix(500)))])) }
             if res.failed > 0 {
-                errorText = res.note
+                setJobError(res.note, for: job.id)
             }
             return
         }
@@ -1552,17 +1564,17 @@ final class AppModel {
             let rid = p["review_id"]?.string ?? ""
             let reply = p["reply"]?.string ?? ""
             guard !rid.isEmpty, !reply.isEmpty else {
-                errorText = "Review reply is missing review_id or reply text."
+                setJobError("Review reply is missing review_id or reply text.", for: job.id)
                 return
             }
             if let problem = Wording.rules.problem(reply) {
-                errorText = "Blocked by Words I never use: \(problem)"
+                setJobError("Blocked by Words I never use: \(problem)", for: job.id)
                 return
             }
             let r = await shieldFix(.object(["fix": .string("review_reply"), "review_id": .string(rid), "text": .string(reply)]), by: "you")
             await act { try await $0.resolveApproved(job.id, ok: r.ok, by: "you", detail: .object([
                 "ok": .bool(r.ok), "message": .string(String(r.message.prefix(500)))])) }
-            if !r.ok { errorText = "Couldn't post review reply: \(r.message)" }
+            if !r.ok { setJobError("Couldn't post review reply: \(r.message)", for: job.id) }
             return
         }
         await act { try await $0.approve(job.id, by: "you") }
@@ -1749,6 +1761,9 @@ final class AppModel {
         await refreshAddOns()
     }
     func skip(_ job: Job) async {
+        guard !approving.contains(job.id), !skipping.contains(job.id) else { return }
+        jobErrors.removeValue(forKey: job.id)
+        skipping.insert(job.id); defer { skipping.remove(job.id) }
         if job.kind == "agent.request", case .object(let p) = job.payload, p["command"]?.string == "set-key",
            case .object(let a)? = p["args"] {
             // Only this request's own secret (skipping one request never deletes another's).

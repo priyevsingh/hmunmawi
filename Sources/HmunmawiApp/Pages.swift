@@ -344,16 +344,22 @@ struct InboxPage: View {
             }
             NextSteps(model: model)
             if !model.waiting.isEmpty {
-                let nonCriticalCount = model.waiting.filter { !AppModel.isCriticalWaiting($0.job) }.count
+                let nonCritical = model.waiting.filter { !AppModel.isCriticalWaiting($0.job) }
+                let nonCriticalCount = nonCritical.count
+                let batchApproving = nonCritical.contains { model.isWaitingApproving($0.job.id) }
                 let displayRows = Self.groupWaiting(model.waiting)
                 KitCard {
                     HStack {
                         CardHeader(symbol: "hand.raised.fill", title: "Needs your OK", tint: Brand.caution, caption: "\(model.waiting.count)")
                         Spacer()
                         if nonCriticalCount > 0 {
-                            Button("Approve all non-critical (\(nonCriticalCount))") {
+                            Button {
                                 Task { await model.approveAllNonCritical() }
-                            }.buttonStyle(.pill)
+                            } label: {
+                                WaitingBusyLabel(title: "Approve all non-critical (\(nonCriticalCount))", busyTitle: "Approving…", busy: batchApproving)
+                            }
+                            .buttonStyle(.pill)
+                            .disabled(batchApproving)
                         }
                     }
                     ForEach(displayRows) { entry in
@@ -368,10 +374,20 @@ struct InboxPage: View {
                             } else if action.job.kind == "review.reply" {
                                 ReviewReplyWaitingRow(action: action, model: model)
                             } else {
-                                HStack(alignment: .top) {
-                                    LogRow(title: action.title, detail: action.detail)
-                                    Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
-                                    Button("Approve") { Task { await model.approve(action.job) } }.buttonStyle(.pillProminent)
+                                let isBusy = model.isWaitingBusy(action.job.id)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(alignment: .top) {
+                                        LogRow(title: action.title, detail: action.detail)
+                                        Button { Task { await model.skip(action.job) } } label: {
+                                            WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: model.isWaitingSkipping(action.job.id))
+                                        }.buttonStyle(.pill).disabled(isBusy)
+                                        Button { Task { await model.approve(action.job) } } label: {
+                                            WaitingBusyLabel(title: "Approve", busyTitle: "Working…", busy: model.isWaitingApproving(action.job.id))
+                                        }.buttonStyle(.pillProminent).disabled(isBusy)
+                                    }
+                                    if let err = model.jobErrors[action.job.id] {
+                                        WaitingErrorBanner(text: err)
+                                    }
                                 }
                             }
                         }
@@ -587,6 +603,35 @@ struct EqualRowsGrid: Layout {
     }
 }
 
+/// Rotating progress indicator + label shared across Log & Today waiting action buttons.
+struct WaitingBusyLabel: View {
+    let title: String
+    let busyTitle: String
+    let busy: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if busy {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Text(busy ? busyTitle : title)
+        }
+    }
+}
+
+/// Inline failure note shown directly inside a waiting card when sending or approving fails.
+struct WaitingErrorBanner: View {
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption)
+            .foregroundStyle(Brand.bad)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 /// Editable outbound outreach draft in Log → Waiting with pinned recipient and MailCheck DNS status.
 private struct OutreachWaitingRow: View {
     let action: WaitingAction
@@ -599,12 +644,24 @@ private struct OutreachWaitingRow: View {
     private var toAddress: String { action.job.payload[path: "to"]?.string ?? "" }
 
     var body: some View {
+        let isSending = model.isWaitingApproving(action.job.id)
+        let isSkipping = model.isWaitingSkipping(action.job.id)
+        let isBusy = isSending || isSkipping
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(action.title).font(.body.weight(.medium))
                     Text("To: \(toAddress) · via \(MailSender.modeDescription)")
                         .font(.callout).foregroundStyle(.secondary)
+                    if isSending {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Sending via \(MailSender.modeDescription)…")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let err = model.jobErrors[action.job.id] {
+                        WaitingErrorBanner(text: err)
+                    }
                     if let mc = mailCheck, !mc.ok {
                         Label("Mail DNS warning: \(mc.advice.first ?? "SPF/DKIM/DMARC incomplete")", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(Brand.caution)
@@ -612,22 +669,28 @@ private struct OutreachWaitingRow: View {
                     }
                 }
                 Spacer()
-                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
-                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
-                Button("Send") {
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.skip(action.job) } } label: {
+                    WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: isSkipping)
+                }.buttonStyle(.pill).disabled(isBusy)
+                Button {
                     Task {
                         if editing { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) }
                         await model.approve(action.job)
                     }
-                }.buttonStyle(.pillProminent)
+                } label: {
+                    WaitingBusyLabel(title: "Send", busyTitle: "Sending…", busy: isSending)
+                }.buttonStyle(.pillProminent).disabled(isBusy)
             }
             if editing {
-                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder)
+                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder).disabled(isBusy)
                 TextEditor(text: $bodyText).font(.callout).frame(minHeight: 110, maxHeight: 200)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                    .disabled(isBusy)
                 HStack {
                     Spacer()
-                    Button("Save draft") { Task { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) } }.buttonStyle(.pill)
+                    Button("Save draft") { Task { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) } }
+                        .buttonStyle(.pill).disabled(isBusy)
                 }
             }
         }
@@ -672,6 +735,9 @@ private struct ReleaseNotifyWaitingRow: View {
     }
 
     var body: some View {
+        let isSendingBatch = model.isWaitingApproving(action.job.id)
+        let isSkipping = model.isWaitingSkipping(action.job.id)
+        let isBusy = isSendingBatch || isSkipping
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -691,6 +757,15 @@ private struct ReleaseNotifyWaitingRow: View {
                                 .lineLimit(3)
                         }
                     }
+                    if isSendingBatch {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Sending release notifications…")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let err = model.jobErrors[action.job.id] {
+                        WaitingErrorBanner(text: err)
+                    }
                     if let mc = mailCheck, !mc.ok {
                         Label("Mail DNS warning: \(mc.advice.first ?? "SPF/DKIM/DMARC incomplete")", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(Brand.caution)
@@ -698,20 +773,26 @@ private struct ReleaseNotifyWaitingRow: View {
                     }
                 }
                 Spacer()
-                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
-                Button(sendingTest ? "Sending…" : "Send test") {
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill).disabled(isBusy)
+                Button {
                     Task { await sendTest() }
+                } label: {
+                    WaitingBusyLabel(title: "Send test", busyTitle: "Sending…", busy: sendingTest)
                 }
                 .buttonStyle(.pill)
-                .disabled(sendingTest || selfTestAddress == nil)
+                .disabled(isBusy || sendingTest || selfTestAddress == nil)
                 .help(selfTestAddress.map { "Send a test copy to \($0)" } ?? "Set your sending email in Outreach → Setup first")
-                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
-                Button("Send batch") {
+                Button { Task { await model.skip(action.job) } } label: {
+                    WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: isSkipping)
+                }.buttonStyle(.pill).disabled(isBusy)
+                Button {
                     Task {
                         if editing { await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText) }
                         await model.approve(action.job)
                     }
-                }.buttonStyle(.pillProminent)
+                } label: {
+                    WaitingBusyLabel(title: "Send batch", busyTitle: "Sending…", busy: isSendingBatch)
+                }.buttonStyle(.pillProminent).disabled(isBusy)
             }
             if let testNote {
                 Text(testNote)
@@ -843,6 +924,9 @@ private struct SetKeyBatchWaitingRow: View {
     }
 
     var body: some View {
+        let isApproving = items.contains { model.isWaitingApproving($0.job.id) }
+        let isSkipping = items.contains { model.isWaitingSkipping($0.job.id) }
+        let isBusy = isApproving || isSkipping
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -852,9 +936,13 @@ private struct SetKeyBatchWaitingRow: View {
                         .lineLimit(expanded ? nil : 2)
                 }
                 Spacer()
-                Button(expanded ? "Less" : "Details") { expanded.toggle() }.buttonStyle(.pill)
-                Button("Skip all") { Task { await model.skipBatch(items.map(\.job)) } }.buttonStyle(.pill)
-                Button("Approve all") { Task { await model.approveBatch(items.map(\.job)) } }.buttonStyle(.pillProminent)
+                Button(expanded ? "Less" : "Details") { expanded.toggle() }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.skipBatch(items.map(\.job)) } } label: {
+                    WaitingBusyLabel(title: "Skip all", busyTitle: "Skipping…", busy: isSkipping)
+                }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.approveBatch(items.map(\.job)) } } label: {
+                    WaitingBusyLabel(title: "Approve all", busyTitle: "Approving…", busy: isApproving)
+                }.buttonStyle(.pillProminent).disabled(isBusy)
             }
         }
     }
@@ -874,22 +962,37 @@ private struct ReviewReplyWaitingRow: View {
     }
 
     var body: some View {
+        let isPosting = model.isWaitingApproving(action.job.id)
+        let isSkipping = model.isWaitingSkipping(action.job.id)
+        let isBusy = isPosting || isSkipping
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(action.title).font(.body.weight(.medium))
                     Text(reviewSummary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     Text(replyText).font(.callout).fixedSize(horizontal: false, vertical: true)
+                    if isPosting {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Posting review reply…").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let err = model.jobErrors[action.job.id] {
+                        WaitingErrorBanner(text: err)
+                    }
                 }
                 Spacer()
-                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill)
-                Button("Skip") { Task { await model.skip(action.job) } }.buttonStyle(.pill)
-                Button("Post reply") {
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.skip(action.job) } } label: {
+                    WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: isSkipping)
+                }.buttonStyle(.pill).disabled(isBusy)
+                Button {
                     Task {
                         if editing { await model.updateReviewReplyDraft(action.job, reply: replyText) }
                         await model.approve(action.job)
                     }
-                }.buttonStyle(.pillProminent)
+                } label: {
+                    WaitingBusyLabel(title: "Post reply", busyTitle: "Posting…", busy: isPosting)
+                }.buttonStyle(.pillProminent).disabled(isBusy)
             }
             if editing {
                 TextEditor(text: $replyText).font(.callout).frame(minHeight: 90, maxHeight: 160)
