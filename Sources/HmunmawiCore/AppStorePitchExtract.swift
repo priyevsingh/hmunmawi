@@ -16,7 +16,7 @@ public struct AppPitchHighlights: Codable, Hashable, Sendable {
 }
 
 public enum AppStorePitchExtract {
-    private static let maxBulletChars = 120
+    private static let maxBulletChars = 138
 
     private static let highSignalSectionTokens = [
         "sees what no single", "correlation", "why", "echo", "how it works", "what it"
@@ -234,6 +234,8 @@ public enum AppStorePitchExtract {
             if excludedWhatsNewTokens.contains(where: lower.contains) { continue }
             if containsEmailOrURL(stripped) { continue }
             if isAllCapsHeader(stripped) || lower == "what's new:" || lower == "whats new:" { continue }
+            // Skip bare app-version title headers like "ExampleApp 3.9.2" in release notes.
+            if stripped.count <= 40, stripped.wholeMatch(of: /^[^\n]{1,30}\s+v?\d+\.\d+(?:\.\d+)?$/) != nil { continue }
 
             let capped = trimCleanly(stripped, maxChars: maxBulletChars)
             if !out.contains(where: { isDuplicateBullet($0, capped) }) {
