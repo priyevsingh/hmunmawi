@@ -285,4 +285,14 @@ import Testing
         #expect(signedIn?.needsSignIn == false)
         #expect(signedIn?.isMailReady == true)
     }
+
+    @Test func storyBoardCalibratesDeclaredScoresBelowCriticalRevenueDrops() {
+        let urgent = AttentionItem(app: "Body Vitals", severity: "critical", title: "Crash spike", detail: "Crashes up")
+        let rating = AttentionItem(app: "Body Vitals", severity: "high", title: "Rated below 4 stars in US", detail: "3.7")
+        let drought = AttentionItem(app: "Body Vitals", severity: "high", title: "No new written reviews", detail: "46 days")
+
+        #expect(StoryBoard.declaredScore(for: urgent) > StoryBoard.declaredScore(for: rating))
+        #expect(StoryBoard.declaredScore(for: rating) > StoryBoard.declaredScore(for: drought))
+        #expect(StoryBoard.declaredScore(for: drought) <= 0.5)
+    }
 }

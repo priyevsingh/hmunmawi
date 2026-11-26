@@ -360,6 +360,21 @@ final class ScriptedIMAP: IMAPTransport, @unchecked Sendable {
         #expect(metrics.first { $0.key == "subscription.mrr|A|mrr_usd" }?.perDay == false)
         #expect(metrics.first { $0.key == "revenue.daily|A|proceeds_usd" }?.perDay == true)
     }
+
+    @Test func lowerPreservesCamelCaseBrandsAndBusinessWeightBoostsRevenueAndSubscribers() {
+        #expect(InsightEngine.lower("YouTube views (all time)") == "YouTube views (all time)")
+        #expect(InsightEngine.lower("iPhone downloads") == "iPhone downloads")
+        #expect(InsightEngine.lower("First downloads") == "first downloads")
+
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let pts = (0..<14).map { (cal.date(byAdding: .day, value: -(13 - $0), to: today)!, Double($0 + 1)) }
+        let mrrMetric = Metric(key: "subscription.mrr|App|mrr_usd", name: "MRR", app: "App", better: .up, isCount: false, isMoney: true, points: pts)
+        let searchMetric = Metric(key: "search|All|seen", name: "Seen on Google", app: "All", better: .up, isCount: false, isMoney: false, points: pts)
+
+        #expect(InsightEngine.businessWeight(for: mrrMetric, lane: .worry) > InsightEngine.businessWeight(for: searchMetric, lane: .worry))
+        #expect(InsightEngine.businessWeight(for: mrrMetric, lane: .worry) >= 1.5)
+    }
 }
 
 @Suite struct PublicGoLiveTests {

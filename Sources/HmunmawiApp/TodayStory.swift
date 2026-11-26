@@ -276,10 +276,9 @@ extension Chapter {
             let s = f.app.map { f.title.hasPrefix($0 + ": ") ? String(f.title.dropFirst($0.count + 2)) + " (" + $0 + ")" : f.title } ?? f.title
             return s.prefix(1).lowercased() + s.dropFirst()
         }
-        let declared = AttentionItem.all(model).filter { $0.severityRank <= 1 }
         let wins = model.findings.filter { $0.lane == .win }
-        let worries = model.findings.filter { $0.lane == .worry }
-        let worryText = worries.first.map(short) ?? declared.first.map { ($0.outcome ?? $0.title).prefix(1).lowercased() + ($0.outcome ?? $0.title).dropFirst() }
+        let worries = StoryBoard.rankedWorries(model)
+        let worryText = worries.first.map(short)
         let statement: String
         switch (wins.first, worryText) {
         case let (w?, b?): statement = (short(w).prefix(1).uppercased() + short(w).dropFirst()) + ", but " + b
@@ -287,6 +286,6 @@ extension Chapter {
         case let (nil, b?): statement = b.prefix(1).uppercased() + b.dropFirst()
         default: statement = "A steady day: nothing out of the ordinary"
         }
-        let counts = "\(min(wins.count, 3)) win\(wins.count == 1 ? "" : "s") · \(min(worries.count + declared.count, 3)) worr\(worries.count + declared.count == 1 ? "y" : "ies") · judged against each number's own normal"
+        let counts = "\(min(wins.count, 3)) win\(wins.count == 1 ? "" : "s") · \(min(worries.count, 3)) worr\(worries.count == 1 ? "y" : "ies") · judged against each number's own normal · click any item for chart"
         let winText = wins.first.map { short($0).prefix(1).uppercased() + short($0).dropFirst() }
         return (statement, counts, winText, worryText.map { wins.isEmpty ? $0.prefix(1).uppercased() + $0.dropFirst() : $0 })}

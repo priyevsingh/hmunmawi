@@ -132,7 +132,8 @@ struct FrontPage: View {
         }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(TodayStory.greeting) · \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))\(LastSeen.isFirstLook ? "" : " · last looked \(when)")")
+                let latestText = model.events.first.map { " · updated \(Ago.text(millis: $0.occurredAt))" } ?? ""
+                Text("\(TodayStory.greeting) · \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))\(LastSeen.isFirstLook ? "" : " · last looked \(when)")\(latestText)")
                     .font(.callout).foregroundStyle(.secondary)
                 Spacer()
                 // A card of the week to post (X, Threads, LinkedIn, stories).

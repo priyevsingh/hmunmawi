@@ -5,15 +5,28 @@ import SwiftUI
 struct StoryBoard: View {
     let model: AppModel
 
-    var body: some View {
-        let wins = Array(model.findings.filter { $0.lane == .win }.prefix(3))
-        // Worries: the engine's findings plus the problems the data itself declares (urgent and important).
+    /// Scores declared attention items below live revenue/subscriber drops unless critical, and lowers stale review-drought notices.
+    static func declaredScore(for item: AttentionItem) -> Double {
+        if item.severityRank == 0 { return 1.45 }
+        let text = (item.title + " " + (item.outcome ?? "")).lowercased()
+        if text.contains("no new written review") { return 0.40 }
+        return 0.75
+    }
+
+    /// Unified ranked worries shared between `StoryBoard` and `storySummary` so headline and cards always match.
+    @MainActor
+    static func rankedWorries(_ model: AppModel) -> [Finding] {
         let declared = AttentionItem.all(model).filter { $0.severityRank <= 1 }.map { item in
             Finding(id: "declared|" + item.id, lane: .worry, detector: .declared, app: item.app,
                     title: item.app + ": " + (item.outcome ?? item.title), evidence: item.feedFigure ?? item.severityText,
-                    why: item.detail, score: item.severityRank == 0 ? 2.5 : 1.5)
+                    why: item.detail, score: declaredScore(for: item))
         }
-        let worries = Array((model.findings.filter { $0.lane == .worry } + declared).sorted { $0.score > $1.score }.prefix(3))
+        return (model.findings.filter { $0.lane == .worry } + declared).sorted { $0.score > $1.score }
+    }
+
+    var body: some View {
+        let wins = Array(model.findings.filter { $0.lane == .win }.prefix(3))
+        let worries = Array(Self.rankedWorries(model).prefix(3))
         // The same action for several apps becomes one line naming them all.
         let sectionTodos = model.snapshots("section.snapshot").compactMap(CustomSection.init).filter { !model.replacedByApp($0) }.flatMap(\.items)
             .map { item -> AttentionItem in var i = item; if i.action == nil { i.action = i.outcome ?? i.title }; return i }
@@ -95,27 +108,54 @@ private struct FindingRow: View {
         return String(finding.title.dropFirst(app.count + 2))
     }
 
+    private var isRealApp: Bool {
+        guard let app = finding.app, !app.isEmpty else { return false }
+        let lower = app.lowercased()
+        return !lower.hasPrefix("all ") && lower != "website"
+    }
+
+    private static func channelSymbol(for finding: Finding) -> String {
+        let t = (finding.title + " " + (finding.metricKey ?? "")).lowercased()
+        if t.contains("google") || t.contains("search") { return "magnifyingglass" }
+        if t.contains("youtube") { return "play.rectangle.fill" }
+        if t.contains("x followers") || t.contains("x ") { return "bubble.left.and.text.bubble.fill" }
+        if t.contains("site") || t.contains("visitor") || t.contains("page") { return "globe" }
+        return "chart.line.uptrend.xyaxis"
+    }
+
     var body: some View {
         let tint = finding.lane == .win ? Brand.good : Brand.bad
         HStack(alignment: .center, spacing: 10) {
-            if finding.app != nil {
-                AppIcon(app: finding.app, size: 28)
+            if isRealApp, let app = finding.app {
+                AppIcon(app: app, size: 28)
             } else {
-                IconBadge(symbol: "chart.line.uptrend.xyaxis", tint: tint, size: 28)
+                IconBadge(symbol: Self.channelSymbol(for: finding), tint: tint, size: 28)
             }
             VStack(alignment: .leading, spacing: 2) {
-                // The figure leads, big and glowing; the sentence underneath in full (no cut-off).
-                Text(finding.evidence).font(.title3.bold()).monospacedDigit().foregroundStyle(Kit.vibrant(tint))
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(finding.evidence).font(.title3.bold()).monospacedDigit().foregroundStyle(Kit.vibrant(tint))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let app = finding.app, !app.isEmpty {
+                        Text(app)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Text([sentence, finding.driver].compactMap { $0 }.joined(separator: " · "))
                     .font(.callout).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 6)
-            // Only for slow moves (a trend or a new level): for a one-day spike or a record, a three-week
-            // average can point the other way and contradict the sentence.
-            if finding.points.count >= 14, [.trend, .newLevel].contains(finding.detector) {
-                // Before -> now as daily averages (a week three weeks ago vs this week), so it agrees with the
-                // sentence and isn't thrown by one odd day. Click the row for the full chart.
+            if finding.detector == .newLevel, let pct = finding.deltaPercent, pct != 0 {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("\(pct > 0 ? "+" : "−")\(abs(pct))%")
+                        .font(.callout.bold()).monospacedDigit().foregroundStyle(Kit.vibrant(tint))
+                    Text("vs baseline").font(.caption).foregroundStyle(.secondary)
+                }
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(pct > 0 ? "Up" : "Down") \(abs(pct)) percent compared to baseline")
+            } else if finding.detector == .trend, finding.points.count >= 14 {
+                // Before -> now as daily averages (a week three weeks ago vs this week), matching trend direction.
                 let recent = finding.points.suffix(21).map(\.value)
                 let before = recent.prefix(7).reduce(0, +) / Double(min(7, recent.count))
                 let now = recent.suffix(7).reduce(0, +) / Double(min(7, recent.count))
@@ -128,8 +168,11 @@ private struct FindingRow: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("About \(Self.num(before)) three weeks ago, \(Self.num(now)) now")
             }
-
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
+        .contentShape(Rectangle())
         .clickForDetail(model)
         .arrival(rank)
     }
@@ -146,8 +189,12 @@ private struct NextRow: View {
                 Text(Plain.readable(item.action ?? item.title)).font(.body).fixedSize(horizontal: false, vertical: true)
                 Text(Plain.readable(item.outcome ?? item.title)).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
+        .contentShape(Rectangle())
         .clickForDetail(item.infoModel)
         .arrival(rank)
     }
