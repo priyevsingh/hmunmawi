@@ -2,6 +2,26 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.6.1",
+      "items": [
+        {
+          "title": "Clearer Automations Timeline",
+          "detail": "Overlapping 12 am dots spread cleanly apart, hovering any dot identifies its exact job, future runs show Later today instead of Ran, and Dark Mode dots and legend stay crisp.",
+          "action": "page:automations"
+        },
+        {
+          "title": "Sharper Today Story & Priority Ranking",
+          "detail": "Wins and Worries align across headline and cards with app labels, channel icons, and baseline deltas, while revenue and subscriber drops rank ahead of stale review notices.",
+          "action": "page:today"
+        },
+        {
+          "title": "Readable Outreach Forms & Links",
+          "detail": "Toggles and long App Store campaign links wrap across lines cleanly inside Outreach detail sheets without text cutoff.",
+          "action": "page:log"
+        }
+      ]
+    },
+    {
       "version": "1.6.0",
       "items": [
         {

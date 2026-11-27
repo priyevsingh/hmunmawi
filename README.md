@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Every morning, one calm answer: what you won, what to watch, what to do next.</b><br>
-  A free, open-source Mac app for indie developers on Apple's platforms: iPhone, iPad, Apple Watch, Mac, Apple TV and Vision Pro.
+  A free, open-source Mac command center for indie makers running Apple apps (iPhone, iPad, Watch, Mac, TV, Vision Pro) and website projects—delivering clear daily answers, early issue alerts, and ready-to-approve growth actions.
 </p>
 
 <p align="center">
@@ -35,12 +35,11 @@
 
 <br>
 
-## One Mac app. Your apps and everything else you run.
+## Ship healthier Apple apps and websites in minutes a day—catch problems early, never miss growth.
 
-Hmunmawi watches your Apple apps **and** the other things you run, then turns it all into one calm answer each morning.
-It runs on its own from your Mac's menu bar, and nothing is changed without your OK.
+Hmunmawi watches all your Apple apps, website projects, and growth scripts 24/7 from your Mac's menu bar—turning revenue, search traffic, crashes, and background jobs into one calm morning answer, catching broken deploys or sites before users notice, and queueing every fix and outreach draft for your one-click OK.
 
-| | 🍎 Your Apple apps | 🌐 Everything else you run (via add-ons) |
+| | 🍎 Your Apple apps | 🌐 Your website projects, growth & scripts (via add-ons) |
 |---|---|---|
 | **🌱 Win** | Downloads, proceeds, active subscribers, ratings and new reviews, in one sentence from your own numbers. Every payment shows up as it happens, including free trials, intro offers and refunds. | Website visits, Google and Bing search clicks, daily active users, subscriptions, YouTube and X growth, in the same sentence. |
 | **👀 Worry** | Refunds, crashes, what could get a version rejected, where your version is in review, offer codes about to expire. Told once, quietly, only if it's still true 7 minutes later. | A failed Mac job, a website that stopped answering, a new Sentry problem in plain words, a website deploy that failed or never started, a dead link on your site, a broken Python environment, a search problem your own monitor found, a crash spike, trouble that one of your own scripts reports, a connection or key that stopped working. Same calm alert on iMessage, your phone or Calendar. |
