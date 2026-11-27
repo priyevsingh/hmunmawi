@@ -2,6 +2,13 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.6.3 (build 163), 27 Nov 2026
+
+**Improved**
+- **Agent guide & documentation sync (`AgentBridge`, `README`, `AGENTS`, `docs/`):** Updated `AgentGuide.commands` (`hm guide`) for `services` (`is_hang`, `is_aggregate`, triage priority order) and `usage` (`stale`, `problem`) to match [docs/HM-COMMANDS.md](docs/HM-COMMANDS.md), aligned `outreach-send` and `review-reply` docs, refreshed sample and selectively blurred screenshots across [README.md](README.md) and [docs/GUIDE.md](docs/GUIDE.md), clarified strictly read-only Sentry boundaries in [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md), and removed all personal location/schedule references from [AGENTS.md](AGENTS.md) and [README.md](README.md).
+
+Hmunmawi still does everything it did in 1.6.2. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.6.2 (build 162), 27 Nov 2026
 
 **Fixed & Improved**
