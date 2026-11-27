@@ -44,10 +44,10 @@ Hosts: `api.vercel.com` and `api.github.com`; each token may only go to its own 
   `gitSource`; refused if the branch moved since you approved), or rebuilds a given deployment (`deploymentId`). It
   runs only after the owner's OK in Log → Waiting (put there by Watch my services or `hm deploy-redeploy`).
 
-**Sentry** (0.2.0). Every 30 minutes. Besides sessions and crash-free rate, it reads your unresolved issues of the
+**Sentry** (0.2.0). Every 30 minutes. Strictly **read-only**: besides sessions and crash-free rate, it reads your unresolved issues of the
 last 14 days (`GET /api/0/organizations/{org}/issues/?query=is:unresolved`, up to 50) as one `issues.snapshot`
 event. That needs the token's `event:read` scope; without it the issues part is skipped (noted in the add-on's log)
-and the crash numbers still arrive.
+and the crash numbers still arrive. `hm services` ranks open issues by triage priority (non-hang crashes/uptime issues first, hangs next, and aggregate `mac-jobs-ok` rollups last) with `is_hang` and `is_aggregate` flags.
 
 **Google Search Console.** Reads 50 top pages (by clicks) with their average position, so Next steps can name pages
 that rank on Google's first page but get under half your site's own click rate.

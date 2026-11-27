@@ -322,11 +322,8 @@ merges anything by itself; where a recipe says "merge" or "post", that is your s
 ### Crash alerts in plain words
 
 - **For:** one plain sentence per new crash or freeze, not a dashboard.
-- **Built in:** the Sentry connection reads crash-free sessions and freezes; ready-made rules alert on a crash spike.
-- **Built in (1.4.0):** give the Sentry token the `event:read` scope and add **Watch my services**
-  (Automations → +): each new open Sentry problem comes as one plain sentence, and again when it closes.
-- **Your workspace:** an AI job can write an "explain this crash" note into `out/`. The note is only a note; fixing
-  code is yours.
+- **Built in:** the Sentry connection reads crash-free sessions and freezes (separating older-release freezes from the live build); ready-made rules alert on a crash spike. With `event:read` granted and **Watch my services** enabled (Automations → +), new open Sentry issues appear in plain words and `hm services` ranks non-hang crashes ahead of hangs and `mac-jobs-ok` rollups; **Apps → Stability** also offers a read-only **Copy brief for Claude** button when open crashes or live-release freezes need attention.
+- **Your workspace:** Hmunmawi keeps Sentry strictly read-only, while your own workspace scripts or local Claude sessions can handle interactive triage, hang archival, or explanation notes in `out/` (code fixes always wait for you).
 
 ### Search health
 
