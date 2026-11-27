@@ -387,7 +387,7 @@ private struct MoneyStory: View {
                         ? RollingNumber(key: "money.\(days)d.\(code)", value: proceeds.rounded(),
                                         format: { Money.text($0, code, decimals: 0) }, tint: Brand.Category.money,
                                         deltaLabel: "\(days)-day earnings") : nil,
-                    trend: facts.subscribers, trendLabel: "Active subscribers, last 4 weeks",
+                    trend: facts.subscribers, trendLabel: "Subscribers paying right now (4 weeks)",
                     footer: proceeds > 0 || portal?[path: "proceeds_usd"] != nil
                         ? "Earned in the last \(days) days, after Apple's cut." + MRRSummary.footer(model.mrr)
                         : "Your earnings show here once App Store Connect is connected.") {
@@ -426,7 +426,7 @@ private struct ReachStory: View {
                                : fastest.map { "\($0.0) is growing fastest: \(Int(($0.1 * 100).rounded()))% of its month came this week." }
                                ?? "How people found you this month.",
                            number: anyReach ? RollingNumber(key: "reach.seen", value: seen, format: { Int(safe: $0).formatted() }, tint: Brand.Category.web) : nil,
-                           trend: downloads, trendLabel: "Downloads: first downloads a day, all apps",
+                           trend: downloads, trendLabel: "First-time App Store downloads a day (all apps)",
                            footer: anyReach ? "Times you were seen on Google, YouTube and Bing in 28 days." : nil) {
             CardHeader(symbol: "chart.line.uptrend.xyaxis", title: "Reach", tint: Brand.Category.web)
             GrowthPage(model: model)

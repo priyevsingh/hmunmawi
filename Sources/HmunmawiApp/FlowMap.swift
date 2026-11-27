@@ -243,11 +243,13 @@ private struct StepTile: View {
                 .keyframeAnimator(initialValue: 1.0, trigger: pulse) { v, s in v.scaleEffect(s) } keyframes: { _ in
                     SpringKeyframe(1.25, duration: 0.25); SpringKeyframe(1.0, duration: 0.5)
                 }
-            Text(on ? step.text : zero)
+            Text(step.text)
                 .font(compact ? .system(size: 24, weight: .bold) : Kit.number).monospacedDigit()
                 .foregroundStyle(step.tint.gradient)
-                .contentTransition(.numericText())
-                .lineLimit(1).fixedSize()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .opacity(on ? 1 : 0.25)
+                .animation(.smooth(duration: 0.45), value: on)
                 .modifier(Shine(trigger: shine))
             Text(step.title).font(.callout.weight(.semibold)).fixedSize()
             Text(rate ?? step.line)
@@ -261,10 +263,6 @@ private struct StepTile: View {
         .scaleEffect(on ? 1 : 0.9)
         .hoverLift()
     }
-
-    /// "0" in the step's own format, so the number rolls up into place.
-    private var zero: String { step.text.replacingOccurrences(of: "[0-9]", with: "0", options: .regularExpression)
-        .replacingOccurrences(of: "^([^0-9]*)0+[,.0]*", with: "$10", options: .regularExpression) }
 }
 
 /// A faint light that crosses the text once per trigger (never on its own).

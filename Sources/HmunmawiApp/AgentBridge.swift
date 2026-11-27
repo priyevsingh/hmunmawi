@@ -1015,9 +1015,12 @@ final class AgentBridge {
             return ["ok": true, "result": "\(command == "approve" ? "Approved" : "Skipped"): \(w.title)"]
         case "services":
             // Sentry's open problems and each website's deploy state, as Hmunmawi last read them (read only).
-            let issues = model.snapshots("issues.snapshot").flatMap { SentryIssues.parse($0.payload) }.prefix(50).map { i in
-                ["id": i.id, "title_untrusted_text": i.title, "project": i.project, "kind": SentryIssues.kind(i).rawValue, "count": i.count,
-                 "link": i.permalink ?? ""] as [String: Any] }
+            let parsed = model.snapshots("issues.snapshot").flatMap { SentryIssues.parse($0.payload) }
+            let issues = SentryIssues.sortedForTriage(parsed).prefix(50).map { i in
+                ["id": i.id, "title_untrusted_text": i.title, "project": i.project, "kind": SentryIssues.kind(i).rawValue,
+                 "is_hang": SentryIssues.isHangTitle(i.title), "is_aggregate": SentryIssues.isAggregate(i),
+                 "count": i.count, "link": i.permalink ?? ""] as [String: Any]
+            }
             let deploys: [[String: Any]] = model.snapshots("deploy.snapshot").compactMap { e in
                 guard let s = DeployWatch.Snapshot(e.payload) else { return nil }
                 return ["project": s.project, "status": DeployWatch.status(s).rawValue, "branch": s.branch ?? "", "head": s.headSHA ?? "",
@@ -1140,10 +1143,7 @@ final class AgentBridge {
             return res.ok ? ["ok": true, "result": res.message] : ["ok": false, "error": res.message]
         case "usage":
             await UsageWatch.shared.refresh()
-            return ["ok": true, "result": UsageWatch.shared.readings.map { r -> [String: Any] in
-                ["service": r.service, "detail": r.detail ?? NSNull(), "used_percent": r.usedPercent ?? NSNull(),
-                 "resets": r.resets.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull(), "source": r.source,
-                 "problem": r.problem ?? NSNull()] }]
+            return ["ok": true, "result": UsageWatch.shared.readings.map { Self.usageRow($0) }]
         case "ai-pause-status":
             await AIPolicyService.shared.refresh()
             return ["ok": true, "result": AIPolicyService.shared.statusJSON]
@@ -1225,6 +1225,22 @@ final class AgentBridge {
         default: d.set(value, forKey: key.defaultsKey)
         }
         if key == .settingsTab { NotificationCenter.default.post(name: .hmOpenSettings, object: nil) }
+    }
+
+    /// Formats a usage reading with explicit `stale` and `problem` status for CLI/MCP consumers.
+    static func usageRow(_ r: UsageWatch.Reading, now: Date = .now) -> [String: Any] {
+        let stale = r.resets.map { $0 < now } ?? false
+        let problem: String? = r.problem
+            ?? (stale ? "Old reading: reset passed without a fresh update." : (r.usedPercent ?? 0) >= 100 ? "At 100% limit until reset." : nil)
+        return [
+            "service": r.service,
+            "detail": r.detail ?? NSNull(),
+            "used_percent": r.usedPercent ?? NSNull(),
+            "resets": r.resets.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull(),
+            "stale": stale,
+            "source": r.source,
+            "problem": problem ?? NSNull(),
+        ]
     }
 }
 

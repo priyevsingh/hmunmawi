@@ -194,9 +194,12 @@ struct UsageCard: View {
     @ViewBuilder private var content: some View {
         if !watch.readings.isEmpty {
             KitCard {
-                // Credits count too: a used-up credit is as hot as a plan at its limit.
+                // Credits count too: a hot active/monthly credit counts, while spent one-off grants don't stay red forever.
                 let hot = watch.readings.filter { ($0.usedPercent ?? 0) >= 80 }.map(\.id)
-                    + Credits.shared.current.filter { Credits.shared.percent($0) >= 80 }.map(\.id)
+                    + Credits.shared.current.filter { c in
+                        let left = max(0, c.amountUSD - Credits.shared.used(c))
+                        return Credits.shared.percent(c) >= 80 && !Credits.isExhaustedGrant(c, left: left)
+                    }.map(\.id)
                 HStack(spacing: 8) {
                     CardHeader(symbol: "gauge.with.dots.needle.67percent", title: "AI & subscriptions", tint: Brand.Category.users,
                                caption: (hot.isEmpty ? Quips.pick(["Plenty of fuel in every tank.", "All meters chilling below 80%."])
@@ -328,6 +331,11 @@ final class Credits {
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? enc.encode(list).write(to: url, options: .atomic)
+    }
+
+    /// A one-off non-monthly credit grant that has been completely spent is retired rather than permanently "running hot".
+    static func isExhaustedGrant(_ c: Credit, left: Double) -> Bool {
+        !c.monthly && left <= 0.005
     }
 
     /// A monthly credit whose period ended counts as the next period's credit (Anthropic renews it), so an old
@@ -499,16 +507,22 @@ enum MeterTint {
 struct CreditRows: View {
     @State private var credits = Credits.shared
     var body: some View {
-        ForEach(credits.current) { c in
+        let rows = credits.current.map { c -> (credit: Credits.Credit, raw: Double, left: Double, pct: Double) in
             let raw = credits.used(c)
             let used = min(raw, c.amountUSD)
-            let over = raw - c.amountUSD          // spend past the credit comes from the normal balance; say so
             let left = max(0, c.amountUSD - used)
-            let pct = credits.percent(c)
+            return (c, raw, left, credits.percent(c))
+        }
+        let active = rows.filter { !Credits.isExhaustedGrant($0.credit, left: $0.left) }
+        let finished = rows.filter { Credits.isExhaustedGrant($0.credit, left: $0.left) }
+
+        ForEach(active, id: \.credit.id) { row in
+            let c = row.credit
+            let over = row.raw - c.amountUSD          // spend past the credit comes from the normal balance; say so
             HStack(spacing: 12) {
                 ServiceIcon(service: "Claude")
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(c.name) · \(String(format: "$%.2f", left)) left of $\(Int(c.amountUSD).formatted())"
+                    Text("\(c.name) · \(String(format: "$%.2f", row.left)) left of $\(Int(c.amountUSD).formatted())"
                          + (c.workspaces.map { " · \($0.joined(separator: ", ")) workspace" } ?? ""))
                     if over >= 0.01 {
                         Text("\(String(format: "$%.2f", over)) spent beyond this credit. " + (Costs.paysForAPI
@@ -516,14 +530,14 @@ struct CreditRows: View {
                                 : "You don't buy credits and no card is used, so nothing is charged: when the credits are empty, API calls stop."))
                             .font(.caption.weight(.semibold)).foregroundStyle(Brand.bad).fixedSize(horizontal: false, vertical: true)
                     }
-                    Text([left <= 0.005 ? Quips.pick(["All spent. Every cent did its job.", "Tank empty. Well used."]) : nil,
+                    Text([row.left <= 0.005 ? Quips.pick(["All spent. Every cent did its job.", "Tank empty. Well used."]) : nil,
                           c.monthly ? Credits.nextLine(c) : nil,
                           credits.live[c.id] != nil ? "used from Anthropic API" : "used: as you typed it"].compactMap { $0 }.joined(separator: " · "))
                         .font(.caption).foregroundStyle(.secondary)
                     if let allocs = c.allocations, !allocs.isEmpty {
                         let appUsed = AISettings.shared.usdThisMonth
                         let others = allocs.filter { $0.source != "app" }
-                        let rest = max(0, raw - (allocs.contains { $0.source == "app" } ? appUsed : 0))
+                        let rest = max(0, row.raw - (allocs.contains { $0.source == "app" } ? appUsed : 0))
                         ForEach(allocs, id: \.self) { a in
                             let used: String = a.source == "app" ? String(format: "$%.2f used", appUsed)
                                 : (others.count == 1 ? String(format: "$%.2f used", rest) : "shares the rest")
@@ -533,10 +547,15 @@ struct CreditRows: View {
                     }
                 }
                 Spacer()
-                ProgressView(value: pct, total: 100).tint(MeterTint.of(pct)).frame(width: 140)
-                Text("\(Int(pct.rounded()))%").font(.callout.bold().monospacedDigit()).foregroundStyle(Kit.vibrant(MeterTint.of(pct)))
+                ProgressView(value: row.pct, total: 100).tint(MeterTint.of(row.pct)).frame(width: 140)
+                Text("\(Int(row.pct.rounded()))%").font(.callout.bold().monospacedDigit()).foregroundStyle(Kit.vibrant(MeterTint.of(row.pct)))
                     .frame(width: 46, alignment: .trailing)
             }
+        }
+        if !finished.isEmpty {
+            let names = finished.map { "\($0.credit.name) ($\(Int($0.credit.amountUSD).formatted()) used)" }.joined(separator: ", ")
+            Text("Finished grants: \(names).")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 }

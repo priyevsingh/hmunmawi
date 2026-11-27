@@ -101,15 +101,20 @@ public struct FreezeSummary: Codable, Sendable, Equatable {
 
     public static func failed(_ reason: String, at: Date = .now) -> FreezeSummary { FreezeSummary(checkedAt: at, unavailable: reason) }
 
-    /// The lines the Stability card shows for one app, or nil when Sentry has never been read.
-    public func lines(for app: String) -> [String] {
+    /// The lines the Stability card shows for one app. When `liveVersion` is supplied, older releases are called out cleanly.
+    public func lines(for app: String, liveVersion: String? = nil) -> [String] {
         if let unavailable { return ["Fatal freezes (Sentry): not available. \(unavailable)"] }
         let rel = releases.filter { $0.app == app && $0.events > 0 }.sorted { $0.events > $1.events }
         let total = rel.reduce(0) { $0 + $1.events }
         guard total > 0 else { return ["No fatal freezes in \(windowDays) days (Sentry)."] }
+        let live = liveVersion?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasLive = live.map { !$0.isEmpty } ?? false
+        let liveHits = hasLive && rel.contains { FreezeClassifier.version($0.release) == live }
         let perRelease = rel.map { r in
-            "\(r.events.formatted()) on \(FreezeClassifier.version(r.release))" + (r.users.map { " (\($0.formatted()) user\($0 == 1 ? "" : "s"))" } ?? "")
-        }.joined(separator: ", ")
+            let v = FreezeClassifier.version(r.release)
+            let ageTag = (hasLive && v != live) ? " (older release)" : ""
+            return "\(r.events.formatted()) on \(v)\(ageTag)" + (r.users.map { " (\($0.formatted()) user\($0 == 1 ? "" : "s"))" } ?? "")
+        }.joined(separator: ", ") + ((hasLive && !liveHits) ? "; 0 on live \(live!)" : "")
         let mine = issues.filter { $0.app == app }
         func sum(_ v: FreezeVerdict) -> Int { mine.filter { $0.verdict == v }.reduce(0) { $0 + $1.events } }
         var sorted = ["\(sum(.ourCode).formatted()) with our code on the screen thread",

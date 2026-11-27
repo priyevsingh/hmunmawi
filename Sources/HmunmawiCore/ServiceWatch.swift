@@ -32,6 +32,33 @@ public enum SentryIssues {
         return .other
     }
 
+    public static func isHangTitle(_ title: String) -> Bool {
+        title.range(of: "App Hang", options: .caseInsensitive) != nil
+    }
+
+    /// True for mac-jobs aggregate heartbeats (`mac-jobs-ok`), which roll up Mac cron state rather than a single app bug.
+    public static func isAggregate(_ i: Issue) -> Bool {
+        kind(i) == .jobProblem && (i.title.localizedCaseInsensitiveContains("mac-jobs-ok") || i.project == "mac-jobs" && i.title.localizedCaseInsensitiveContains("Cron failure"))
+    }
+
+    /// Ranks real app crashes and website downtime ahead of Mac cron issues, performance items, App Hangs, and aggregate rollups.
+    public static func sortedForTriage(_ issues: [Issue]) -> [Issue] {
+        func priority(_ i: Issue) -> Int {
+            switch kind(i) {
+            case .websiteDown: return 0
+            case .crash: return isHangTitle(i.title) ? 3 : 0
+            case .jobProblem: return isAggregate(i) ? 4 : 1
+            case .slow, .other: return 2
+            }
+        }
+        return issues.sorted {
+            let pa = priority($0), pb = priority($1)
+            if pa != pb { return pa < pb }
+            if $0.count != $1.count { return $0.count > $1.count }
+            return $0.id < $1.id
+        }
+    }
+
     /// The issues in an add-on payload (`{"issues": [...]}`).
     public static func parse(_ payload: JSONValue) -> [Issue] {
         (payload[path: "issues"]?.array ?? []).compactMap { o in
