@@ -29,8 +29,8 @@
 > [!TIP]
 > **What you get:** one look each morning tells you if your apps had a good day, what to worry about and what to do next, without opening App Store Connect or five dashboards.
 
-One sentence on how things are going, the biggest win and worry, then the cards below. A **project switcher** in
-the toolbar (All projects, or one project) narrows every page to that project's apps and websites.
+One sentence on how things are going, the biggest win and worry, then **Today's story** and the cards below. A **project switcher** in
+the toolbar (All projects, or one project) narrows every page to that project's apps and websites. Near the top right, dedicated buttons open **Today's story**, Refresh, the **Menu bar panel**, and Settings.
 
 #### ✨ Headline and moments
 **Feel every payment as it happens.**
@@ -60,7 +60,16 @@ shows the same notes before you install; both come from one file in the app.
 
 <details><summary>How it works</summary>
 
-People paying now and 14-day earnings (its change since your last look says what it measures); how many times you were seen on Google, YouTube and Bing; crash-free sessions, with anything that needs a look (developer membership, a version in review) on the line under it.
+People paying now and 14-day earnings (`Subscribers paying right now (4 weeks)`), how many times you were seen on Google, YouTube and Bing (`First-time App Store downloads a day (all apps)`), and crash-free sessions (lowest app each day), with anything that needs a look (developer membership, unreleased apps) on the line under it.
+
+</details>
+
+#### 📖 Today's story
+**3 wins, 3 worries, and what to do next—ranked by what hurts or helps the business most.**
+
+<details><summary>How it works</summary>
+
+Opens from the **Today's story** toolbar icon (or scrolls into view on Today): compares wins and worries against each number's own baseline, pairs each item with its app and channel icon, and ranks live subscriber and revenue drops ahead of static star-rating notices.
 
 </details>
 
@@ -126,7 +135,7 @@ Credits from startup programs, approved and in review, if a script of yours send
 
 <details><summary>How it works</summary>
 
-Each AI plan and API credit, how much is used and when it resets, plus the App Store Connect API's hourly request budget.
+Each AI plan and API credit, how much is used and when it resets, plus the App Store Connect API's hourly request budget. Spent one-time credit grants fold quietly into a single **Finished grants** line instead of staying highlighted as `"running hot"`, and plans whose reset window passed without a fresh reading show a clear **Gone quiet** warning (also exposed as `"stale": true` in `hm usage`).
 
 </details>
 
@@ -200,7 +209,7 @@ Downloads, active subscribers, crash-free rate, download-to-paid, new subscriber
 
 <details><summary>How it works</summary>
 
-A week after a release goes live, a report card comparing the 7 days after with the 7 before.
+A week after a release goes live, a report card comparing the 7 days after with the 7 before. App Store go-live timestamps are aligned to your local calendar day so the summary and Release timeline always match.
 
 </details>
 
@@ -230,7 +239,7 @@ Keep per-app customer subscriber lists (imported from CSV or added by hand) loca
 
 <details><summary>How it works</summary>
 
-Crash-free sessions per day, and freezes from Sentry (fatal hangs, and how many involve your own code rather than the system).
+Crash-free sessions per day, and freezes from Sentry cleanly split into freezes on older releases versus the live version (and whether your own code was on the screen thread). Strictly read-only inside Hmunmawi; when an open non-hang Sentry issue or live-version code freeze needs investigation, a **Copy brief for Claude** button copies the formatted triage brief and links for your session.
 
 </details>
 

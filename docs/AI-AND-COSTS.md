@@ -61,7 +61,9 @@ the card says which one each figure came from:
 4. **Typed by you:** plan, price and renewal date, from Tools and plans.
 
 You can switch any source off. A ready-made rule can alert you when a plan passes 80% (Settings → Rules → AI &
-subscriptions).
+subscriptions). When a plan's reset timestamp passes without a fresh reading, **AI & subscriptions** shows a muted
+**Gone quiet / Old reading** notice instead of trusting stale usage percentages, and `hm usage` marks the entry with
+`"stale": true` and a `"problem"` note.
 
 ### API credits
 
@@ -71,6 +73,8 @@ Admin key), or taken from what you typed.
 
 - **Free credits** (a startup program, a monthly team credit) and credits you top up with your own money are kept
   apart, so the card can say, for example, "startup credit used up · monthly credit $12 of $40 left".
+- **Finished grants:** Once a non-monthly one-time grant reaches `$0` left, it stops showing as a 100% red bar or
+  counting toward `"running hot"` and folds into a single muted **Finished grants** summary line.
 
 ### Usage file format
 

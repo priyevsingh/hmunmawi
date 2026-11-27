@@ -4,7 +4,7 @@
 
 Owner policy (not part of this app's runtime): API-credit usage limits are not treated as an account-wide pause. Only Team session and weekly AI limits pause the owner's automated jobs; the weekly cap resets Thursday 15:30 IST. During those pauses some scheduled work is deferred or handled by another agent; after reset, finished work is not redone. Search Console and Bing data collection is API-only and is not paused. This app's own routines and local behaviour are unchanged.
 
-Hmunmawi is a calm, local-first Mac app for indie app developers: it reads your numbers, tells you what matters
+Hmunmawi is a calm, local-first Mac app for indie developers running Apple apps and website projects: it reads your numbers, tells you what matters
 and asks before it acts. Users' guide: [README.md](README.md).
 
 
@@ -59,14 +59,19 @@ Never mention the developer's location (city, state, country) in any public copy
   `Sources/HmunmawiCore/XUnfollow.swift`) is the owner's own opt-in routine: agents can't add, change or start it,
   only pause or resume it; keep its safety stops, pacing and frozen list when changing it.
 
-- **Watch my services, heartbeat, link and Python checks** (1.4.0): the routines live in
+- **Watch my services, heartbeat, link and Python checks**: the routines live in
   `Sources/HmunmawiApp/ServiceRoutines.swift`; their pure rules in `Sources/HmunmawiCore/ServiceWatch.swift`
-  (`SentryIssues`, `DeployWatch`, `Heartbeat`), `LinkCheck.swift` and `PythonEnv.swift`. Sentry problems arrive as
-  `issues.snapshot` (Sentry add-on, needs `event:read`), deploys as `deploy.snapshot` (`AddOns/vercel`). A redeploy
+  (`SentryIssues` — read-only classification and triage sorting `isHangTitle` / `isAggregate` / `sortedForTriage`; active Sentry issue resolution stays in the owner's private workspace, `DeployWatch`, `Heartbeat`), `FatalFreezes.swift` (`FreezeSummary.lines(for:liveVersion:)`), `LinkCheck.swift` and `PythonEnv.swift`. Sentry problems arrive as
+  `issues.snapshot` (Sentry add-on, needs `event:read`), deploys as `deploy.snapshot` (`AddOns/vercel`). In `Apps → Stability` (`PortalPages.swift`), `Stability.triageBrief` builds a read-only **Copy brief for Claude** button for non-hang open issues or live-release freezes. A redeploy
   (`hm deploy-redeploy`, action `vercel.redeploy`) and a Python repair (`hm python-repair`) **always** wait for the
-  owner, even when allowed or in Full Autopilot; `repair=auto` is owner-only (agents may set only `repair=ask`). Keep
+  owner, even when allowed or in Smart/Full Autopilot; `repair=auto` is owner-only (agents may set only `repair=ask`). Keep
   these rules when changing them. A new routine kind that runs for the user goes in `JobSwitchesForm.ownJobKinds` too
   (Settings → Jobs → Run by Hmunmawi).
+- **Customer release notifications, Smart Outreach & Smart Autopilot:** `ReleaseSubscribers.swift` / `ReleaseSubscribersApp.swift` (`release.notify` in Log → Waiting, `subscribers-list` / `subscribers-add` / `subscribers-remove` / `release-notify-draft`), `SMTPClient.swift` / `ZohoSafariAuth.swift` / `Outreach.swift` (`outreach.send`), and `AgentPolicy` (`|smart|1` HMAC-signed Smart Autopilot plus `AgentBridge.isAlwaysAsk`, tested by `SmartAutopilotTests`).
+- **Today story, release dates & AI usage hygiene:** `ReleaseDates.dayString(fromISO:timeZone:)` (`SubscriptionTruthView.swift`) converts UTC App Store lookup timestamps into local calendar days matching `ReleaseTimelinePart`; `StoryBoard.declaredScore(for:)` ranks live revenue/subscriber drops ahead of static rating-floor notices; `Credits.isExhaustedGrant` (`UsageWatch.swift`) retires spent one-off grants into a muted summary line; and `AgentBridge.usageRow(_:now:)` flags expired reset windows (`"stale": Bool`, `"problem"`).
+- **MCP tools & tests:** `readCommands`, `changeCommands`, `actCommands` and `alwaysAskCommands` in `Sources/hmunmawi-cli/main.swift` build the
+  tools' lists; a new agent command goes in one of them (`MCPToolListTests` checks every guide command has a tool; `WhatsNewFileTests` checks `Resources/WhatsNew.json` and `Info.plist`).
+  A new pane is a new case in `SettingsPane`; `hm set settings.tab` and `SettingsPaneTests` follow it.
 - **Words I never use, topics and avoid:** `Sources/HmunmawiCore/WordingRules.swift` and `TopicFilter.swift`; the
   file is `wording-rules.json` in the app's folder (`Sources/HmunmawiApp/Wording.swift`). Check any text with
   `hm lint-text`. Post drafts and reply ideas also keep `DraftGuard` (no outdated app versions).
@@ -84,9 +89,9 @@ Never mention the developer's location (city, state, country) in any public copy
   ([docs/ASC-WEBHOOK-RELAY.md](docs/ASC-WEBHOOK-RELAY.md#keeping-the-worker-up-to-date)).
 - **Releases:** add the version's user-facing notes at the top of `Resources/WhatsNew.json` (Today's What's new card
   and the update window both read it; `release.sh` refuses a version without notes). CHANGELOG.md is the developer record.
-- **MCP tools:** `readCommands`, `changeCommands` and `actCommands` in `Sources/hmunmawi-cli/main.swift` build the
-  tools' lists; a new agent command goes in one of them (`MCPToolListTests` checks every guide command has a tool).
-  A new pane is a new case there; `hm set settings.tab` and `SettingsPaneTests` follow it.
+- **MCP tools & tests:** `readCommands`, `changeCommands`, `actCommands` and `alwaysAskCommands` in `Sources/hmunmawi-cli/main.swift` build the
+  tools' lists; a new agent command goes in one of them (`MCPToolListTests` checks every guide command has a tool; `SmartAutopilotTests` checks `alwaysAsk`; `WhatsNewFileTests` checks `Resources/WhatsNew.json` and `Info.plist`).
+  A new pane is a new case in `SettingsPane`; `hm set settings.tab` and `SettingsPaneTests` follow it.
 - **Job switches (Settings → Jobs):** `Sources/HmunmawiCore/SwitchFile.swift` reads and edits the workspace's JSON
   switch file in place (only the flipped value changes; atomic write; checked before saving); the tab is
   `JobSwitchesForm.swift`. New well-known keys go in `SwitchFile.catalog` with a one-line explanation and a test.
@@ -112,6 +117,7 @@ Never mention the developer's location (city, state, country) in any public copy
 ### Docs rule: keep the capability list in sync
 
 Every docs, README, release-note or GitHub description update must check and keep the full capability list in sync (Apple apps, websites and search, social: YouTube Shorts, Instagram Reels and carousels, Reddit, Discord, X; publishing; crashes; money and offer codes; alerts; AI limits; autopilot with approval). Never under-sell or drop a capability; verify claims against the code. The single canonical list is [docs/CAPABILITIES.md](docs/CAPABILITIES.md); other docs point to it. [docs/PRIVATE-WORKSPACE.md](docs/PRIVATE-WORKSPACE.md) (and the AGENTS.md starter inside it) must stay in sync with the list too.
+- On the owner's Mac, `hmunmawi-workspace` runs its own Claude Teams / local issue-triage workflows (including Sentry archival/auto-resolution); Hmunmawi itself keeps Sentry strictly read-only.
 
 - **No secrets, real data or personal details** in code, tests, fixtures, comments or commit messages. Use
   `example.com`-style names and invented numbers. Keys live only in the macOS Keychain.
