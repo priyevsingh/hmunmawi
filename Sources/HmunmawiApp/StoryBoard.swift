@@ -5,11 +5,14 @@ import SwiftUI
 struct StoryBoard: View {
     let model: AppModel
 
-    /// Scores declared attention items below live revenue/subscriber drops unless critical, and lowers stale review-drought notices.
+    /// Scores declared attention items below live revenue/subscriber drops unless critical, and lowers stale review-drought and chronic rating-floor notices.
     static func declaredScore(for item: AttentionItem) -> Double {
-        if item.severityRank == 0 { return 1.45 }
         let text = (item.title + " " + (item.outcome ?? "")).lowercased()
         if text.contains("no new written review") { return 0.40 }
+        if text.contains("rated below") || text.contains("rating") {
+            return item.severityRank == 0 ? 0.85 : 0.70
+        }
+        if item.severityRank == 0 { return 1.45 }
         return 0.75
     }
 

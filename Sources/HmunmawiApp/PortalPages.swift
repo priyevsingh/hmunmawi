@@ -225,7 +225,7 @@ struct AppPartView: View {
         case .stability:
             // Stability and reviews side by side (stacks on narrow windows), so neither leaves a blank half.
             EqualRowsGrid(minWidth: 360, spacing: 28) {
-                Stability(app: snapshot.app, events: model.events)
+                Stability(app: snapshot.app, events: model.events, model: model)
                 if let app = snapshot.app { ReviewsGlance(app: ComingSoon.shortName(app), model: model) }
             }
         case .codes:
@@ -351,6 +351,8 @@ private struct AttentionList: View {
 struct Stability: View {
     let app: String?
     let events: [StoredEvent]
+    var model: AppModel? = nil
+    @State private var copiedBrief = false
 
     private struct Day: Identifiable {
         let date: Date
@@ -397,13 +399,47 @@ struct Stability: View {
                 // Session health doesn't count freezes the watchdog or the user ended: show them beside it, neutrally
                 // (tracked only, no colour change, no alerts).
                 if let app, let freezes = FreezeWatch.shared.summary {
-                    ForEach(freezes.lines(for: app), id: \.self) { line in
+                    let short = ComingSoon.shortName(app)
+                    let liveVersion = ReleaseDates.shared.live[short]?.version
+                    ForEach(freezes.lines(for: app, liveVersion: liveVersion), id: \.self) { line in
                         Text(line).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let brief = Self.triageBrief(app: app, liveVersion: liveVersion, freezes: freezes, model: model) {
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(brief, forType: .string)
+                            copiedBrief = true
+                            Task { try? await Task.sleep(for: .seconds(2)); copiedBrief = false }
+                        } label: {
+                            Label(copiedBrief ? "Copied triage brief" : "Copy brief for Claude", systemImage: copiedBrief ? "checkmark" : "doc.on.doc")
+                        }
+                        .buttonStyle(.pill)
+                        .help("Copies open Sentry crash & live-release freeze context for your local Claude Teams session")
                     }
                 }
             }
             .accessibilityElement(children: .combine)
         }
+    }
+
+    static func triageBrief(app: String, liveVersion: String?, freezes: FreezeSummary, model: AppModel?) -> String? {
+        let short = ComingSoon.shortName(app)
+        let appIssues = (model?.snapshots("issues.snapshot").flatMap { SentryIssues.parse($0.payload) } ?? []).filter { i in
+            !SentryIssues.isHangTitle(i.title) && !SentryIssues.isAggregate(i)
+                && (ComingSoon.shortName(i.project).caseInsensitiveCompare(short) == .orderedSame
+                    || i.project.caseInsensitiveCompare(app) == .orderedSame)
+        }
+        let ourCodeLiveFreezes = freezes.issues.contains { $0.app == app && $0.verdict == .ourCode }
+            && (liveVersion.map { live in freezes.releases.contains { $0.app == app && FreezeClassifier.version($0.release) == live && $0.events > 0 } } ?? true)
+        guard !appIssues.isEmpty || ourCodeLiveFreezes else { return nil }
+        var lines = ["Sentry triage for \(app)" + (liveVersion.map { " (live v\($0))" } ?? "") + ":"]
+        for i in SentryIssues.sortedForTriage(appIssues).prefix(5) {
+            lines.append("- \(i.title) (\(i.count)x)" + (i.permalink.map { " — \($0)" } ?? ""))
+        }
+        if ourCodeLiveFreezes {
+            lines.append(contentsOf: freezes.lines(for: app, liveVersion: liveVersion))
+        }
+        return lines.joined(separator: "\n")
     }
 
     private static func headline(_ day: Day) -> String {

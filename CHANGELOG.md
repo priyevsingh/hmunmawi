@@ -2,6 +2,16 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.6.2 (build 162), 27 Nov 2026
+
+**Fixed & Improved**
+- **Release date timezone alignment & Story ranking (`SubscriptionTruthView`, `StoryBoard`, `FrontPage`, `FlowMap`):** Converted App Store lookup UTC release timestamps into local calendar days via `ReleaseDates.dayString(fromISO:timeZone:)` so `ReleaseReportPart` and `ReleaseTimelinePart` always agree on the go-live date, calibrated declared rating-floor notices below live subscriber/revenue drops in `StoryBoard.declaredScore(for:)`, clarified `Money` and `Reach` chart sub-labels (`"Subscribers paying right now (4 weeks)"`, `"First-time App Store downloads a day (all apps)"`), and replaced the clipped rolling transition on `StepTile` so wide currency values in `Your journey` never truncate.
+- **Exhausted grants & stale AI usage detection (`UsageWatch`, `AgentBridge`):** Added `Credits.isExhaustedGrant(_:left:)` to exclude depleted non-monthly credit grants from `"running hot"` and summarize them in a muted `"Finished grants: ..."` line, and added `"stale": Bool` plus stale/at-limit `"problem"` strings in `AgentBridge.usageRow(_:now:)` for `hm usage` and MCP `hm_read usage`.
+- **Live-version freeze context & read-only Sentry triage (`FatalFreezes`, `ServiceWatch`, `PortalPages`, `AgentBridge`):** Updated `FreezeSummary.lines(for:liveVersion:)` to label freezes confined to older releases (including `; 0 on live <version>`), added read-only `SentryIssues` triage classification/ranking (`isHangTitle`, `isAggregate`, `sortedForTriage`) so `hm services` ranks real crashes/uptime issues ahead of hangs and `mac-jobs-ok` aggregate rollups, and added a read-only **Copy brief for Claude** button in `Stability` while keeping active Sentry resolution/archival with local Claude sessions.
+- **Regression tests & E2E script (`TelemetryPolishTests`, `e2e_audit_snapshot.py`):** Added 6 unit tests covering date conversion, StoryBoard priority ranking, retired grants, stale usage rows, freeze live-version annotation, and Sentry triage ordering, and updated `e2e_audit_snapshot.py` paths, certificate check logic, and UI matchers.
+
+Hmunmawi still does everything it did in 1.6.1. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.6.1 (build 161), 27 Nov 2026
 
 **Improved**

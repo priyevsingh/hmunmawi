@@ -140,6 +140,21 @@ final class ReleaseDates {
         if let d = UserDefaults.standard.data(forKey: key), let saved = try? JSONDecoder().decode([String: Live].self, from: d) { live = saved }
     }
 
+    /// Parses an ISO8601 timestamp (e.g. App Store Lookup's UTC `currentVersionReleaseDate`) into a local calendar `yyyy-MM-dd` day.
+    static func dayString(fromISO raw: String, timeZone: TimeZone = .current) -> String? {
+        let iso = ISO8601DateFormatter()
+        let isoFrac = ISO8601DateFormatter()
+        isoFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: raw) ?? isoFrac.date(from: raw) else {
+            return raw.count >= 10 ? String(raw.prefix(10)) : nil
+        }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        let c = cal.dateComponents([.year, .month, .day], from: date)
+        guard let y = c.year, let m = c.month, let d = c.day else { return nil }
+        return String(format: "%04d-%02d-%02d", y, m, d)
+    }
+
     func refresh(_ model: AppModel) async {
         if let last = lastRun, Calendar.current.isDateInToday(last) { return }
         var ids: [String: String] = [:]          // App Store id -> short name
@@ -152,8 +167,9 @@ final class ReleaseDates {
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { lastRun = nil; return }
         for r in (root["results"] as? [[String: Any]]) ?? [] {
             guard let id = (r["trackId"] as? Int).map(String.init), let name = ids[id],
-                  let version = r["version"] as? String, let date = r["currentVersionReleaseDate"] as? String, date.count >= 10 else { continue }
-            live[name] = Live(version: version, day: String(date.prefix(10)))
+                  let version = r["version"] as? String, let date = r["currentVersionReleaseDate"] as? String,
+                  let day = Self.dayString(fromISO: date) else { continue }
+            live[name] = Live(version: version, day: day)
         }
         if let d = try? JSONEncoder().encode(live) { UserDefaults.standard.set(d, forKey: key) }
     }

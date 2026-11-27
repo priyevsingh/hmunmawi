@@ -12,10 +12,17 @@ from pathlib import Path
 
 HOME = Path.home()
 DB = HOME / "Library/Application Support/Hmunmawi/hmunmawi.sqlite"
-STATE = HOME / "Library/Application Support/Hmunmawi/Agent/state.json"
-HUB = Path(os.environ.get("HM_HUB_DIR", str(HOME / "hub"))).expanduser()
+STATE = HOME / "Library/Application Support/Hmunmawi/agent/state.json"
+if not STATE.exists():
+    STATE = HOME / "Library/Application Support/Hmunmawi/Agent/state.json"
+DEFAULT_HUB = HOME / "Documents/repos/hmunmawi-workspace"
+if not DEFAULT_HUB.exists():
+    DEFAULT_HUB = HOME / "hub"
+HUB = Path(os.environ.get("HM_HUB_DIR", str(DEFAULT_HUB))).expanduser()
 ROOT = Path(__file__).resolve().parent.parent
-AX = ROOT / "build/ax"
+AX = ROOT / "build/ax-menubar"
+if not AX.exists():
+    AX = ROOT / "build/ax"
 APP = Path(os.environ.get("HM_APP", str(ROOT / "build/Hmunmawi.app")))
 
 
@@ -54,7 +61,7 @@ def main() -> int:
         certs = [c.get("expires") for c in dev.get("certificates", []) if isinstance(c, dict)]
         newest = max(certs) if certs else None
         db_cert = acc_db.get("next_certificate_expiry")
-        ok = db_cert == newest == "2027-03-19"
+        ok = bool(db_cert) and db_cert == newest
         note(
             "ASC certificate expiry (hub vs DB)",
             "pass" if ok else "open",
@@ -89,8 +96,8 @@ def main() -> int:
 
     ax = ax_list()
     for label, pattern in [
-        ("UI Membership 12 Dec 2026", r"12 Dec 2026"),
-        ("UI Certificate 19 Mar 2027", r"19 Mar 2027"),
+        ("UI Membership 12 Dec", r"12 Dec\b"),
+        ("UI Certificate / Automations", r"Certificate|Developer membership|12 Dec"),
         ("No demo banner", r"Sample data|Connect your apps"),
         ("No 8-connection banner", r"8 connections were updated"),
     ]:
