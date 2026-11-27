@@ -238,4 +238,33 @@ import Testing
         let notes = await ctx.subscribers.fetchWhatsNew(app: "ExampleApp", appID: nil, model: ctx.model)
         #expect(notes == "Added live_whats_new correlation summary.")
     }
+
+    @Test func approveUsesSavedDraftEvenWhenPassedStaleJobValue() async throws {
+        let ctx = try await makeContext()
+        defer { try? FileManager.default.removeItem(at: ctx.dir) }
+
+        _ = ctx.subscribers.importCSV("alex@example.com", defaultApps: ["ExampleApp"])
+        let draft = await ctx.subscribers.draftNotification(
+            app: "ExampleApp",
+            version: "2.1.0",
+            whatsNew: "- Clean release notes.",
+            model: ctx.model
+        )
+        #expect(draft.ok)
+        let staleJob = try #require(ctx.model.waiting.first?.job)
+        #expect(staleJob.payload[path: "body"]?.string?.contains("20% off") == false)
+
+        // User edits and saves the draft with a forbidden spam phrase (not present in staleJob).
+        await ctx.model.updateReleaseNotifyDraft(
+            staleJob,
+            subject: "ACT NOW!",
+            body: "Hi,\n\n20% off Lifetime — BUY NOW!\n"
+        )
+        let latest = try #require(ctx.model.waiting.first?.job)
+        #expect(latest.payload[path: "body"]?.string?.contains("20% off Lifetime") == true)
+
+        // Calling approve with the stale pre-edit Job value must resolve the latest saved payload.
+        await ctx.model.approve(staleJob)
+        #expect(ctx.model.jobErrors[staleJob.id]?.contains("Blocked:") == true)
+    }
 }

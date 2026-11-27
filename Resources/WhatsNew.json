@@ -2,6 +2,16 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.6.4",
+      "items": [
+        {
+          "title": "Reliable Draft Saving Before Sending",
+          "detail": "Editing a release update, outreach email, or review reply in Log → Needs your OK now always sends your latest saved text, and Save draft dims once saved until you edit again.",
+          "action": "page:log"
+        }
+      ]
+    },
+    {
       "version": "1.6.3",
       "items": [
         {

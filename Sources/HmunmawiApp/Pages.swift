@@ -660,14 +660,18 @@ private struct OutreachWaitingRow: View {
     @State private var editing = false
     @State private var subject = ""
     @State private var bodyText = ""
+    @State private var savedSubject = ""
+    @State private var savedBody = ""
+    @State private var savingDraft = false
     @State private var mailCheck: Outreach.MailCheck?
 
     private var toAddress: String { action.job.payload[path: "to"]?.string ?? "" }
+    private var hasUnsavedChanges: Bool { subject != savedSubject || bodyText != savedBody }
 
     var body: some View {
         let isSending = model.isWaitingApproving(action.job.id)
         let isSkipping = model.isWaitingSkipping(action.job.id)
-        let isBusy = isSending || isSkipping
+        let isBusy = isSending || isSkipping || savingDraft
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -696,7 +700,13 @@ private struct OutreachWaitingRow: View {
                 }.buttonStyle(.pill).disabled(isBusy)
                 Button {
                     Task {
-                        if editing { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) }
+                        if editing && hasUnsavedChanges {
+                            savingDraft = true
+                            await model.updateOutreachDraft(action.job, subject: subject, body: bodyText)
+                            savedSubject = subject
+                            savedBody = bodyText
+                            savingDraft = false
+                        }
                         await model.approve(action.job)
                     }
                 } label: {
@@ -710,14 +720,34 @@ private struct OutreachWaitingRow: View {
                     .disabled(isBusy)
                 HStack {
                     Spacer()
-                    Button("Save draft") { Task { await model.updateOutreachDraft(action.job, subject: subject, body: bodyText) } }
-                        .buttonStyle(.pill).disabled(isBusy)
+                    Button {
+                        Task {
+                            savingDraft = true
+                            defer { savingDraft = false }
+                            await model.updateOutreachDraft(action.job, subject: subject, body: bodyText)
+                            savedSubject = subject
+                            savedBody = bodyText
+                        }
+                    } label: {
+                        WaitingBusyLabel(title: "Save draft", busyTitle: "Saving…", busy: savingDraft)
+                    }
+                    .buttonStyle(.pill)
+                    .disabled(isBusy || !hasUnsavedChanges)
                 }
             }
         }
         .onAppear {
-            subject = action.job.payload[path: "subject"]?.string ?? ""
-            bodyText = action.job.payload[path: "body"]?.string ?? ""
+            let s = action.job.payload[path: "subject"]?.string ?? ""
+            let b = action.job.payload[path: "body"]?.string ?? ""
+            subject = s; bodyText = b
+            savedSubject = s; savedBody = b
+        }
+        .onChange(of: action.job.payload) { _, newPayload in
+            let s = newPayload[path: "subject"]?.string ?? ""
+            let b = newPayload[path: "body"]?.string ?? ""
+            let wasDirty = hasUnsavedChanges
+            savedSubject = s; savedBody = b
+            if !wasDirty { subject = s; bodyText = b }
         }
         .task {
             let own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? ""
@@ -735,6 +765,9 @@ private struct ReleaseNotifyWaitingRow: View {
     @State private var editing = false
     @State private var subject = ""
     @State private var bodyText = ""
+    @State private var savedSubject = ""
+    @State private var savedBody = ""
+    @State private var savingDraft = false
     @State private var mailCheck: Outreach.MailCheck?
     @State private var sendingTest = false
     @State private var testNote: String?
@@ -742,6 +775,8 @@ private struct ReleaseNotifyWaitingRow: View {
     private var recipientCount: Int {
         Int(safe: action.job.payload[path: "recipient_count"]?.number ?? 0)
     }
+
+    private var hasUnsavedChanges: Bool { subject != savedSubject || bodyText != savedBody }
 
     private var selfTestAddress: String? {
         let candidates = [
@@ -758,7 +793,7 @@ private struct ReleaseNotifyWaitingRow: View {
     var body: some View {
         let isSendingBatch = model.isWaitingApproving(action.job.id)
         let isSkipping = model.isWaitingSkipping(action.job.id)
-        let isBusy = isSendingBatch || isSkipping
+        let isBusy = isSendingBatch || isSkipping || savingDraft
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -808,7 +843,13 @@ private struct ReleaseNotifyWaitingRow: View {
                 }.buttonStyle(.pill).disabled(isBusy)
                 Button {
                     Task {
-                        if editing { await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText) }
+                        if editing && hasUnsavedChanges {
+                            savingDraft = true
+                            await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText)
+                            savedSubject = subject
+                            savedBody = bodyText
+                            savingDraft = false
+                        }
                         await model.approve(action.job)
                     }
                 } label: {
@@ -822,9 +863,10 @@ private struct ReleaseNotifyWaitingRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if editing {
-                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder)
+                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder).disabled(isBusy)
                 TextEditor(text: $bodyText).font(.callout).frame(minHeight: 110, maxHeight: 200)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                    .disabled(isBusy)
                 if let lintProblem = ReleaseNotifySpamLint.problem(bodyText, subject: subject, wording: Wording.rules) {
                     Label(lintProblem, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
@@ -833,15 +875,34 @@ private struct ReleaseNotifyWaitingRow: View {
                 }
                 HStack {
                     Spacer()
-                    Button("Save draft") {
-                        Task { await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText) }
-                    }.buttonStyle(.pill)
+                    Button {
+                        Task {
+                            savingDraft = true
+                            defer { savingDraft = false }
+                            await model.updateReleaseNotifyDraft(action.job, subject: subject, body: bodyText)
+                            savedSubject = subject
+                            savedBody = bodyText
+                        }
+                    } label: {
+                        WaitingBusyLabel(title: "Save draft", busyTitle: "Saving…", busy: savingDraft)
+                    }
+                    .buttonStyle(.pill)
+                    .disabled(isBusy || !hasUnsavedChanges)
                 }
             }
         }
         .onAppear {
-            subject = action.job.payload[path: "subject"]?.string ?? ""
-            bodyText = action.job.payload[path: "body"]?.string ?? ""
+            let s = action.job.payload[path: "subject"]?.string ?? ""
+            let b = action.job.payload[path: "body"]?.string ?? ""
+            subject = s; bodyText = b
+            savedSubject = s; savedBody = b
+        }
+        .onChange(of: action.job.payload) { _, newPayload in
+            let s = newPayload[path: "subject"]?.string ?? ""
+            let b = newPayload[path: "body"]?.string ?? ""
+            let wasDirty = hasUnsavedChanges
+            savedSubject = s; savedBody = b
+            if !wasDirty { subject = s; bodyText = b }
         }
         .task {
             let own = UserDefaults.standard.string(forKey: Outreach.ownKey) ?? ""
@@ -975,6 +1036,10 @@ private struct ReviewReplyWaitingRow: View {
     let model: AppModel
     @State private var editing = false
     @State private var replyText = ""
+    @State private var savedReply = ""
+    @State private var savingDraft = false
+
+    private var hasUnsavedChanges: Bool { replyText != savedReply }
 
     private var reviewSummary: String {
         let title = action.job.payload[path: "review_title"]?.string ?? ""
@@ -985,7 +1050,7 @@ private struct ReviewReplyWaitingRow: View {
     var body: some View {
         let isPosting = model.isWaitingApproving(action.job.id)
         let isSkipping = model.isWaitingSkipping(action.job.id)
-        let isBusy = isPosting || isSkipping
+        let isBusy = isPosting || isSkipping || savingDraft
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -1008,7 +1073,12 @@ private struct ReviewReplyWaitingRow: View {
                 }.buttonStyle(.pill).disabled(isBusy)
                 Button {
                     Task {
-                        if editing { await model.updateReviewReplyDraft(action.job, reply: replyText) }
+                        if editing && hasUnsavedChanges {
+                            savingDraft = true
+                            await model.updateReviewReplyDraft(action.job, reply: replyText)
+                            savedReply = replyText
+                            savingDraft = false
+                        }
                         await model.approve(action.job)
                     }
                 } label: {
@@ -1018,14 +1088,33 @@ private struct ReviewReplyWaitingRow: View {
             if editing {
                 TextEditor(text: $replyText).font(.callout).frame(minHeight: 90, maxHeight: 160)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                    .disabled(isBusy)
                 HStack {
                     Spacer()
-                    Button("Save draft") { Task { await model.updateReviewReplyDraft(action.job, reply: replyText) } }.buttonStyle(.pill)
+                    Button {
+                        Task {
+                            savingDraft = true
+                            defer { savingDraft = false }
+                            await model.updateReviewReplyDraft(action.job, reply: replyText)
+                            savedReply = replyText
+                        }
+                    } label: {
+                        WaitingBusyLabel(title: "Save draft", busyTitle: "Saving…", busy: savingDraft)
+                    }
+                    .buttonStyle(.pill)
+                    .disabled(isBusy || !hasUnsavedChanges)
                 }
             }
         }
         .onAppear {
-            replyText = action.job.payload[path: "reply"]?.string ?? ""
+            let r = action.job.payload[path: "reply"]?.string ?? ""
+            replyText = r; savedReply = r
+        }
+        .onChange(of: action.job.payload) { _, newPayload in
+            let r = newPayload[path: "reply"]?.string ?? ""
+            let wasDirty = hasUnsavedChanges
+            savedReply = r
+            if !wasDirty { replyText = r }
         }
     }
 }

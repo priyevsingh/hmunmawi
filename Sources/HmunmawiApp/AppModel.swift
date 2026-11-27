@@ -602,7 +602,10 @@ final class AppModel {
             // runs every 20 s.
             // Sample data is never something to approve: its made-up jobs are not shown as waiting for you.
             if isDemo { actions = [] }
-            if actions.map({ "\($0.id)|\($0.title)|\($0.detail)" }) != waiting.map({ "\($0.id)|\($0.title)|\($0.detail)" }) { waiting = actions }
+            if actions.map({ "\($0.id)|\($0.job.updatedAt)|\($0.title)|\($0.detail)" }) != waiting.map({ "\($0.id)|\($0.job.updatedAt)|\($0.title)|\($0.detail)" })
+                || actions.map(\.job.payload) != waiting.map(\.job.payload) {
+                waiting = actions
+            }
             // Under 1 GB free, saving can fail: say so instead of failing quietly.
             let free = (try? URL.applicationSupportDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
                 .volumeAvailableCapacityForImportantUsage ?? Int64.max
@@ -1465,12 +1468,16 @@ final class AppModel {
 
     /// A short note while the app does something slow at launch (e.g. "Upgrading database…").
     var busyNote: String?
-    func approve(_ job: Job) async {
+    func approve(_ initialJob: Job) async {
         // One approval per item: a double click (or owner and agent at once) must not run it twice. Checked and
         // claimed before any await, so the main actor can't interleave two runs.
-        guard !approving.contains(job.id), !skipping.contains(job.id) else { return }
-        jobErrors.removeValue(forKey: job.id)
-        approving.insert(job.id); defer { approving.remove(job.id) }
+        guard !approving.contains(initialJob.id), !skipping.contains(initialJob.id) else { return }
+        jobErrors.removeValue(forKey: initialJob.id)
+        approving.insert(initialJob.id); defer { approving.remove(initialJob.id) }
+        // Always read the latest waiting payload from the store (or refreshed waiting list) by ID so a SwiftUI closure
+        // holding a pre-edit Job value never sends stale draft text.
+        let storeJob = try? await currentStore?.jobs(in: .waitingApproval).first(where: { $0.id == initialJob.id })
+        let job = storeJob ?? waiting.first(where: { $0.job.id == initialJob.id })?.job ?? initialJob
         // An agent's request you approved: the app runs it itself, then marks it done.
         if job.kind == "agent.request", case .object(let p) = job.payload {
             var args: [String: String] = [:]
