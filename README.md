@@ -473,8 +473,7 @@ flowchart LR
 <details>
 <summary><b>About the name</b></summary>
 
-"Hmun" means place and "mawi" means beautiful in Mizo, the language of Mizoram, a small, green, hilly state in the
-far north-east of India known for its rolling blue hills, bamboo forests and calm way of life.
+"Hmun" means place and "mawi" means beautiful in Mizo — literally "beautiful place", evoking rolling blue hills, bamboo forests, and a calm way of life.
 
 That calm is the point. An indie developer drowns in dashboards: App Store Connect, analytics, search, crash
 reports, social, email. Hmunmawi is one place where all of it settles into a single answer: **Win, Worry, Next**.
