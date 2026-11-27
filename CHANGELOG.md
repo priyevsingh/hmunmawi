@@ -2,6 +2,15 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.6.1 (build 161), 27 Nov 2026
+
+**Improved**
+- **Today & Story ranking, app labels & baseline deltas (`StoryBoard`, `TodayStory`, `Insights`):** Unified `rankedWorries` across `StoryBoard` and the morning story headline, ranked revenue and subscriber drops above routine declared items and review-drought notices, added clear app badges and channel icons (`magnifyingglass`, `globe`, `play.rectangle.fill`, `bubble.left.and.text.bubble.fill`) to finding rows, and surfaced baseline percent deltas cleanly.
+- **Automation timeline hover, future slots & Dark Mode clarity (`AutomationDay`, `AutomationsPage`):** Replaced 1D clamped bead lanes with collision-free 2D bead placement (`layoutBeads`, up to 7 vertical lanes plus offset columns) so every `12 am` dot is individually hoverable, added 2D nearest-dot hover (`hoveredID`) with an instant floating job callout pill synced to the detail card, gated future `JobLists` slots today (`slotAt > date`) so scheduled afternoon/evening runs stay `"Later today"` instead of `"Ran"`, and boosted Dark Mode contrast across sky beads, `DotKey`, and `LivingFlow`.
+- **Outreach detail wrapping & README clarity (`OutreachSheet`, `FlowLayoutRow`, `README`):** Reused `FlowLayoutRow` to wrap checkboxes and `DatePicker` pairs in `OutreachDetail`, removed middle/line-limit truncation on campaign and suggestion links so full URLs remain visible and selectable, and updated [README.md](README.md) headlines to reflect outcomes across both Apple apps and website projects.
+
+Hmunmawi still does everything it did in 1.6.0. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.6.0 (build 160), 26 Nov 2026
 
 **New**

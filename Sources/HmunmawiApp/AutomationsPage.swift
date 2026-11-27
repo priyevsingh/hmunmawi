@@ -223,9 +223,16 @@ struct LivingFlow: View {
             Text(label).font(.callout.weight(.medium)).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
             if let status {
-                Circle().fill(Self.statusColor(status)).frame(width: 8, height: 8)
-                    .ripple(Self.statusColor(status), trigger: status)
-                    .help(Self.statusText(status))
+                Group {
+                    if status == "later" {
+                        Circle().strokeBorder(Brand.secondaryText, lineWidth: 1.4)
+                    } else {
+                        Circle().fill(Self.statusColor(status))
+                    }
+                }
+                .frame(width: 8, height: 8)
+                .ripple(Self.statusColor(status), trigger: status)
+                .help(Self.statusText(status))
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -342,8 +349,8 @@ struct LivingFlow: View {
                 Spacer()
                 Text("Hover to follow a path · click a routine to open it")
             }
-            HStack(spacing: 8) {
-                Text("Dots: what happened today").font(.callout.weight(.semibold))
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Dots: what happened today").font(.callout.weight(.semibold)).fixedSize()
                 DotKey()
             }
         }
@@ -359,7 +366,7 @@ struct LivingFlow: View {
     }
 
     static func statusColor(_ s: String) -> Color {
-        switch s { case "ran": Brand.good; case "failed": Brand.bad; case "missed": Brand.caution; case "due": Brand.Category.web; default: Brand.secondaryText.opacity(0.5) }
+        switch s { case "ran": Brand.good; case "failed": Brand.bad; case "missed": Brand.caution; case "due": Brand.Category.web; default: Brand.adaptive(light: (0.45, 0.46, 0.50), dark: (0.58, 0.60, 0.65)) }
     }
 
     static func statusText(_ s: String) -> String {

@@ -176,7 +176,7 @@ struct OutreachSheet: View {
                         .background(Brand.caution.opacity(0.18), in: Capsule()).foregroundStyle(Brand.caution) }
                 }
                 Text(s.kind == "thread" ? Self.threadWords(s) : (Self.words[s.kind] ?? s.kind)).font(.callout)
-                if let l = s.link, let u = InputCheck.httpsURL(l) { Link(l, destination: u).font(.callout).lineLimit(1).truncationMode(.middle) }
+                if let l = s.link, let u = InputCheck.httpsURL(l) { Link(l, destination: u).font(.callout).fixedSize(horizontal: false, vertical: true) }
                 Text([s.mailSubject.map { "“\($0)”" }, s.mailFrom, s.why].compactMap { $0 }.joined(separator: " · "))
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if isApplying {
@@ -374,7 +374,7 @@ struct OutreachDetail: View {
             }
             if let f = Outreach.side().feeds?[item.id] {
                 Text("Watching \(f.url) for \(item.app) until \(Outreach.prettyDay(f.until))\(f.checked.map { ", last read \(Outreach.prettyDay($0))" } ?? "")")
-                    .font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
                 if let c = item.contact { GridRow { Text("Went to").gridColumnAlignment(.trailing); Text(c).textSelection(.enabled) } }
@@ -387,11 +387,16 @@ struct OutreachDetail: View {
                 }
                 GridRow {
                     Text("")
-                    HStack(spacing: 16) {
+                    FlowLayoutRow(spacing: 14) {
                         Toggle("Don't contact again", isOn: Binding(get: { extra.dnc == true }, set: { extra.dnc = $0 ? true : nil }))
+                            .fixedSize(horizontal: true, vertical: false)
                         Toggle("Under embargo", isOn: Binding(get: { extra.embargo == true }, set: { extra.embargo = $0 ? true : nil }))
-                        Toggle("About a release on", isOn: $hasLaunch)
-                        DatePicker("Release", selection: $launch, displayedComponents: .date).labelsHidden().disabled(!hasLaunch)
+                            .fixedSize(horizontal: true, vertical: false)
+                        HStack(spacing: 8) {
+                            Toggle("About a release on", isOn: $hasLaunch)
+                            DatePicker("Release", selection: $launch, displayedComponents: .date).labelsHidden().disabled(!hasLaunch)
+                        }
+                        .fixedSize()
                     }
                 }
                 GridRow {
@@ -405,14 +410,15 @@ struct OutreachDetail: View {
                     }
                 }
                 ForEach(extra.coverage ?? [], id: \.self) { c in
-                    GridRow { Text(""); Link(c.url, destination: URL(string: c.url) ?? URL(string: "https://apple.com")!).font(.callout) }
+                    GridRow { Text(""); Link(c.url, destination: URL(string: c.url) ?? URL(string: "https://apple.com")!).font(.callout).fixedSize(horizontal: false, vertical: true) }
                 }
                 if let appID {
                     GridRow {
                         Text("Link")
-                        HStack {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
                             let link = Outreach.campaignLink(appID: appID, outlet: item.outlet, app: item.app)
-                            Text(link).font(.callout.monospaced()).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
+                            Text(link).font(.callout.monospaced()).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 8)
                             Button("Copy") { copy(link) }.help("An App Store link that counts the downloads this outlet brings")
                         }
                     }
@@ -420,7 +426,7 @@ struct OutreachDetail: View {
             }
             if extra.embargo == true, inReview {
                 Label("\(item.app) is still in App Review: don't send anything under embargo until it's approved.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout).foregroundStyle(Brand.caution)
+                    .font(.callout).foregroundStyle(Brand.caution).fixedSize(horizontal: false, vertical: true)
             }
             Divider()
             if extra.dnc == true {

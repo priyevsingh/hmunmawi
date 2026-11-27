@@ -323,18 +323,19 @@ private struct ItemDetail: View {
     }
 }
 
-/// Wraps capsules onto as many lines as needed.
-private struct FlowLayoutRow: Layout {
+/// Wraps controls or capsules onto as many lines as needed.
+struct FlowLayoutRow: Layout {
     var spacing: CGFloat = 8
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 800
-        var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0
+        let limit = proposal.width ?? 800
+        var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0, maxLineWidth: CGFloat = 0
         for s in subviews {
             let size = s.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > width { x = 0; y += line + spacing; line = 0 }
+            if x > 0 && x + size.width > limit { x = 0; y += line + spacing; line = 0 }
+            maxLineWidth = max(maxLineWidth, x + size.width)
             x += size.width + spacing; line = max(line, size.height)
         }
-        return CGSize(width: width, height: y + line)
+        return CGSize(width: proposal.width ?? maxLineWidth, height: y + line)
     }
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var x = bounds.minX, y = bounds.minY, line: CGFloat = 0
