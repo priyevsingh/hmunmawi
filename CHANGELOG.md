@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.6.4 (build 164), 27 Nov 2026
+
+**Fixed**
+- **Waiting draft edits & Save draft state (`AppModel`, `Pages`):** Updated `AppModel.refreshOnce()` to compare `job.updatedAt` and `job.payload` when refreshing `waiting`, and updated `AppModel.approve(_:)` to fetch the latest `waiting_approval` job by ID from the store before sending `outreach.send`, `release.notify`, or `review.reply` jobs so stale SwiftUI closures never send pre-edit text. Added dirty-state tracking (`hasUnsavedChanges`) to `OutreachWaitingRow`, `ReleaseNotifyWaitingRow`, and `ReviewReplyWaitingRow` so **Save draft** disables itself after saving until edited again, and **Send** / **Send batch** / **Post reply** auto-save any unsaved inline edits first.
+- **Regression test (`ReleaseSubscribersAppTests`):** Added `approveUsesSavedDraftEvenWhenPassedStaleJobValue()`.
+
+Hmunmawi still does everything it did in 1.6.3. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.6.3 (build 163), 27 Nov 2026
 
 **Improved**
