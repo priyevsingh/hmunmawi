@@ -606,6 +606,9 @@ final class AppModel {
                 || actions.map(\.job.payload) != waiting.map(\.job.payload) {
                 waiting = actions
             }
+            if !isDemo {
+                Task { await DealListings.shared.pollOpenPRsIfDue() }
+            }
             // Under 1 GB free, saving can fail: say so instead of failing quietly.
             let free = (try? URL.applicationSupportDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
                 .volumeAvailableCapacityForImportantUsage ?? Int64.max
@@ -1566,6 +1569,28 @@ final class AppModel {
             }
             return
         }
+        // Deal directory GitHub PR approved by the owner.
+        if job.kind == "deal.pr" {
+            let res = await DealListings.shared.executeApprovedPRJob(job, model: self)
+            if !res.ok {
+                setJobError(res.note, for: job.id)
+                return
+            }
+            await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
+                "ok": .bool(true), "pr_url": .string(res.prURL ?? ""), "note": .string(String(res.note.prefix(500)))])) }
+            return
+        }
+        // Deal directory email pitch approved by the owner.
+        if job.kind == "deal.email" {
+            let res = await DealListings.shared.executeApprovedEmailJob(job)
+            if !res.ok {
+                setJobError(res.note, for: job.id)
+                return
+            }
+            await act { try await $0.resolveApproved(job.id, ok: true, by: "you", detail: .object([
+                "ok": .bool(true), "note": .string(String(res.note.prefix(500)))])) }
+            return
+        }
         // Proactive review reply approved by the owner: post publicly on App Store Connect.
         if job.kind == "review.reply", case .object(let p) = job.payload {
             let rid = p["review_id"]?.string ?? ""
@@ -1594,9 +1619,17 @@ final class AppModel {
         await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
     }
 
+    /// Saves edits to a waiting `deal.email` pitch draft before sending.
+    func updateDealEmailDraft(_ job: Job, subject: String, body: String) async {
+        guard job.kind == "deal.email", case .object(var p) = job.payload else { return }
+        p["subject"] = .string(String(subject.prefix(300)))
+        p["body"] = .string(String(body.prefix(10_000)))
+        await act { try await $0.updateWaitingPayload(job.id, payload: .object(p)) }
+    }
+
     /// Critical actions that are NEVER approved by "Approve all non-critical" and always wait for individual owner review.
     nonisolated static func isCriticalWaiting(_ job: Job) -> Bool {
-        if job.kind == "outreach.send" || job.kind == "review.reply" || job.kind == "release.notify" { return true }
+        if job.kind == "outreach.send" || job.kind == "review.reply" || job.kind == "release.notify" || job.kind == "deal.pr" || job.kind == "deal.email" { return true }
         if job.kind == "asc.fix" {
             let fix = job.payload[path: "params.fix"]?.string ?? job.payload[path: "fix"]?.string ?? ""
             if fix == "submit" || fix == "review_reply" { return true }

@@ -13,6 +13,7 @@ struct OfferCodesPart: View {
     @State private var found: [URL]?
     @State private var searching = false
     @State private var webImport = false
+    @State private var showDeals = false
     @State private var campaign = ""
 
     /// The App Store id for this app name (from App Store Connect snapshots).
@@ -46,10 +47,23 @@ struct OfferCodesPart: View {
                     Button { find() } label: { Label(searching ? "Finding" : "Find CSV files", systemImage: "magnifyingglass") }
                         .disabled(searching)
                     Button { webImport = true } label: { Label("Import from a web page", systemImage: "safari") }
+                    Button { showDeals = true } label: { Label("Deal directories", systemImage: "megaphone") }
                     Text("App Store Connect → your in-app purchase → Offer Codes → export codes (CSV)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.pill)
+                .sheet(isPresented: $showDeals) {
+                    let firstCustom = codes.custom(app: appID).first
+                    let redeem = firstCustom.map { "https://apps.apple.com/redeem?ctx=offercodes&id=\(appID)&code=\($0.code)" }
+                    DealListingsView(
+                        appName: app,
+                        appStoreID: appID,
+                        initialOfferCode: firstCustom?.code,
+                        initialRedeemURL: redeem,
+                        initialEndDate: firstCustom?.expires,
+                        model: model
+                    )
+                }
                 if let note = codes.scanNote { Text(note).font(.callout).foregroundStyle(.secondary) }
                 if !all.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {

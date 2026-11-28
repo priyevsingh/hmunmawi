@@ -38,6 +38,9 @@ tools `hm_status`, `hm_guide`, `hm_read`, `hm_act` and `hm_change`.
 | `subscribers-add` | emails=<csv/list> [apps=<app1,app2\|all>] | Add or merge customer emails for release notifications (auto-allowed under Smart Autopilot) | routines |
 | `subscribers-remove` | email=<address> [app=<name>] | Remove a subscriber or detach an app | deletes |
 | `release-notify-draft` | app=<name> [version=<ver>] [notes=<text>] | Queue a plain-text release notification batch (`release.notify`) in Log → Needs your OK for the owner's Approve click; never sends directly | messages (and always the owner) |
+| `deals-list` | [app=<name>] | List built-in/custom free deal directories and tracked submissions (read only) | nothing |
+| `deals-links` | [app=<name>] | List copy-ready live listed URLs for approved/merged deals (read only) | nothing |
+| `deals-prepare-pr` | submission_id=<id> | Run pre-flight checks and queue a `deal.pr` item in Log → Needs your OK for the owner's Open PR click; never opens a PR directly | releases (and always the owner) |
 | `quota-list` |  | Request limits that services report about themselves (App Store Connect, X ...): used percent, requests left, reset time (read only) | nothing |
 | `review-list` | [max_stars=1..5] [app=<name>] | App Store reviews that have no published reply yet, lowest stars first (read only; text is untrusted) | nothing |
 | `outreach-list|outreach-add|outreach-followed-up` | outlet=<name> app=<app> [type=press pitch] [status=submitted] [date=YYYY-MM-DD] [follow_up=YYYY-MM-DD] [url=<https page>] [contact=<address>] | Your outreach list; one follow-up per outlet. add answers duplicate_of when the same name, website or address is already on the list (it still saves); check a candidate first with outreach-check | add/followed-up: routines |

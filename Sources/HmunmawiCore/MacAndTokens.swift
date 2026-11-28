@@ -78,6 +78,16 @@ public enum JobText {
                 ? "Release update ready: \(target) · \(count) subscriber\(count == 1 ? "" : "s")"
                 : "Release update ready: \(target)"
         }
+        if job.kind == "deal.pr", case .object(let p) = job.payload {
+            let dirName = p["directory_name"]?.string ?? "directory"
+            let app = p["app"]?.string ?? "App"
+            return "Deal PR ready: \(app) → \(dirName)"
+        }
+        if job.kind == "deal.email", case .object(let p) = job.payload {
+            let dirName = p["directory_name"]?.string ?? "directory"
+            let app = p["app"]?.string ?? "App"
+            return "Deal pitch ready: \(app) → \(dirName)"
+        }
         let channel = channels[job.resource] ?? job.resource
         return job.kind == "notify" ? "Send an alert by \(channel)" : "Run “\(job.kind)” with \(channel)"
     }

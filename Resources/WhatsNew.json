@@ -2,6 +2,16 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.7.0",
+      "items": [
+        {
+          "title": "Deal & Directory Launches",
+          "detail": "Match your apps and offer codes to free deal directories, run instant pre-flight link and icon checks, prepare gated GitHub PRs in Log → Needs your OK, and copy your Live Listed Links in one click.",
+          "action": "page:apps"
+        }
+      ]
+    },
+    {
       "version": "1.6.4",
       "items": [
         {
