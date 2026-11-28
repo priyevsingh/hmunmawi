@@ -79,7 +79,7 @@ func printJSON(_ obj: Any) {
 
 // MARK: MCP (stdio, JSON-RPC 2.0). Works with stateless (2026-07-28) and older clients that still initialize.
 
-let readCommands: Set<String> = ["status", "review-list", "quota-list", "data-read", "release-timeline", "routine-list", "bank-list", "outreach-list", "change-list", "metric-list", "usage", "ai-pause-status", "ai-pause-check", "promo-status", "shield", "bot-setup", "services", "links-dead", "lint-text", "outreach-check", "python-check", "plan-list", "extras", "mail-status", "wall-plan", "subscribers-list"]
+let readCommands: Set<String> = ["status", "review-list", "quota-list", "data-read", "release-timeline", "routine-list", "bank-list", "outreach-list", "change-list", "metric-list", "usage", "ai-pause-status", "ai-pause-check", "promo-status", "shield", "bot-setup", "services", "links-dead", "lint-text", "outreach-check", "python-check", "plan-list", "extras", "mail-status", "wall-plan", "subscribers-list", "deals-list", "deals-links"]
 /// Commands that remove or undo something: they only run through hm_change, so a client can show them as destructive.
 let changeCommands: Set<String> = ["remove-connection", "routine-remove", "change-remove", "promo-undo", "plan-remove", "subscribers-remove"]
 /// Everyday commands that add or run things (hm_act). Listed so the tool's description names every one.
@@ -87,9 +87,9 @@ let actCommands: [String] = ["refresh", "check", "set", "send-test", "publish", 
                              "job-run", "job-pause", "job-resume", "routine-run", "routine-pause", "routine-resume", "routine-add", "routine-set",
                              "bank-add", "outreach-add", "outreach-followed-up", "outreach-send", "change-add", "plan-add", "approve", "skip",
                              "shield-fix", "review-reply", "promo-next", "promo-mark", "ai-pause-set", "ai-pause-clear", "deploy-redeploy", "python-repair",
-                             "subscribers-add", "release-notify-draft"]
+                             "subscribers-add", "release-notify-draft", "deals-prepare-pr"]
 /// Always wait for the owner's OK, even when allowed, in Smart Autopilot, or in Full Autopilot.
-let alwaysAskCommands = ["deploy-redeploy", "python-repair", "shield-fix item=submit", "outreach-send", "release-notify-draft", "review-reply", "set-key", "publish", "remove-connection", "routine-remove", "change-remove", "plan-remove"]
+let alwaysAskCommands = ["deploy-redeploy", "python-repair", "shield-fix item=submit", "outreach-send", "release-notify-draft", "deals-prepare-pr", "review-reply", "set-key", "publish", "remove-connection", "routine-remove", "change-remove", "plan-remove"]
 
 let tools: [[String: Any]] = [
     ["name": "hm_status",

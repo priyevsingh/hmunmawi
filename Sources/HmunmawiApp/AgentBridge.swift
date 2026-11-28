@@ -469,7 +469,7 @@ final class AgentBridge {
     /// release checks, watched changes) say so, the same way state.json labels its fields (security audit, Nov 2026).
     static let untrustedReplies: Set<String> = ["routine-list", "bot-setup", "bank-list", "outreach-list", "change-list",
                                                 "metric-list", "shield", "usage", "ai-pause-status", "ai-pause-check",
-                                                "promo-status", "status", "review-list", "data-read", "subscribers-list"]
+                                                "promo-status", "status", "review-list", "data-read", "subscribers-list", "deals-list", "deals-links"]
     /// An AI account name for the pause file: 1-32 letters, digits, - or _ (default "team").
     nonisolated static func aiAccount(_ raw: String?) -> String? {
         let v = (raw ?? "team").trimmingCharacters(in: .whitespaces)
@@ -486,7 +486,7 @@ final class AgentBridge {
     /// Critical actions that ALWAYS wait for owner approval in Log → Waiting (even in Smart Autopilot or Full Autopilot).
     nonisolated static func isAlwaysAsk(command: String, args: [String: String]) -> Bool {
         if command == "shield-fix", InputRule.identifier.clean(args["item"] ?? "").lowercased() == "submit" { return true }
-        if ["deploy-redeploy", "python-repair", "outreach-send", "release-notify-draft", "review-reply", "set-key", "publish",
+        if ["deploy-redeploy", "python-repair", "outreach-send", "release-notify-draft", "deals-prepare-pr", "review-reply", "set-key", "publish",
             "remove-connection", "routine-remove", "change-remove", "plan-remove"].contains(command) {
             return true
         }
@@ -564,6 +564,7 @@ final class AgentBridge {
         case "subscribers-add": .routines
         case "subscribers-remove": .deletes
         case "release-notify-draft": .messages
+        case "deals-prepare-pr": .releases
         case "outreach-send": .messages
         case "change-remove": .deletes
         case "approve", "skip": .decisions
@@ -994,6 +995,53 @@ final class AgentBridge {
             var out: [String: Any] = ["ok": true, "result": res.note]
             if let jobID = res.jobID { out["job_id"] = jobID }
             return out
+        case "deals-list":
+            let appFilter = args["app"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let dirs = DealListings.shared.book.allDirectories.map { d -> [String: Any] in
+                [
+                    "id": d.id,
+                    "name": d.name,
+                    "kind": d.kind.rawValue,
+                    "platforms": d.platforms.map(\.rawValue),
+                    "free": d.isFree,
+                    "submit_url": d.submitURL,
+                ]
+            }
+            let subs = DealListings.shared.book.submissions.filter {
+                appFilter.isEmpty || $0.appName.caseInsensitiveCompare(appFilter) == .orderedSame
+            }.map { s -> [String: Any] in
+                [
+                    "id": s.id,
+                    "app": s.appName,
+                    "directory": s.directoryID,
+                    "status": s.status.rawValue,
+                    "code": s.offerCode ?? "",
+                    "end_date": s.endDate,
+                    "pr_url": s.prURL ?? "",
+                    "live_url": s.liveListingURL ?? "",
+                ]
+            }
+            return ["ok": true, "result": ["directories": dirs, "submissions": subs]]
+        case "deals-links":
+            let appFilter = args["app"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rows = DealListings.shared.liveListedSubmissions(appName: appFilter).map { s -> [String: Any] in
+                [
+                    "app": s.appName,
+                    "directory": DealListings.shared.book.directory(id: s.directoryID)?.name ?? s.directoryID,
+                    "live_url": s.liveListingURL ?? "",
+                    "code": s.offerCode ?? "",
+                    "end_date": s.endDate,
+                ]
+            }
+            return ["ok": true, "result": rows]
+        case "deals-prepare-pr":
+            let subID = args["submission_id"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !subID.isEmpty else { return ["ok": false, "error": "Give submission_id=<id>."] }
+            let res = await DealListings.shared.preparePRJob(submissionID: subID, model: model)
+            guard res.ok else { return ["ok": false, "error": res.note] }
+            var out: [String: Any] = ["ok": true, "result": res.note]
+            if let jobID = res.jobID { out["job_id"] = jobID }
+            return out
         case "job-run", "job-pause", "job-resume":
             let label = InputRule.identifier.clean(args["label"] ?? "")
             guard !label.isEmpty else { return ["ok": false, "error": "Give the job's label."] }
@@ -1008,7 +1056,7 @@ final class AgentBridge {
             guard let id = Int64(args["id"] ?? ""), let w = model.waiting.first(where: { $0.id == id }) else { return ["ok": false, "error": "No waiting item with that id."] }
             // An agent never approves an agent's request, an App Store Connect write, an outbound outreach email,
             // a release notification batch, or a public review reply: those are the owner's alone, even with "Approve or skip" allowed or in Full Autopilot.
-            if command == "approve", ["agent.request", "asc.fix", "outreach.send", "release.notify", "review.reply"].contains(w.job.kind) {
+            if command == "approve", ["agent.request", "asc.fix", "outreach.send", "release.notify", "deal.pr", "deal.email", "review.reply"].contains(w.job.kind) {
                 return ["ok": false, "error": "Only the owner can approve agent requests, App Store Connect changes, outbound outreach, release notifications, and review replies (Log → Waiting)."]
             }
             if command == "approve" { await model.approve(w.job) } else { await model.skip(w.job) }
@@ -1277,6 +1325,8 @@ enum AgentGuide {
         ["name": "subscribers-add", "args": "emails=<csv/list> [apps=<app1,app2|all>]", "does": "Add or merge customer emails for release notifications (auto-allowed under Smart Autopilot)", "needs": "routines"],
         ["name": "subscribers-remove", "args": "email=<address> [app=<name>]", "does": "Remove a subscriber or detach an app", "needs": "deletes"],
         ["name": "release-notify-draft", "args": "app=<name> [version=<ver>] [notes=<text>]", "does": "Queue a plain-text release notification batch (`release.notify`) in Log → Needs your OK for the owner's Approve click; never sends directly", "needs": "messages (and always the owner)"],
+        ["name": "deals-list|deals-links", "args": "[app=<name>]", "does": "List free deal directories and tracked submissions (`deals-list`), or copy-ready live listed URLs (`deals-links`) (read only)", "needs": "nothing"],
+        ["name": "deals-prepare-pr", "args": "submission_id=<id>", "does": "Run pre-flight checks and queue a `deal.pr` item in Log → Needs your OK for the owner's Open PR click; never opens a PR directly", "needs": "releases (and always the owner)"],
         ["name": "routine-add|routine-set (a bot's job)", "args": "[id=<id>] title=<name> who=<bot|cloud|you|mac> [at=HH:MM] [days=Mon,Thu] [detail=<what to do>] [proof=<file it writes; {date} = YYYY-MM-DD>] [late=<minutes, 15-720; 0 = off>]", "does": "List a job another runner does (no does=); with proof and late, the owner is told when its file hasn't arrived", "needs": "routines"],
         ["name": "bot-setup", "does": "The message to paste into a bot without a shell (its jobs, the shared folder, the files to write), and whether it changed since the owner last copied it", "needs": "nothing"],
         ["name": "metric-list", "does": "Numbers a change can be judged on (key and name)", "needs": "nothing"],

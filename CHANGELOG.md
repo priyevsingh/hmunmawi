@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.7.0 (build 170), 28 Nov 2026
+
+**Added**
+- **Deal & Directory Launches (`DealListings`, `DealListingsApp`, `DealListingsView`, `OfferCodesView`, `Pages`, `AppModel`, `AgentBridge`):** Added built-in free directory catalog (`Indie App Sales`, `Indie Goodies`, `Rare Big Deal`, `Awesome BFCM`, and Mac-only `Apps.Deals`) with platform filtering, pure-Swift schema/date/quota validation, off-main-actor `HEAD`-first `URLSession` (`200 OK`) & `ImageIO` (`>= 128px`) pre-flight checks with a 10-minute URL cache, 1-click self-serve copy blocks, gated `deal.pr` / `deal.email` approval rows in **Log → Needs your OK** (using `--depth 1` shallow clones), a zero-lag `ETag` (`304 Not Modified`) background PR watcher, a dedicated **Live Listed Links** copy panel, and `hm deals-list` / `hm deals-links` / `hm deals-prepare-pr` CLI & MCP tools.
+- **Native-only dependency rule (`AGENTS.md`):** Codified that Hmunmawi uses Apple native frameworks and libraries (plus existing pinned `Sparkle 2.10.1`) with zero `npm`/Node or unapproved third-party packages.
+
+Hmunmawi still does everything it did in 1.6.4. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.6.4 (build 164), 27 Nov 2026
 
 **Fixed**

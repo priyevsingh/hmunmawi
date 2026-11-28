@@ -379,6 +379,10 @@ struct InboxPage: View {
                                 ReleaseNotifyWaitingRow(action: action, model: model)
                             } else if action.job.kind == "review.reply" {
                                 ReviewReplyWaitingRow(action: action, model: model)
+                            } else if action.job.kind == "deal.pr" {
+                                DealPRWaitingRow(action: action, model: model)
+                            } else if action.job.kind == "deal.email" {
+                                DealEmailWaitingRow(action: action, model: model)
                             } else {
                                 let isApproving = model.isWaitingApproving(action.job.id)
                                 let isSkipping = model.isWaitingSkipping(action.job.id)
@@ -1115,6 +1119,145 @@ private struct ReviewReplyWaitingRow: View {
             let wasDirty = hasUnsavedChanges
             savedReply = r
             if !wasDirty { replyText = r }
+        }
+    }
+}
+
+/// Waiting row for a `deal.pr` item: shows target repo/path + exact diff preview before opening a GitHub PR.
+private struct DealPRWaitingRow: View {
+    let action: WaitingAction
+    let model: AppModel
+    @State private var showPreview = true
+
+    private var repo: String { action.job.payload[path: "repo"]?.string ?? "" }
+    private var targetPath: String { action.job.payload[path: "target_path"]?.string ?? "" }
+    private var preview: String { action.job.payload[path: "preview"]?.string ?? "" }
+
+    var body: some View {
+        let isApproving = model.isWaitingApproving(action.job.id)
+        let isSkipping = model.isWaitingSkipping(action.job.id)
+        let isBusy = isApproving || isSkipping
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title).font(.body.weight(.medium))
+                    Text("\(repo) · \(targetPath)")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if isApproving {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Opening GitHub pull request…").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let err = model.jobErrors[action.job.id] {
+                        WaitingErrorBanner(text: err)
+                    }
+                }
+                Spacer()
+                Button(showPreview ? "Hide diff" : "Preview") { showPreview.toggle() }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.skip(action.job) } } label: {
+                    WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: isSkipping)
+                }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.approve(action.job) } } label: {
+                    WaitingBusyLabel(title: "Open PR", busyTitle: "Opening…", busy: isApproving)
+                }.buttonStyle(.pillProminent).disabled(isBusy)
+            }
+            if showPreview && !preview.isEmpty {
+                Text(preview)
+                    .font(.caption.monospaced())
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.4)))
+                    .textSelection(.enabled)
+            }
+        }
+    }
+}
+
+/// Waiting row for a `deal.email` item: supports inline Subject/Body editing with dirty-state Save draft before sending.
+private struct DealEmailWaitingRow: View {
+    let action: WaitingAction
+    let model: AppModel
+    @State private var editing = false
+    @State private var subject = ""
+    @State private var bodyText = ""
+    @State private var savedSubject = ""
+    @State private var savedBody = ""
+    @State private var savingDraft = false
+
+    private var hasUnsavedChanges: Bool { subject != savedSubject || bodyText != savedBody }
+    private var recipient: String { action.job.payload[path: "to"]?.string ?? "" }
+
+    var body: some View {
+        let isSending = model.isWaitingApproving(action.job.id)
+        let isSkipping = model.isWaitingSkipping(action.job.id)
+        let isBusy = isSending || isSkipping || savingDraft
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action.title).font(.body.weight(.medium))
+                    Text("To \(recipient) · via \(MailSender.modeDescription)")
+                        .font(.callout).foregroundStyle(.secondary)
+                    if isSending {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Sending deal pitch…").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let err = model.jobErrors[action.job.id] {
+                        WaitingErrorBanner(text: err)
+                    }
+                }
+                Spacer()
+                Button(editing ? "Hide" : "Edit") { editing.toggle() }.buttonStyle(.pill).disabled(isBusy)
+                Button { Task { await model.skip(action.job) } } label: {
+                    WaitingBusyLabel(title: "Skip", busyTitle: "Skipping…", busy: isSkipping)
+                }.buttonStyle(.pill).disabled(isBusy)
+                Button {
+                    Task {
+                        if editing && hasUnsavedChanges {
+                            savingDraft = true
+                            await model.updateDealEmailDraft(action.job, subject: subject, body: bodyText)
+                            savedSubject = subject; savedBody = bodyText
+                            savingDraft = false
+                        }
+                        await model.approve(action.job)
+                    }
+                } label: {
+                    WaitingBusyLabel(title: "Send", busyTitle: "Sending…", busy: isSending)
+                }.buttonStyle(.pillProminent).disabled(isBusy)
+            }
+            if editing {
+                TextField("Subject", text: $subject).textFieldStyle(.roundedBorder).disabled(isBusy)
+                TextEditor(text: $bodyText).font(.callout).frame(minHeight: 110, maxHeight: 200)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                    .disabled(isBusy)
+                HStack {
+                    Spacer()
+                    Button {
+                        Task {
+                            savingDraft = true
+                            defer { savingDraft = false }
+                            await model.updateDealEmailDraft(action.job, subject: subject, body: bodyText)
+                            savedSubject = subject; savedBody = bodyText
+                        }
+                    } label: {
+                        WaitingBusyLabel(title: "Save draft", busyTitle: "Saving…", busy: savingDraft)
+                    }
+                    .buttonStyle(.pill)
+                    .disabled(isBusy || !hasUnsavedChanges)
+                }
+            }
+        }
+        .onAppear {
+            let s = action.job.payload[path: "subject"]?.string ?? ""
+            let b = action.job.payload[path: "body"]?.string ?? ""
+            subject = s; bodyText = b; savedSubject = s; savedBody = b
+        }
+        .onChange(of: action.job.payload) { _, newPayload in
+            let s = newPayload[path: "subject"]?.string ?? ""
+            let b = newPayload[path: "body"]?.string ?? ""
+            let wasDirty = hasUnsavedChanges
+            savedSubject = s; savedBody = b
+            if !wasDirty { subject = s; bodyText = b }
         }
     }
 }
