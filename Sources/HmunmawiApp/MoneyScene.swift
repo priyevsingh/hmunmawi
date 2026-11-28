@@ -273,7 +273,8 @@ struct MonthBars: View {
 }
 
 /// The next payment from Apple and the months around it, each with where it stands: paid (the amount your bank
-/// received, from Settings → Money), due (Apple pays a month's sales within 45 days after it ends), or this month so far.
+/// received, from Settings → Money), due (expected 33 days after Apple's fiscal month ends, the pattern every payment has
+/// followed; Apple's limit is 45 days), or this month so far.
 struct NextPayment: View {
     let model: AppModel
 
@@ -286,8 +287,13 @@ struct NextPayment: View {
         return MonthBars.months(model).suffix(4).reversed().compactMap { m in
             guard let start = MonthBars.monthStart(m.label), let end = cal.date(byAdding: .month, value: 1, to: start) else { return nil }
             let paid = PayoutBook.shared.bank[key.string(from: start)]
-            let due = cal.date(byAdding: .day, value: 45, to: end)
-            let state = paid != nil ? "paid" : end > now ? "so far" : (due.map { $0 < now } ?? false) ? "should have arrived" : "due"
+            // Apple's own fiscal month (e.g. October = 27 Sep – 31 Oct), the same one Payday & profit uses: payment
+            // has come 33 days after it ends every time so far; Apple's limit is 45 days.
+            let fiscal = AppleFiscal.month(containing: cal.date(byAdding: .day, value: 14, to: start) ?? start)
+            let fiscalEnd = cal.date(byAdding: .day, value: 1, to: fiscal.end) ?? end
+            let due = cal.date(byAdding: .day, value: 33, to: fiscal.end)
+            let limit = cal.date(byAdding: .day, value: 45, to: fiscal.end) ?? fiscalEnd
+            let state = paid != nil ? "paid" : fiscalEnd > now ? "so far" : limit < now ? "should have arrived" : "due"
             return Row(label: m.label, usd: m.total, state: state, bankINR: paid, due: due)
         }
     }
@@ -298,9 +304,9 @@ struct NextPayment: View {
         VStack(alignment: .leading, spacing: 10) {
             CardHeader(symbol: "building.columns.fill", title: "Next payment", tint: Brand.Category.money)
             if let next, let due = next.due {
-                Text("by " + due.formatted(.dateTime.day().month(.abbreviated)))
+                Text("≈ " + due.formatted(.dateTime.day().month(.abbreviated)))
                     .font(.system(size: 30, weight: .bold)).foregroundStyle(Brand.Category.money.gradient)
-                Text("For \(next.label) sales · about \(Money.shared.format(next.usd, from: "USD", decimals: 0))")
+                Text("For \(next.label) sales · about \(Money.shared.format(next.usd, from: "USD", decimals: 0)) from daily sales (Payday & profit shows Apple's exact report)")
                     .font(.callout.weight(.medium))
                 if next.state == "should have arrived" {
                     Label("Later than Apple's usual 45 days; check App Store Connect → Payments", systemImage: "clock.badge.exclamationmark.fill")
@@ -316,7 +322,7 @@ struct NextPayment: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("\(r.label) sales").font(.callout)
                             Text(r.state == "paid" ? "Paid to your bank" : r.state == "so far" ? "This month so far"
-                                 : r.state == "due" ? "Due by \(r.due?.formatted(.dateTime.day().month(.abbreviated)) ?? "")" : "Overdue")
+                                 : r.state == "due" ? "Expected ≈ \(r.due?.formatted(.dateTime.day().month(.abbreviated)) ?? "")" : "Overdue")
                                 .font(.callout).foregroundStyle(r.state == "should have arrived" ? Brand.caution : Brand.secondaryText)
                         }
                         Spacer()

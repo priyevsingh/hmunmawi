@@ -41,6 +41,10 @@ struct TrendChart: View {
     var showHeader = true
     /// Small charts print their date range underneath unless this is off.
     var showsDates = true
+    /// Inside a clickable card: the pointer still shows each bar's value, but clicks pass through to the card.
+    var hoverOnly = false
+    /// Percentages that sit near 100% (crash-free): start the scale just under the lowest day so small dips show.
+    var zoomFlat = false
     var format: (Double) -> String = { $0.formatted(.number.precision(.fractionLength(0...1))) }
     @State private var picked: Date?
     @State private var grow = 1.0
@@ -49,6 +53,12 @@ struct TrendChart: View {
 
     /// Bars for day-by-day or month-by-month numbers (up to 45 points); a line for long histories.
     private var useBars: Bool { points.count >= 2 && points.count <= 45 && height < 140 }
+    /// Zoomed scale for near-flat percentages: from a little under the lowest value (at least 1 point of room) to the highest.
+    private var zoomDomain: ClosedRange<Double>? {
+        guard zoomFlat, let lo = points.map(\.1).min(), let hi = points.map(\.1).max(), lo > 0 else { return nil }
+        return max(0, lo - max(1, (hi - lo) * 2))...max(hi, lo + 0.01)
+    }
+    private var barBase: Double { zoomDomain?.lowerBound ?? 0 }
     private var barColor: Color { tint == .primary ? Brand.data : tint }
     private var barUnit: Calendar.Component {
         guard points.count > 1 else { return .day }
@@ -79,11 +89,14 @@ struct TrendChart: View {
                     let isLast = index == points.count - 1
                     let isPicked = picked.map { Calendar.current.isDate($0, equalTo: point.0, toGranularity: barUnit) } ?? false
                     // Slim fixed-width capsules (as in Health), so short bars never turn into ovals.
-                    BarMark(x: .value("Day", point.0, unit: barUnit), y: .value(title, point.1 * grow), width: .fixed(height > 60 ? 10 : 7))
+                    BarMark(x: .value("Day", point.0, unit: barUnit), yStart: .value(title, barBase),
+                            yEnd: .value(title, barBase + (point.1 - barBase) * grow), width: .fixed(height > 60 ? 10 : 7))
                         .cornerRadius(height > 60 ? 5 : 3.5)
                         .foregroundStyle(isLast || isPicked ? AnyShapeStyle(barColor.gradient) : AnyShapeStyle(barColor.opacity(0.28)))
                         .shadow(color: isLast ? barColor.opacity(0.45) : .clear, radius: 4)
-                        .annotation(position: .top, alignment: .center, spacing: 2) {
+                        // Kept inside the chart: a full-height bar's label slides down instead of being cut off at the top.
+                        .annotation(position: .top, alignment: .center, spacing: 2,
+                                    overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                             if isPicked {
                                 VStack(spacing: 0) {
                                     Text(format(point.1)).font(.callout.weight(.bold)).foregroundStyle(barColor)
@@ -91,6 +104,9 @@ struct TrendChart: View {
                                         .font(.callout).foregroundStyle(.secondary)
                                 }
                                 .fixedSize()
+                                // A backing so the label reads cleanly when it sits over a full-height bar.
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(Brand.surface.opacity(0.92), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                             }
                         }
                 } else {
@@ -105,15 +121,16 @@ struct TrendChart: View {
                     }
                 }
             }
-            .chartXSelection(value: $picked)
-            .chartYScale(domain: useBars ? .automatic(includesZero: true) : .automatic(includesZero: false))
+            .chartXSelection(value: hoverOnly ? .constant(nil) : $picked)
+            .modifier(TrendYScale(zoom: zoomDomain, bars: useBars))
             .chartXAxis {
                 if showAxis || height >= 100 {
                     AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                         AxisGridLine().foregroundStyle(Color(nsColor: .separatorColor))
-                        AxisValueLabel(format: .dateTime.day().month(.abbreviated), centered: false).font(.callout)
+                        // An explicit label colour: `.secondary` inside a chart picked up the accent (blue dates).
+                        AxisValueLabel(format: .dateTime.day().month(.abbreviated), centered: false)
                             .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     }
                 }
             }
@@ -130,6 +147,22 @@ struct TrendChart: View {
                             .ripple(direction.color, trigger: points.count)   // once when new data lands; no loop
                             .position(x: origin.x + pos.x, y: origin.y + pos.y)
                             .allowsHitTesting(false)
+                    }
+                }
+            }
+            // Hover-only: track the pointer without a gesture, so a click still reaches the card underneath.
+            .chartOverlay { proxy in
+                if hoverOnly {
+                    GeometryReader { g in
+                        Rectangle().fill(.clear).contentShape(.rect)
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active(let at):
+                                    guard let plot = proxy.plotFrame else { return }
+                                    picked = proxy.value(atX: at.x - g[plot].origin.x, as: Date.self)
+                                case .ended: picked = nil
+                                }
+                            }
                     }
                 }
             }
@@ -169,6 +202,16 @@ struct TrendChart: View {
                   let date = try? Date(String(d.prefix(10)) + "T12:00:00Z", strategy: .iso8601) else { return nil }
             return (date, v)
         }
+    }
+}
+
+/// The chart's vertical scale: an explicit range when zoomed, otherwise automatic (bars from zero).
+private struct TrendYScale: ViewModifier {
+    let zoom: ClosedRange<Double>?
+    let bars: Bool
+    func body(content: Content) -> some View {
+        if let zoom { content.chartYScale(domain: zoom) }
+        else { content.chartYScale(domain: bars ? .automatic(includesZero: true) : .automatic(includesZero: false)) }
     }
 }
 

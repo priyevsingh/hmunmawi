@@ -57,7 +57,7 @@ import Testing
     @Test func notBlockedDoesNotClaimPaused() {
         let json: [String: Any] = ["account_id": "team", "blocked": false, "until_epoch": 0, "reasons": []]
         let h = AIPolicyDisplay.headline(AIPolicyDisplay.parse(json))
-        #expect(h.contains("allowed"))
+        #expect(h.contains("running"))
         #expect(!h.contains("paused until"))
     }
 

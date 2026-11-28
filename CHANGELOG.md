@@ -2,6 +2,24 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.7.2 (build 172), 28 Nov 2026
+
+**Fixed**
+- **Hover numbers on the Today cards (`TrendChart`, `FrontPage`):** The small charts on Money, Reach and Health had hit testing switched off so a click opened the card, which also removed hover. A new `hoverOnly` mode tracks the pointer with `onContinuousHover` (no gesture), so each bar shows its value and date while clicks still reach the card. Labels stay inside the chart (`overflowResolution` fit) on a small backing; Health shows `%` and starts its scale just under the lowest day (`zoomFlat`, bars drawn from that floor) so small dips are visible.
+- **Next payment matched Payday & profit (`MoneyScene.NextPayment`):** It used calendar months + 45 days ("by 16 Dec") while Payday used Apple's fiscal calendar + 33 days ("≈ 3 Dec"). It now uses `AppleFiscal` months and the 33-day pattern; "should have arrived" still waits for Apple's 45-day limit. Its amount is labelled as the daily-sales estimate (Payday shows Apple's exact finance report).
+- **Today card wording (`FrontPage`):** Money, Reach and Health say which line is the big number and which is the bars; Health names the one thing to look at instead of "listed below".
+- **Payday & profit (`MoneyPlan`, `AIAccounts`, `docs/AI-AND-COSTS.md`):** "Costs paid so far" is now "From your pocket so far" (prepaid API credits aren't money out of your pocket); with no costs, "Really yours" says the whole forecast is yours instead of repeating "forecast − ₹0".
+- **AI & subscriptions (`UsageWatch`):** A reading counts as old only 30 minutes after its reset (no amber "old reading" a minute after a reset); a meter at 100% says jobs that use it wait for the reset; plans quiet for over 14 days (e.g. a plan you cancelled) are dropped instead of listed forever.
+- **AI job pause (`AIPolicyDisplay`, `AIPolicyPauseCard`):** Plain status ("AI jobs are running (not paused)") and a one-line caption.
+- **Weekly story & findings (`WeeklyStory`, `Insights`):** No "All channels:" prefix; rolling-window findings read "about 1,200 for 3–9 Mar" instead of "in recent readings (latest …)".
+- **Log (`Pages.ActivityPage`, `Dashboard.ActivityText`):** Steps grouped under day headings (Today, Yesterday, weekday + date) with the time only on each row; `routine.ran` and add-on ids shown in plain words ("Routine ran · your routines", "Mac action · Mac jobs — checked the Mac jobs").
+- **Apps page (`PortalPages`, `Sections`, `TrendChart`):** Installs say they are Apple's usage sample (not the 14-day downloads); a Sessions figure fills the row; percentage tables (Versions) get share bars across the card; chart dates use the label colour (they showed in accent blue).
+- **Automations (`AutomationExtras`):** Empty days say "Nothing weekly"; chips drop a repeated "(Sunday 09:30)" from titles.
+- **Toolbar (`MainView`, `Status`):** The tab switch is wider so "Automations" isn't cramped; hovering the status pill lists what needs a look.
+- **Journey (`FlowMap`):** "Saw an app" reads "% of visitors, via your site", since most downloads come straight from App Store search.
+
+Hmunmawi still does everything it did in 1.7.1. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.7.1 (build 171), 28 Nov 2026
 
 **Improved**

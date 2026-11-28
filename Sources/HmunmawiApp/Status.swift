@@ -149,7 +149,7 @@ struct StatusPill: View {
             .font(.callout)
             .padding(.horizontal, 4)
         }
-        .help("System status")
+        .help(truth.problems.isEmpty ? "System status" : truth.problems.joined(separator: "\n") + "\nClick for details.")
         .popover(isPresented: $open, arrowEdge: .bottom) {
             // Scrolls inside a screen-sized box: a long day used to push the top of the panel off screen.
             ScrollView { StatusDetail(status: status, truth: truth) }

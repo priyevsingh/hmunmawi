@@ -326,8 +326,8 @@ struct StoryColumn<Detail: View>: View {
             if let number { number }
             if trend.count > 2 {
                 VStack(alignment: .leading, spacing: 2) {
-                    TrendChart(title: trendLabel, points: trend, tint: tint, height: 64, showAxis: false, showHeader: false)
-                        .allowsHitTesting(false)   // the whole card opens the story; the small chart must not take the click
+                    TrendChart(title: trendLabel, points: trend, tint: tint, height: 64, showAxis: false, showHeader: false, hoverOnly: true, zoomFlat: title == "Health",
+                               format: title == "Health" ? { String(format: "%.2f%%", $0) } : { $0.formatted(.number.precision(.fractionLength(0...1))) })
                     Text(trendLabel).font(.callout).foregroundStyle(.secondary)
                 }
             }
@@ -387,9 +387,9 @@ private struct MoneyStory: View {
                         ? RollingNumber(key: "money.\(days)d.\(code)", value: proceeds.rounded(),
                                         format: { Money.text($0, code, decimals: 0) }, tint: Brand.Category.money,
                                         deltaLabel: "\(days)-day earnings") : nil,
-                    trend: facts.subscribers, trendLabel: "Subscribers paying right now (4 weeks)",
+                    trend: facts.subscribers, trendLabel: "Bars: people paying each day (4 weeks)",
                     footer: proceeds > 0 || portal?[path: "proceeds_usd"] != nil
-                        ? "Earned in the last \(days) days, after Apple's cut." + MRRSummary.footer(model.mrr)
+                        ? "Big number: earned in the last \(days) days, after Apple's cut." + MRRSummary.footer(model.mrr)
                         : "Your earnings show here once App Store Connect is connected.") {
             CardHeader(symbol: "banknote.fill", title: "Money", tint: Brand.Category.money)
             MoneySummary(model: model)
@@ -426,8 +426,8 @@ private struct ReachStory: View {
                                : fastest.map { "\($0.0) is growing fastest: \(Int(($0.1 * 100).rounded()))% of its month came this week." }
                                ?? "How people found you this month.",
                            number: anyReach ? RollingNumber(key: "reach.seen", value: seen, format: { Int(safe: $0).formatted() }, tint: Brand.Category.web) : nil,
-                           trend: downloads, trendLabel: "First-time App Store downloads a day (all apps)",
-                           footer: anyReach ? "Times you were seen on Google, YouTube and Bing in 28 days." : nil) {
+                           trend: downloads, trendLabel: "Bars: first-time App Store downloads a day (all apps)",
+                           footer: anyReach ? "Big number: times you were seen on Google, YouTube and Bing in 28 days." : nil) {
             CardHeader(symbol: "chart.line.uptrend.xyaxis", title: "Reach", tint: Brand.Category.web)
             GrowthPage(model: model)
             CustomSections(model: model, page: "overview")
@@ -447,11 +447,11 @@ private struct HealthStory: View {
         let releases = ComingSoon.releases(model).prefix(2)
         StoryColumn(symbol: "heart.text.square.fill", title: "Health", tint: Brand.Category.users,
                     // The sentence says what the big number is; anything that needs a look goes in the footnote.
-                    sentence: trend.last != nil ? (problems.isEmpty ? "Crash-free sessions; everything else runs fine." : "Crash-free sessions; \(problems.count == 1 ? "1 thing" : "\(problems.count) things") to look at, listed below.")
+                    sentence: trend.last != nil ? (problems.isEmpty ? "Crash-free sessions; everything else runs fine." : (problems.count == 1 ? "Crash-free sessions; 1 thing to look at: \(problems[0].title.prefix(1).lowercased() + problems[0].title.dropFirst())." : "Crash-free sessions; \(problems.count) things to look at, listed below."))
                         : model.truth.dot == .good || (model.isDemo && problems.isEmpty) ? "Everything is running fine." : problems.isEmpty ? model.truth.sentence : problemLine(problems),
                     number: trend.last.map { RollingNumber(key: "health.crashfree", value: ($0.1 * 10).rounded() / 10,
                                                            format: { String(format: "%.1f%%", $0) }, tint: Brand.Category.users) },
-                    trend: trend, trendLabel: "Crash-free sessions (Sentry), lowest app each day",
+                    trend: trend, trendLabel: "Bars: crash-free sessions (Sentry), lowest app each day",
                     footer: footer(problems: trend.last != nil ? problems : [], releases: Array(releases))) {
             CardHeader(symbol: "heart.text.square.fill", title: "Health", tint: Brand.Category.users)
             HealthList(model: model).padding(20).contentCard(cornerRadius: 22)

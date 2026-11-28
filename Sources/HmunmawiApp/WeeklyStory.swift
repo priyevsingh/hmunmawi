@@ -22,7 +22,9 @@ import SwiftUI
             out.append("\(reviews.count) new review\(reviews.count == 1 ? "" : "s"), averaging \(String(format: "%.1f", avg))★")
         }
         for f in model.findings.prefix(4) {
-            out.append((f.lane == .win ? "Win: " : f.lane == .worry ? "Worry: " : "") + (f.app.map { "\($0): " } ?? "") + StoryCards.headline(f))
+            // A source's pseudo-app ("All channels", "All apps") isn't a name worth printing.
+            let app = f.app.flatMap { $0.lowercased().hasPrefix("all ") ? nil : $0 }
+            out.append((f.lane == .win ? "Win: " : f.lane == .worry ? "Worry: " : "") + (app.map { "\($0): " } ?? "") + StoryCards.headline(f))
         }
         for r in ComingSoon.releases(model) where !r.parked { out.append("\(r.app) \(r.version ?? ""): \(r.status.prefix(1).lowercased() + r.status.dropFirst())") }
         let tf = week.filter { $0.kind == "testflight.feedback" }.count

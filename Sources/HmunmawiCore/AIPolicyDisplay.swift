@@ -53,13 +53,13 @@ public enum AIPolicyDisplay {
         if snap.loadFailed { return "Couldn't read pause policy" }
         let who = accountLabel(snap.accountID)
         guard snap.blocked else {
-            return "\(who) — hub jobs allowed by this Mac's policy (Anthropic may still refuse)"
+            return "\(who): AI jobs are running (not paused)"
         }
         guard let until = snap.effectiveUntilEpoch, until > 0, !isIndefiniteEpoch(until) else {
             return "\(who) paused until you clear it"
         }
         if until <= Int(now.timeIntervalSince1970) {
-            return "\(who) — pause window ended; tap Check availability to refresh"
+            return "\(who): the pause has ended; click Check availability to refresh"
         }
         return "\(who) paused until \(formatUntil(until, now: now, calendar: calendar))"
     }

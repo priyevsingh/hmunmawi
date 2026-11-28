@@ -60,7 +60,7 @@ shows the same notes before you install; both come from one file in the app.
 
 <details><summary>How it works</summary>
 
-People paying now and 14-day earnings (`Subscribers paying right now (4 weeks)`), how many times you were seen on Google, YouTube and Bing (`First-time App Store downloads a day (all apps)`), and crash-free sessions (lowest app each day), with anything that needs a look (developer membership, unreleased apps) on the line under it.
+Each card has a big number and a small bar chart, and says which is which. **Money:** the big number is what you earned in 14 days after Apple's cut; the bars are people paying each day (4 weeks); MRR and its 90-day range sit underneath. **Reach:** the big number is how many times you were seen on Google, YouTube and Bing in 28 days; the bars are first-time App Store downloads a day. **Health:** crash-free sessions (lowest app each day; the scale starts just under the lowest day so small dips show), and the sentence names anything that needs a look (developer membership, unreleased apps). Point at a bar to see that day's number; click anywhere on the card to open it.
 
 </details>
 
@@ -117,7 +117,7 @@ Each of your websites with its search health (all clear, worth a look, needs att
 
 <details><summary>How it works</summary>
 
-Apple's next payment (from Apple's finance report; the date comes from Apple's payment calendar, so it's an estimate), this month's forecast, costs paid so far and what's really yours. *Sort it for me: Predict* asks the AI where the month will land. *Export for accountant* (the share button on the card): Apple's payouts by fiscal month, with a box for what reached your bank, saved as a CSV. Details: [AI credits, costs and profit](AI-AND-COSTS.md).
+Apple's next payment (from Apple's finance report; the date comes from Apple's payment calendar, so it's an estimate), this month's forecast, what came out of your pocket so far (prepaid API credits don't count) and what's really yours. The **Next payment** box on the Money page uses the same Apple fiscal months and the same estimate: about 33 days after Apple's month ends, the pattern every payment has followed (Apple's own limit is 45 days). *Sort it for me: Predict* asks the AI where the month will land. *Export for accountant* (the share button on the card): Apple's payouts by fiscal month, with a box for what reached your bank, saved as a CSV. Details: [AI credits, costs and profit](AI-AND-COSTS.md).
 
 </details>
 
