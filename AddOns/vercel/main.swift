@@ -190,6 +190,19 @@ struct Vercel: HmunmawiPlugin {
             guard let d = row[path: "timestamp"]?.string.map({ String($0.prefix(10)) }), d < today else { continue }
             days.append(.string(d)); values.append(.number(row[path: "visitors"]?.number ?? 0))
         }
+        // Nothing in 28 days on a project with Web Analytics on almost always means the site doesn't load Vercel's
+        // analytics script. Say so, and send no "Visitors" figure: a 0 there would read as "nobody came" and could
+        // replace the site's real visitor count from another source (both are found by the "Visitors" label).
+        if v28 == 0 && p7 == 0 {
+            return PluginEvent(kind: "section.snapshot", app: siteName, payload: .object([
+                "id": .string("vercel-visitors-\(project.id)"),
+                "title": .string("Website visitors (Vercel)"),
+                "page": .string("growth"), "symbol": .string("globe"), "order": .number(13), "color": .string("web"),
+                "outcome": .string("Vercel Web Analytics recorded no visits in 28 days. The site probably doesn't load Vercel's analytics script (add @vercel/analytics, or the /_vercel/insights script, to count visits here). Visitors from any other source you connected still show on Today."),
+                "figures": .array([]), "series": .array([]),
+            ]), occurredAt: Int64(now.timeIntervalSince1970 * 1000),
+               dedupeKey: "section.snapshot-vercel-\(project.id)-\(today)-\(Int(now.timeIntervalSince1970 / 10800))")
+        }
         let payload = JSONValue.object([
             "id": .string("vercel-visitors-\(project.id)"),
             "title": .string("Website visitors (Vercel)"),

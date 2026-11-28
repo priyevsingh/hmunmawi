@@ -16,6 +16,7 @@ All notable changes to Hmunmawi are listed here, newest first. Version numbers f
 - **Apps page (`PortalPages`, `Sections`, `TrendChart`):** Installs say they are Apple's usage sample (not the 14-day downloads); a Sessions figure fills the row; percentage tables (Versions) get share bars across the card; chart dates use the label colour (they showed in accent blue).
 - **Automations (`AutomationExtras`):** Empty days say "Nothing weekly"; chips drop a repeated "(Sunday 09:30)" from titles.
 - **Toolbar (`MainView`, `Status`):** The tab switch is wider so "Automations" isn't cramped; hovering the status pill lists what needs a look.
+- **Vercel visitors card (`AddOns/vercel`):** A project with Web Analytics on but no visits in 28 days now says the site probably doesn't load Vercel's analytics script, and sends no Visitors figure, instead of three zeros that read as "nobody came".
 - **Journey (`FlowMap`):** "Saw an app" reads "% of visitors, via your site", since most downloads come straight from App Store search.
 
 Hmunmawi still does everything it did in 1.7.1. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
