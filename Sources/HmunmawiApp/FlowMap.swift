@@ -137,7 +137,7 @@ struct FlowMap: View {
     private func rateLine(_ i: Int, _ r: Double?) -> String? {
         switch i {
         case 1: r.map { "\(Self.pct($0)) of those who saw you" }
-        case 2: r.map { "\(Self.pct($0)) of visitors" }
+        case 2: r.map { "\(Self.pct($0)) of visitors, via your site" }
         case 3: downloadSourceLine
         case 4: r.map { "\(Self.pct($0)) of downloads" }
         default: nil

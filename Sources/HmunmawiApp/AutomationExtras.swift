@@ -125,6 +125,10 @@ private struct ThisWeek: View {
                         Text(d).font(.caption.weight(.semibold))
                             .foregroundStyle(d == today ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.secondary))
                         ForEach(dated.filter { $0.when.contains(d) }.sorted { Self.timeOnly($0.when) < Self.timeOnly($1.when) }) { i in chip(i) }
+                        // An empty day says so, instead of an unexplained blank column.
+                        if !dated.contains(where: { $0.when.contains(d) }) {
+                            Text("Nothing weekly").font(.caption).foregroundStyle(.tertiary)
+                        }
                     }
                     .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
                     .padding(8)
@@ -158,13 +162,18 @@ private struct ThisWeek: View {
         return words.joined(separator: " ")
     }
 
+    /// "Morning digest (Sunday 09:30)" -> "Morning digest": the chip already shows the day and time.
+    static func plainTitle(_ title: String) -> String {
+        title.replacingOccurrences(of: #"\s*\((Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\.?\s*[0-9:]*\)"#, with: "", options: .regularExpression)
+    }
+
     private func chip(_ i: AutomationExtras.Item) -> some View {
         Button { open = i } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Self.timeOnly(i.when))
                     .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                 // Non-breaking hyphens: narrow day columns wrap whole words ("sign‑in"), never "sign- / in".
-                Text(i.title.replacingOccurrences(of: "-", with: "\u{2011}")).font(.callout).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                Text(Self.plainTitle(i.title).replacingOccurrences(of: "-", with: "\u{2011}")).font(.callout).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
             }
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .padding(6)

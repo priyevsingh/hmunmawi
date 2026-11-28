@@ -25,7 +25,7 @@ struct AIPolicyPauseCard: View {
     var body: some View {
         KitCard {
             CardHeader(symbol: "pause.circle.fill", title: "AI job pause", tint: Brand.Category.users,
-                       caption: "Shared hub policy on this Mac. The status below is live; nothing changes until you save.")
+                       caption: "Pause the hub's AI jobs on this Mac")
 
             statusBlock
 

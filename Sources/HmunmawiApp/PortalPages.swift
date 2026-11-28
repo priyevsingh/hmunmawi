@@ -313,7 +313,11 @@ private struct AppHeader: View {
                      detail: MRRSummary.projectionLine(mrr), tint: Brand.Category.money),
                 Stat(label: "Installs", value: Format.number(p[path: "installations"]),
                      detail: p[path: "installations"]?.number == nil ? ""
-                        : p[path: "analytics_days"]?.number.map { "last \(Int(safe: $0)) days" } ?? "", tint: Brand.Category.users),
+                        : p[path: "analytics_days"]?.number.map { "last \(Int(safe: $0)) days (Apple's usage sample, not the 14-day downloads)" } ?? "", tint: Brand.Category.users),
+                // Same sample and window as Installs: fills the row and shows how much the app is opened.
+                Stat(label: "Sessions", value: Format.number(p[path: "sessions"]),
+                     detail: p[path: "sessions"]?.number == nil ? ""
+                        : p[path: "analytics_days"]?.number.map { "times opened, last \(Int(safe: $0)) days" } ?? "", tint: Brand.Category.users),
             ]))
         }
     }

@@ -495,9 +495,29 @@ struct SectionTable: View {
                             Text(v).font(.callout.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(row.highlight ? tint : Color.primary)
                         }
+                        // A share column ("84%") gets a bar that fills the rest of the row, so the table uses the
+                        // card's width instead of leaving it empty.
+                        if showsBars, let f = Self.fraction(row.values.last) {
+                            Capsule().fill(.quaternary).frame(height: 6).frame(maxWidth: .infinity)
+                                .overlay(alignment: .leading) {
+                                    GeometryReader { g in
+                                        Capsule().fill(row.highlight ? AnyShapeStyle(tint.gradient) : AnyShapeStyle(tint.opacity(0.45)))
+                                            .frame(width: g.size.width * f)
+                                    }
+                                }
+                                .frame(height: 6)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private var showsBars: Bool { table.rows.contains { Self.fraction($0.values.last) != nil } }
+
+    /// "84%" -> 0.84 (capped at 1); nil for anything that isn't a percentage.
+    static func fraction(_ v: String?) -> Double? {
+        guard let v, v.hasSuffix("%"), let n = Double(v.dropLast().trimmingCharacters(in: .whitespaces)) else { return nil }
+        return min(1, max(0, n / 100))
     }
 }

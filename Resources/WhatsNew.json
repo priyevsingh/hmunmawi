@@ -2,6 +2,26 @@
   "_note": "User-facing notes, newest first: the Today card after an update and the update window (scripts/release-notes.py) both read this file. Every release adds its version here; 1-3 items, each a short title and one or two plain sentences. action: settings:<pane> or page:<today|apps|log|automations>.",
   "versions": [
     {
+      "version": "1.7.2",
+      "items": [
+        {
+          "title": "Hover the bars on Today",
+          "detail": "Point at any bar on the Money, Reach or Health cards to see that day's number; a click still opens the card. Each card now says what its big number and its bars show.",
+          "action": "page:today"
+        },
+        {
+          "title": "One payday, everywhere",
+          "detail": "Next payment now uses Apple's own fiscal calendar, so it shows the same date as Payday & profit (about 33 days after Apple's month ends).",
+          "action": "page:today"
+        },
+        {
+          "title": "A clearer Log",
+          "detail": "Every step is grouped under Today, Yesterday and so on, in plain words instead of internal names.",
+          "action": "page:log"
+        }
+      ]
+    },
+    {
       "version": "1.7.1",
       "items": [
         {

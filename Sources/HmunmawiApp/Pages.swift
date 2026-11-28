@@ -528,12 +528,18 @@ struct ActivityPage: View {
 
     var body: some View {
         GlassPanel(title: "Every step, newest first", symbol: "clock.arrow.circlepath", tint: Brand.Category.social) {
+            let groups = ActivityGroup.make(entries)
             LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(ActivityGroup.make(entries)) { group in
+                ForEach(Array(groups.enumerated()), id: \.element.id) { i, group in
+                    let date = Date(timeIntervalSince1970: Double(group.first.at) / 1000)
+                    // One heading per day ("Today", "Yesterday", "26 Nov") instead of the date on every row.
+                    if i == 0 || !Calendar.current.isDate(date, inSameDayAs: Date(timeIntervalSince1970: Double(groups[i - 1].first.at) / 1000)) {
+                        Text(Self.dayHeading(date)).font(.callout.weight(.semibold)).padding(.top, i == 0 ? 0 : 8)
+                    }
                     HStack(spacing: 12) {
-                        Text(Date(timeIntervalSince1970: Double(group.first.at) / 1000), format: .dateTime.day().month().hour().minute())
+                        Text(date, format: .dateTime.hour().minute())
                             .monospacedDigit().foregroundStyle(.secondary)
-                            .frame(width: 130, alignment: .leading)
+                            .frame(width: 80, alignment: .leading)
                         Text(group.label)
                         Spacer()
                         Text(group.subject).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -542,6 +548,13 @@ struct ActivityPage: View {
                 }
             }
         }
+    }
+
+    static func dayHeading(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Today" }
+        if cal.isDateInYesterday(date) { return "Yesterday" }
+        return date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
     }
 }
 

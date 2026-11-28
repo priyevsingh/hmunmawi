@@ -33,7 +33,7 @@ with read-only keys; anything else (Gemini, a subscription) goes in Tools and pl
   doesn't give the payment date, so it comes from Apple's payment calendar (about 33 days after Apple's fiscal month
   ends) and is shown as an estimate.
 - **This month:** a forecast from Apple's daily sales so far.
-- **Costs paid so far:** your tools and plans plus what your AI accounts spent.
+- **From your pocket so far:** your tools and plans plus what your AI accounts charged you. Prepaid API credits are not counted, because they are not money out of your pocket.
 - **Profit:** what's left after costs, in the currency you chose.
 
 ### Tools and plans

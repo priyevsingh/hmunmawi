@@ -374,7 +374,10 @@ struct ActivityGroup: Identifiable {
     var subject: String {
         if started.count > 1 { return started.sorted().joined(separator: ", ") }
         guard count == 1, let s = first.subject, !s.hasPrefix("event:"), !s.hasPrefix("job:") else { return "" }
-        return s.replacingOccurrences(of: "plugin:", with: "").replacingOccurrences(of: "rule:", with: "rule ")
+        return s.split(separator: ",").map { part -> String in
+            let t = part.trimmingCharacters(in: .whitespaces)
+            return ActivityText.macActions[t] ?? t
+        }.joined(separator: ", ").replacingOccurrences(of: "plugin:", with: "").replacingOccurrences(of: "rule:", with: "rule ")
     }
 
     static func make(_ entries: [AuditEntry]) -> [ActivityGroup] {
@@ -426,11 +429,25 @@ enum ActivityText {
         "plugin.mac": "Mac action",
         "plugin.poll_failed": "Check failed",
         "plugin.settings_saved": "Settings saved",
+        "routine.ran": "Routine ran",
+        "routine.failed": "Routine failed",
+        "routine.ok": "Routine ran",
+    ]
+    /// Who did it, in plain words (internal add-on ids mean nothing to a reader).
+    private static let actors: [String: String] = [
+        "routine": "your routines", "hmunmawi": "Hmunmawi", "macjobs": "Mac jobs", "scriptfeed": "hub scripts",
+        "appstoreconnect": "App Store Connect", "x": "X", "vercel": "Vercel", "sentry": "Sentry", "mail": "Mail",
+        "posthog": "PostHog", "searchconsole": "Search Console", "bing": "Bing", "youtube": "YouTube",
+        "cloudflare": "Cloudflare", "ntfy": "ntfy", "imessage": "iMessage",
+    ]
+    /// What a Mac action did, in plain words.
+    static let macActions: [String: String] = [
+        "launchd.list": "checked the Mac jobs", "script.run": "ran a hub script", "xfile.read": "read the X file",
     ]
 
     static func label(_ entry: AuditEntry) -> String {
         let base = labels[entry.action] ?? entry.action
         guard entry.actor != "rules", entry.actor != "queue", entry.actor != "engine" else { return base }
-        return "\(base) · \(entry.actor)"
+        return "\(base) · \(actors[entry.actor] ?? entry.actor)"
     }
 }

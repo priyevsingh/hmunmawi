@@ -390,7 +390,7 @@ public enum InsightEngine {
                             let since = pts[best.i].day.formatted(.dateTime.day().month(.abbreviated))
                             if let period = m.period {   // a rolling window read later: name the window, not the reading day
                                 if after.rounded() == 0 { return "No \(lower(m.name)) for \(period) (\(approx(fmt(before, m))) before)" }
-                                return "\(plainName(m.name)) \(up ? "up" : "down"): \(approx(fmtRate(after, m))) in recent readings (latest \(period)), \(up ? "from" : "down from") \(fmtRate(before, m))"
+                                return "\(plainName(m.name)) \(up ? "up" : "down"): \(approx(fmtRate(after, m))) for \(period), \(up ? "from" : "down from") \(fmtRate(before, m))"
                             }
                             if after.rounded() == 0 { return "No \(lower(m.name)) since \(since) (\(approx(fmt(before, m))) before)" }
                             return "\(plainName(m.name)) \(up ? "up" : "down") since \(since): \(approx(fmtRate(after, m))) now, \(up ? "from" : "down from") \(fmtRate(before, m))"

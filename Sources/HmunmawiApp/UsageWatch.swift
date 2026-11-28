@@ -213,28 +213,33 @@ struct UsageCard: View {
                 // A reading whose reset passed over 36 hours ago with nothing new is a plan that has ended or a
                 // source that stopped: fold it into one quiet line instead of a stale row.
                 let gone = watch.readings.filter { ($0.resets ?? .distantFuture) < .now.addingTimeInterval(-36 * 3600) }
+                // Quiet for over two weeks: the plan has ended; drop it instead of mentioning it forever.
+                let quiet = gone.filter { ($0.resets ?? .distantFuture) > .now.addingTimeInterval(-14 * 86_400) }
+                // A reset only just passed (a fresh reading usually lands within minutes): not "old" yet.
+                let stale = { (r: UsageWatch.Reading) -> Bool in r.resets.map { $0 < .now.addingTimeInterval(-30 * 60) } ?? false }
                 ForEach(watch.readings.filter { r in !gone.contains { $0.id == r.id } }) { r in
                     HStack(spacing: 12) {
                         ServiceIcon(service: r.service)
                         VStack(alignment: .leading, spacing: 2) {
                             Text([r.service, r.detail].compactMap { $0 }.joined(separator: " · "))
-                            Text(r.problem ?? ((r.resets.map { $0 < .now } ?? false)
+                            Text(r.problem ?? (stale(r)
                                 ? "Old reading: it was due to reset \(Ago.text(r.resets!)); waiting for a fresh one from \(r.source)"
                                 : [r.resets.map { "resets \(Ago.text($0))" },
                                                 "from \(r.source)" + (r.read.map { ", \(Ago.text($0))" } ?? "")]
-                                               .compactMap { $0 }.joined(separator: " · ")))
-                                .font(.caption).foregroundStyle(r.problem == nil && !(r.resets.map { $0 < .now } ?? false) ? Color.secondary : Brand.caution).fixedSize(horizontal: false, vertical: true)
+                                               .compactMap { $0 }.joined(separator: " · ")
+                                    + ((r.usedPercent ?? 0) >= 100 ? " · at its limit: jobs that use it wait for the reset" : "")))
+                                .font(.caption).foregroundStyle(r.problem == nil && !stale(r) ? Color.secondary : Brand.caution).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
-                        if let p = r.usedPercent, !(r.resets.map { $0 < .now } ?? false) {
+                        if let p = r.usedPercent, !stale(r) {
                             let tint = MeterTint.of(p)
                             ProgressView(value: p, total: 100).tint(tint).frame(width: 140)
                             Text("\(Int(p.rounded()))%").font(.callout.bold().monospacedDigit()).liveNumber(Int(p.rounded())).foregroundStyle(Kit.vibrant(tint)).frame(width: 46, alignment: .trailing)
                         }
                     }
                 }
-                if !gone.isEmpty {
-                    Text("Gone quiet: " + gone.map { [$0.service, $0.detail].compactMap { $0 }.joined(separator: " · ") }.joined(separator: ", ")
+                if !quiet.isEmpty {
+                    Text("Gone quiet: " + quiet.map { [$0.service, $0.detail].compactMap { $0 }.joined(separator: " · ") }.joined(separator: ", ")
                          + ". No fresh reading since its reset; plan ended? It pops back the moment a new one arrives.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }

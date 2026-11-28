@@ -2,7 +2,7 @@ import Foundation
 import HmunmawiCore
 
 /// Other AI accounts (OpenAI, xAI, OpenRouter, DeepSeek) read with read-only keys from the Keychain, for
-/// "Costs paid so far" and its details. Anthropic stays in Credits (it has its own credit rules).
+/// "From your pocket so far" and its details. Anthropic stays in Credits (it has its own credit rules).
 /// One read per account at most every 30 minutes; the last readings are kept on disk, so a restart or a refused
 /// read shows real figures.
 @MainActor @Observable

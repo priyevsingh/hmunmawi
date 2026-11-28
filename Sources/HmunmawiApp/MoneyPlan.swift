@@ -198,16 +198,17 @@ struct MoneyPlanCard: View {
                                : "\(curSpan) · \(money.format(money.convert(p.monthSoFarUSD, from: "USD") ?? 0, from: money.target, decimals: 0)) so far, day \(p.dayOfMonth) of \(p.daysTotal)", Brand.Category.users, usd: money.usdNote(forecast, from: money.target))
                     if Credits.shared.spendPending {
                         // A key is saved but Anthropic hasn't answered yet: no figure beats a figure missing the API.
-                        figure("…", "Costs paid so far", "Reading your Claude API spend from Anthropic. If it's busy (too many requests), Hmunmawi tries again within 30 minutes.", Brand.caution)
+                        figure("…", "From your pocket so far", "Reading your Claude API spend from Anthropic. If it's busy (too many requests), Hmunmawi tries again within 30 minutes.", Brand.caution)
                         figure("…", "Really yours, this month", "\(curName) forecast − costs, once your Claude API spend is in.", Brand.good)
                     } else {
-                    figure(fmt(costSoFar), "Costs paid so far",
+                    figure(fmt(costSoFar), "From your pocket so far",
                            Self.costsLine(costs).replacingOccurrences(of: " Click for details.", with: "")
                                + (abs(costHigh - costLow) >= 1 || costHigh - costSoFar >= 1 ? " By month end: likely \(span(costLow, costHigh))." : "") + " Click for details.",
                            Brand.caution, usd: money.usdNote(costSoFar, from: money.target))
                         .clickForDetail(Self.costsDetail(costs))
                     figure(span(profitLow, profitHigh), "Really yours, this month",
-                           "\(curName) forecast \(fmt(forecast)) − costs \(abs(costHigh - costLow) >= 1 ? "by month end (\(span(costLow, costHigh)))" : fmt(costHigh)), before tax. " +
+                           (costHigh < 1 ? "Nothing came out of your pocket, so all of \(curName)'s forecast is yours, before tax. "
+                               : "\(curName) forecast \(fmt(forecast)) − costs \(abs(costHigh - costLow) >= 1 ? "by month end (\(span(costLow, costHigh)))" : fmt(costHigh)), before tax. ") +
                            (profit >= 0 ? Quips.pick(["Ramen fund: growing.", "Profit! Tiny, but it counts.", "In the black. Somebody frame this."])
                                : Quips.pick(["Costs are winning this round.", "Spending more than earning. Plot twist pending."])),
                            profit >= 0 ? Brand.good : Brand.bad, usd: money.usdNote(profit, from: money.target))
@@ -376,7 +377,7 @@ struct MoneyPlanCard: View {
         // Both currencies: yours first, dollars beside it (what Anthropic actually bills).
         let local = { (usd: Double) in money.format(usd, from: "USD", decimals: 2)
             + (money.target == "USD" ? "" : " (" + Money.text(usd, "USD", decimals: 2) + ")") }
-        var m = InfoModel(icon: .symbol("creditcard"), tint: Brand.caution, title: "Costs paid so far",
+        var m = InfoModel(icon: .symbol("creditcard"), tint: Brand.caution, title: "From your pocket so far",
                           subtitle: "What running the business costs this month, and how it's worked out")
         var tools: [InfoModel.Fact] = costs.items.compactMap { item in
             item.isFree ? m.fact("gift", item.name, "free" + (item.ends.map { " until \($0.formatted(.dateTime.day().month(.abbreviated).year()))" } ?? "") + ", not counted")

@@ -141,7 +141,7 @@ struct MainView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(minWidth: 320, idealWidth: 380)
+                .frame(minWidth: 440, idealWidth: 480)
                 .background {
                     // ⌘1-⌘4 switch spaces (shortcuts only: one way to each page, no extra menu).
                     ForEach(Page.allCases) { p in
