@@ -31,7 +31,7 @@ public enum XNative {
               views:(t.views&&t.views.count)||0, likes:t.favorite_count||0, replies:t.reply_count||0,
               reposts:t.retweet_count||0, quotes:t.quote_count||0, bookmarks:t.bookmark_count||0};});
           return JSON.stringify({followers:me.followers_count, following:me.friends_count,
-            pinned:(me.pinned_tweet_ids_str||[])[0]||null, tweets:out});
+            pinned:(me.pinned_tweet_ids_str||[])[0]||null, pinned_ids:(me.pinned_tweet_ids_str||[]), tweets:out});
         })()
         """
     }
@@ -46,8 +46,11 @@ public enum XNative {
         public var followers: Int?; public var following: Int?; public var posts: [Post]
         /// The id of your pinned post, when X's page has one.
         public var pinned: String?
-        public init(followers: Int?, following: Int?, posts: [Post], pinned: String? = nil) {
+        /// All pinned post/article ids reported by X's page, in order.
+        public var pinnedIDs: [String]
+        public init(followers: Int?, following: Int?, posts: [Post], pinned: String? = nil, pinnedIDs: [String]? = nil) {
             self.followers = followers; self.following = following; self.posts = posts; self.pinned = pinned
+            self.pinnedIDs = pinnedIDs ?? (pinned.map { [$0] } ?? [])
         }
     }
 
@@ -75,7 +78,13 @@ public enum XNative {
                         article: article?.isEmpty == false ? String(article!.prefix(200)) : nil)
         }
         let pinned = (o["pinned"] as? String).flatMap { $0.allSatisfy(\.isNumber) && !$0.isEmpty ? $0 : nil }
-        return Read(followers: o["followers"] as? Int, following: o["following"] as? Int, posts: posts, pinned: pinned)
+        var seenPinned: Set<String> = []
+        let parsedPinnedIDs = ((o["pinned_ids"] as? [String]) ?? []).filter {
+            !$0.isEmpty && $0.allSatisfy(\.isNumber) && seenPinned.insert($0).inserted
+        }
+        let pinnedIDs = parsedPinnedIDs.isEmpty ? (pinned.map { [$0] } ?? []) : parsedPinnedIDs
+        return Read(followers: o["followers"] as? Int, following: o["following"] as? Int, posts: posts,
+                    pinned: pinned ?? pinnedIDs.first, pinnedIDs: pinnedIDs)
     }
 
     /// A post "takes off" when it earns this many times your average views (originals of the last 7 days)…
@@ -99,8 +108,14 @@ public enum XNative {
              "views": p.impressions, "likes": p.likes, "replies": p.replies, "posted": p.created_at]
         }
         var g: [String: Any] = ["updated": iso.string(from: now)]
-        if let id = read.pinned, let p = read.posts.first(where: { $0.url.hasSuffix("/status/\(id)") }) { g["pinned"] = row(p) }
-        if let a = read.posts.filter({ $0.article != nil }).max(by: { when($0) < when($1) }) { g["latest_article"] = row(a) }
+        let pinnedRows = read.pinnedIDs.compactMap { id in
+            read.posts.first(where: { $0.url.hasSuffix("/status/\(id)") }).map(row)
+        }
+        if let firstPinned = pinnedRows.first { g["pinned"] = firstPinned }
+        if !pinnedRows.isEmpty { g["pinned_items"] = pinnedRows }
+        let articleRows = read.posts.filter { $0.article != nil }.sorted { when($0) > when($1) }.map(row)
+        if let latestArticle = articleRows.first { g["latest_article"] = latestArticle }
+        if !articleRows.isEmpty { g["articles"] = articleRows }
         let originals = read.posts.filter { $0.type == "post" && when($0) >= cutoff }
         if originals.count >= takeOffMinPosts {
             let avg = Double(originals.reduce(0) { $0 + $1.impressions }) / Double(originals.count)

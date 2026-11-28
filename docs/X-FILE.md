@@ -25,6 +25,7 @@ and calls it fresh for 8 hours after `generated`.
     "pinned": { "title": "How I price my apps", "kind": "article", "url": "https://x.com/example/status/2",
                 "views": 600, "likes": 5, "replies": 3 },
     "latest_article": { "title": "How I price my apps", "url": "https://x.com/example/status/2", "views": 600 },
+    "articles": [ { "title": "How I price my apps", "url": "https://x.com/example/status/2", "views": 600 } ],
     "taking_off": null,
     "taking_off_reason": "Nothing yet: your best post this week has 47 views; taking off means 73.",
     "top_replies": [ { "to": "@someone", "url": "https://x.com/example/status/3", "views": 1200 } ]
@@ -32,8 +33,7 @@ and calls it fresh for 8 hours after `generated`.
 }
 ```
 
-**`glance`** (optional) is your X at a glance, shown on the X card and your portal: your pinned post, your latest
-X Article, a post that's taking off (one of this week's posts with at least 3× your average views, over at least 3
+**`glance`** (optional) is your X at a glance, shown on the X card and your portal: your pinned posts/articles (`pinned` / `pinned_items`), all your X Articles (`articles` and `latest_article`), a post that's taking off (one of this week's posts with at least 3× your average views, over at least 3
 posts) or why none is, and your two most-viewed replies of the last 7 days. The Safari read fills it in for you;
 Grok Bot may write it too, either inside this file or as its own file with the same fields (set it under Settings →
 General → X numbers → *X glance file*, or `hm set key=x.glance_file`); when both exist, the newer `updated` wins. Only `https://x.com/<handle>/status/<id>` links are kept; anything else is dropped.

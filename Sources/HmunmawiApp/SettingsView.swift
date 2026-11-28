@@ -1018,6 +1018,7 @@ private struct XSourceSection: View {
         {"updated": "<ISO 8601 time>",
          "pinned": {"title": "<pinned post or article title>", "kind": "post or article", "url": "https://x.com/<me>/status/<id>", "views": 0, "likes": 0, "replies": 0},
          "latest_article": {"title": "<my newest X Article>", "url": "https://x.com/<me>/status/<id>", "views": 0, "likes": 0},
+         "articles": [<all my X Articles, newest first, same fields as latest_article>],
          "taking_off": <one of my posts from the last 7 days with at least 3x my average views, same fields as pinned, or null>,
          "taking_off_reason": "<one short sentence why, or why nothing is>",
          "top_replies": [{"to": "@<who I replied to>", "url": "https://x.com/<me>/status/<id>", "views": 0}]}
@@ -1056,7 +1057,7 @@ private struct XSourceSection: View {
             }
             PathField(label: "X glance file from Grok Bot (optional)", prompt: "Choose the file", text: $glanceFile, folders: false)
             HStack(spacing: 8) {
-                Text("Pinned post, latest article, a post taking off and your top replies. The Safari read fills these in too; the newer one is shown.")
+                Text("Pinned items, X Articles, a post taking off and your top replies. The Safari read fills these in too; the newer one is shown.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button(glanceCopied ? "Copied" : "Copy request for Grok Bot") {

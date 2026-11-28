@@ -256,9 +256,19 @@ extension PortalPublisher {
                   views: int(p[path: "views"]), likes: int(p[path: "likes"]))
         }
         var rows: [PortalBuilder.XRow] = []
-        let pinned = g[path: "pinned"]
-        if let p = pinned, p != .null { rows.append(row("pinned", p[path: "kind"]?.string == "article" ? "Pinned article" : "Pinned post", p)) }
-        if let a = g[path: "latest_article"], a != .null, a[path: "url"] != pinned?[path: "url"] { rows.append(row("latest", "Latest article", a)) }
+        var shownURLs: Set<String> = []
+        let pinnedItems = g[path: "pinned_items"]?.array ?? (g[path: "pinned"].flatMap { $0 != .null ? [$0] : nil } ?? [])
+        for p in pinnedItems where p != .null {
+            if let u = p[path: "url"]?.string, !shownURLs.insert(u).inserted { continue }
+            rows.append(row("pinned", p[path: "kind"]?.string == "article" ? "Pinned article" : "Pinned post", p))
+        }
+        let articles = g[path: "articles"]?.array ?? (g[path: "latest_article"].flatMap { $0 != .null ? [$0] : nil } ?? [])
+        var addedArticle = false
+        for a in articles where a != .null {
+            if let u = a[path: "url"]?.string, !shownURLs.insert(u).inserted { continue }
+            rows.append(row("latest", addedArticle ? "Article" : "Latest article", a))
+            addedArticle = true
+        }
         if let t = g[path: "taking_off"], t != .null { rows.append(row("off", "Taking off", t)) }
         else if let why = g[path: "taking_off_reason"]?.string { rows.append(.init(kind: "off", label: "Taking off", title: why)) }
         for r in g[path: "top_replies"]?.array ?? [] {

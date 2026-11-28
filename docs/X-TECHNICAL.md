@@ -74,8 +74,8 @@ shape).
 
 | Part | Rule |
 |---|---|
-| Pinned | the post whose id is `pinned_tweet_ids_str[0]`; kind `article` when it has an article title |
-| Latest article | newest post with an article title; hidden on screen when it's the pinned post |
+| Pinned | posts/articles matching `pinned_tweet_ids_str` (`pinned` for the first, `pinned_items` for all); kind `article` when it has an article title |
+| Articles | all posts with an article title (`articles`, newest first, plus `latest_article`); any already shown under Pinned is skipped on screen |
 | Taking off | among your original posts of the last 7 days (at least 3), the most viewed one if it has **≥ 3×** the average views; otherwise a one-line reason |
 | Top replies | your two most-viewed replies of the last 7 days, with who they answered |
 

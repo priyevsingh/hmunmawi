@@ -102,7 +102,7 @@ Followers, views, likes and replies of the last 7 days on Today (Reach → X), t
 #### 👀 Your X at a glance
 **Know in one look what's working on X right now.**
 
-Open the X card: 📌 your pinned post · 📰 your latest article · 🔥 a post that's taking off (3× your usual views) · 💬 your two most-viewed replies.
+Open the X card: 📌 your pinned posts/articles · 📰 all your X Articles · 🔥 a post that's taking off (3× your usual views) · 💬 your two most-viewed replies.
 
 <p align="center"><img src="images/guide/x-glance.png" width="520" alt="The X card's glance: pinned article, taking off, top replies (numbers blurred)"></p>
 

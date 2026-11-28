@@ -88,6 +88,41 @@ import Testing
         #expect(g[path: "top_replies"]?.array?.count == 1)
         #expect(XFileNumbers.glance(["latest_article": ["url": "nope"]]) == .null)
     }
+
+    @Test func tracksAllPinnedItemsAndAllArticles() throws {
+        let multi = """
+        {"followers":120,"following":300,"pinned":"900","pinned_ids":["900","899"],"tweets":[
+         {"id":"899","created_at":"2026-10-10T09:00:00.000Z","text":"https://x.com/i/article/0","reply":false,"article":"Older pinned article","views":300,"likes":4,"replies":1,"reposts":0,"quotes":0,"bookmarks":0},
+         {"id":"900","created_at":"2026-10-20T09:00:00.000Z","text":"https://x.com/i/article/1","reply":false,"article":"Newest pinned article","views":600,"likes":5,"replies":3,"reposts":0,"quotes":0,"bookmarks":0},
+         {"id":"901","created_at":"2026-11-14T09:00:00.000Z","text":"https://x.com/i/article/2","reply":false,"article":"Unpinned newer article","views":450,"likes":8,"replies":2,"reposts":1,"quotes":0,"bookmarks":0}]}
+        """
+        let r = try XNative.parse(multi, handle: "example")
+        #expect(r.pinnedIDs == ["900", "899"])
+        let g = XNative.glance(read: r, now: Self.now)
+        let pinnedItems = try #require(g["pinned_items"] as? [[String: Any]])
+        #expect(pinnedItems.count == 2)
+        #expect(pinnedItems[0]["url"] as? String == "https://x.com/example/status/900")
+        #expect(pinnedItems[1]["url"] as? String == "https://x.com/example/status/899")
+        let articles = try #require(g["articles"] as? [[String: Any]])
+        #expect(articles.count == 3)
+        #expect(articles.map { $0["title"] as? String } == ["Unpinned newer article", "Newest pinned article", "Older pinned article"])
+        #expect((g["latest_article"] as? [String: Any])?["title"] as? String == "Unpinned newer article")
+
+        let validated = XFileNumbers.glance([
+            "pinned_items": [
+                ["title": "Pinned 1", "kind": "article", "url": "https://x.com/example/status/900", "views": 600],
+                ["title": "Pinned 1 dup", "kind": "article", "url": "https://x.com/example/status/900", "views": 600],
+                ["title": "Bad", "kind": "article", "url": "https://evil.example.com/status/1"]
+            ],
+            "articles": [
+                ["title": "Art 2", "url": "https://x.com/example/status/901", "views": 450],
+                ["title": "Art 1", "url": "https://x.com/example/status/900", "views": 600],
+                ["title": "Bad", "url": "javascript:alert(1)"]
+            ]
+        ])
+        #expect(validated[path: "pinned_items"]?.array?.count == 1)
+        #expect(validated[path: "articles"]?.array?.count == 2)
+    }
 }
 
 @Suite struct XGlanceFileTests {

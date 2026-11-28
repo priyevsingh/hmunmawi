@@ -161,6 +161,15 @@ public enum XFileNumbers {
                             "url": .string(url), "views": num(int(p["views"])), "likes": num(int(p["likes"])),
                             "replies": num(int(p["replies"])), "posted": text(p["posted"], 40)])
         }
+        func postList(_ v: Any?, article: Bool = false) -> [JSONValue] {
+            var seen: Set<String> = []
+            return ((v as? [[String: Any]]) ?? []).compactMap { raw -> JSONValue? in
+                let item = post(raw, article: article)
+                guard case .object(let fields) = item, case .string(let url)? = fields["url"],
+                      seen.insert(url).inserted else { return nil }
+                return item
+            }
+        }
         let replies: [JSONValue] = ((g["top_replies"] as? [[String: Any]]) ?? []).prefix(2).compactMap { r -> JSONValue? in
             guard let url = link(r["url"]) else { return nil }
             let to = (r["to"] as? String).flatMap { s -> String? in
@@ -168,10 +177,22 @@ public enum XFileNumbers {
                 return XNative.validHandle(h).map { "@\($0)" } } ?? "a reply"
             return .object(["to": .string(to), "url": .string(url), "views": num(int(r["views"]))])
         }
-        let out: [String: JSONValue] = ["pinned": post(g["pinned"]), "latest_article": post(g["latest_article"], article: true),
+        let pinnedItems = postList(g["pinned_items"])
+        let articles = postList(g["articles"], article: true)
+        var out: [String: JSONValue] = ["pinned": post(g["pinned"]), "latest_article": post(g["latest_article"], article: true),
                                         "taking_off": post(g["taking_off"]), "taking_off_reason": text(g["taking_off_reason"], 240),
                                         "top_replies": .array(replies), "updated": text(g["updated"], 40)]
-        let any = out.contains { k, v in k == "top_replies" ? !replies.isEmpty : (k != "updated" && v != .null) }
+        if !pinnedItems.isEmpty { out["pinned_items"] = .array(pinnedItems) }
+        if !articles.isEmpty { out["articles"] = .array(articles) }
+        let any = out.contains { k, v in
+            switch k {
+            case "top_replies": return !replies.isEmpty
+            case "pinned_items": return !pinnedItems.isEmpty
+            case "articles": return !articles.isEmpty
+            case "updated": return false
+            default: return v != .null
+            }
+        }
         return any ? .object(out) : .null
     }
 
