@@ -2,6 +2,14 @@
 
 All notable changes to Hmunmawi are listed here, newest first. Version numbers follow [Semantic Versioning](https://semver.org).
 
+## 1.7.1 (build 171), 28 Nov 2026
+
+**Improved**
+- **All pinned X items & X Articles (`XNative`, `XFileNumbers`, `XSafariReader`, `PortalPages`, `PortalExtra`, `SettingsView`):** Updated `XNative.storeJS` and `XNative.parse` to collect all `pinned_tweet_ids_str` (`pinned_ids`), updated `XNative.glance` and `XFileNumbers.glance` to emit and validate `pinned_items` and `articles` (all X Articles sorted newest first, alongside `pinned` and `latest_article` for backwards compatibility), and updated `PortalPages.xGlance` and `PortalExtra.xRows` to display every pinned item and X Article deduplicated by URL.
+- **Tests & Docs (`XNativeTests`, `docs/X-FILE.md`, `docs/X-SETUP.md`, `docs/X-TECHNICAL.md`):** Added `tracksAllPinnedItemsAndAllArticles()` and synced X glance documentation.
+
+Hmunmawi still does everything it did in 1.7.0. Full list: [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
+
 ## 1.7.0 (build 170), 28 Nov 2026
 
 **Added**

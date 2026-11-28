@@ -48,7 +48,7 @@ final class XSafariReader {
         }
         guard let c = counts, !merged.isEmpty else { note = "No posts of @\(h) on the page yet."; return note }
         var history = (UserDefaults.standard.dictionary(forKey: Self.historyKey) as? [String: Int]) ?? [:]
-        let doc = XNative.file(handle: h, read: .init(followers: c.followers, following: c.following, posts: Array(merged.values), pinned: c.pinned),
+        let doc = XNative.file(handle: h, read: .init(followers: c.followers, following: c.following, posts: Array(merged.values), pinned: c.pinned, pinnedIDs: c.pinnedIDs),
                                now: .now, today: Date.now.localDay, history: &history)
         UserDefaults.standard.set(history, forKey: Self.historyKey)
         guard let data = try? JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys]) else { return nil }

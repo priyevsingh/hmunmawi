@@ -672,9 +672,19 @@ extension GrowthPage {
             return s.isEmpty ? t : "\(t) · \(s)"
         }
         var rows: [(String, String, String)] = []
-        let pinned = g[path: "pinned"], latest = g[path: "latest_article"]
-        if let p = pinned, p != .null { rows.append(("pin.fill", p[path: "kind"]?.string == "article" ? "Pinned article" : "Pinned post", line(p))) }
-        if let a = latest, a != .null, a[path: "url"] != pinned?[path: "url"] { rows.append(("doc.richtext", "Latest article", line(a))) }
+        var shownURLs: Set<String> = []
+        let pinnedItems = g[path: "pinned_items"]?.array ?? (g[path: "pinned"].flatMap { $0 != .null ? [$0] : nil } ?? [])
+        for p in pinnedItems where p != .null {
+            if let u = p[path: "url"]?.string, !shownURLs.insert(u).inserted { continue }
+            rows.append(("pin.fill", p[path: "kind"]?.string == "article" ? "Pinned article" : "Pinned post", line(p)))
+        }
+        let articles = g[path: "articles"]?.array ?? (g[path: "latest_article"].flatMap { $0 != .null ? [$0] : nil } ?? [])
+        var addedArticle = false
+        for a in articles where a != .null {
+            if let u = a[path: "url"]?.string, !shownURLs.insert(u).inserted { continue }
+            rows.append(("doc.richtext", addedArticle ? "Article" : "Latest article", line(a)))
+            addedArticle = true
+        }
         if let t = g[path: "taking_off"], t != .null {
             rows.append(("flame.fill", "Taking off", line(t)))
         } else if let why = g[path: "taking_off_reason"]?.string {
